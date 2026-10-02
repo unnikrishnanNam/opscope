@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"net/http"
 
 	"opscope/internal/clusters"
@@ -51,6 +52,32 @@ func getOverview(manager *clusters.Manager) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, http.StatusOK, overview)
+	}
+}
+
+// GET /api/clusters/{id}/secrets/{namespace}/{name}/{key}
+//
+// Returns {"value": "...", "base64": false} for one key of one secret. The
+// list endpoint never includes values; this is the only way to read one.
+func getSecretValue(manager *clusters.Manager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cluster, ok := findCluster(w, r, manager)
+		if !ok {
+			return
+		}
+
+		value, err := resources.GetSecretValue(r.Context(), cluster.Client,
+			r.PathValue("namespace"), r.PathValue("name"), r.PathValue("key"))
+		switch {
+		case errors.Is(err, resources.ErrKeyNotFound):
+			writeError(w, http.StatusNotFound, err.Error())
+		case err != nil:
+			writeClusterError(w, err, cluster)
+		default:
+			// Tell the browser (and anything in between) not to keep a copy.
+			w.Header().Set("Cache-Control", "no-store")
+			writeJSON(w, http.StatusOK, value)
+		}
 	}
 }
 

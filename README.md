@@ -117,9 +117,13 @@ The container must be able to reach the cluster's API server. A `server:` addres
 | DELETE | `/api/clusters/{id}`            | Remove a cluster added in the UI                                    |
 | GET    | `/api/clusters/{id}/{resource}` | Rows for one resource type; `?namespace=` to limit to one namespace |
 | GET    | `/api/clusters/{id}/overview`   | Counts, node health and pods by status; `?namespace=` limits the namespaced counts |
+| GET    | `/api/clusters/{id}/secrets/{namespace}/{name}/{key}` | One secret value: `{"value", "base64"}`; sent with `Cache-Control: no-store` |
 
 `{resource}` is one of `namespaces`, `nodes`, `events`, `pods`, `deployments`, `statefulsets`,
-`daemonsets`, `jobs` or `cronjobs` (see `backend/internal/resources/resources.go`). Events are
+`daemonsets`, `jobs`, `cronjobs`, `configmaps`, `secrets`, `services` or `ingresses` (see `backend/internal/resources/resources.go`). Events are
 returned newest first (at most 100) and accept `?type=Warning` or `?type=Normal`.
+
+The secrets list only ever contains key names. A value is sent only by the endpoint above, one key
+at a time, when someone clicks "Reveal" in the UI.
 
 Errors look like `{"error": "readable message", "detail": "original error"}`.

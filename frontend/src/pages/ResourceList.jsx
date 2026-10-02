@@ -4,6 +4,13 @@ import { columns as allColumns } from "../columns.jsx";
 import { clock } from "../format.js";
 import ResourceTable from "../components/ResourceTable.jsx";
 import ErrorBox from "../components/ErrorBox.jsx";
+import SecretKeys from "../components/SecretKeys.jsx";
+
+// Resource types whose rows can be opened to show more. Each entry gets the
+// row and the cluster and returns what to show under the row.
+const expanders = {
+  secrets: (row, cluster) => <SecretKeys cluster={cluster} secret={row} />,
+};
 
 const REFRESH_MS = 10_000;
 
@@ -37,6 +44,7 @@ export default function ResourceList({ page }) {
           columns={columns}
           rows={data}
           noun={noun}
+          expand={expanders[page.resource] && ((row) => expanders[page.resource](row, cluster))}
           emptyText={namespace ? `No ${noun} in ${namespace}.` : `No ${noun} in this cluster.`}
           toolbar={
             <>

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+
 	"opscope/internal/clusters"
 )
 
@@ -127,9 +129,15 @@ func findCluster(w http.ResponseWriter, r *http.Request, manager *clusters.Manag
 }
 
 // writeClusterError reports a failed call to a cluster with a readable
-// explanation and the original error as detail.
+// explanation and the original error as detail. "Not found" from the cluster
+// becomes a 404; anything else is a 502 (we're a gateway to the cluster,
+// and the cluster's side failed).
 func writeClusterError(w http.ResponseWriter, err error, cluster *clusters.Cluster) {
-	writeErrorDetail(w, http.StatusBadGateway, clusters.Explain(err, cluster.Server), err.Error())
+	status := http.StatusBadGateway
+	if apierrors.IsNotFound(err) {
+		status = http.StatusNotFound
+	}
+	writeErrorDetail(w, status, clusters.Explain(err, cluster.Server), err.Error())
 }
 
 // readJSON decodes a JSON request body into dst. On failure it writes a 400

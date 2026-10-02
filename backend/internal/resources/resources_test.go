@@ -2,12 +2,17 @@ package resources
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"strings"
 	"testing"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -324,5 +329,127 @@ func TestOverview(t *testing.T) {
 	}
 	if d := o.Workloads[0]; d.Resource != "deployments" || d.Total != 2 || d.Unhealthy != 1 {
 		t.Errorf("unexpected deployments count: %+v", d)
+	}
+}
+
+func TestSecretListNeverContainsValues(t *testing.T) {
+	client := fake.NewClientset(&corev1.Secret{
+		ObjectMeta: meta("web", "db"),
+		Type:       corev1.SecretTypeOpaque,
+		Data:       map[string][]byte{"password": []byte("hunter2"), "user": []byte("admin")},
+	})
+
+	secrets, err := listSecrets(context.Background(), client, Query{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := secrets[0]; s.Type != "Opaque" || len(s.Keys) != 2 || s.Keys[0] != "password" {
+		t.Errorf("unexpected secret row: %+v", s)
+	}
+
+	// Check the actual JSON the browser would receive.
+	body, _ := json.Marshal(secrets)
+	if strings.Contains(string(body), "hunter2") || strings.Contains(string(body), "aHVudGVyMg") {
+		t.Fatalf("secret value leaked into the list: %s", body)
+	}
+}
+
+func TestGetSecretValue(t *testing.T) {
+	client := fake.NewClientset(&corev1.Secret{
+		ObjectMeta: meta("web", "db"),
+		Data:       map[string][]byte{"password": []byte("hunter2"), "keystore": {0xff, 0xfe, 0x00}},
+	})
+	ctx := context.Background()
+
+	text, err := GetSecretValue(ctx, client, "web", "db", "password")
+	if err != nil || text.Value != "hunter2" || text.Base64 {
+		t.Errorf("password: got %+v, %v", text, err)
+	}
+
+	binary, err := GetSecretValue(ctx, client, "web", "db", "keystore")
+	if err != nil || !binary.Base64 || binary.Value != "//4A" {
+		t.Errorf("keystore: got %+v, %v", binary, err)
+	}
+
+	if _, err := GetSecretValue(ctx, client, "web", "db", "nope"); !errors.Is(err, ErrKeyNotFound) {
+		t.Errorf("missing key: got %v, want ErrKeyNotFound", err)
+	}
+	if _, err := GetSecretValue(ctx, client, "web", "gone", "password"); !apierrors.IsNotFound(err) {
+		t.Errorf("missing secret: got %v, want a NotFound error", err)
+	}
+}
+
+func TestListConfigMapsCountsBothKindsOfKeys(t *testing.T) {
+	client := fake.NewClientset(&corev1.ConfigMap{
+		ObjectMeta: meta("web", "settings"),
+		Data:       map[string]string{"b.conf": "x", "a.conf": "y"},
+		BinaryData: map[string][]byte{"logo.png": {1}},
+	})
+
+	configMaps, err := listConfigMaps(context.Background(), client, Query{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if keys := configMaps[0].Keys; strings.Join(keys, ",") != "a.conf,b.conf,logo.png" {
+		t.Errorf("keys = %v", keys)
+	}
+}
+
+func TestListServices(t *testing.T) {
+	client := fake.NewClientset(
+		&corev1.Service{
+			ObjectMeta: meta("web", "api"),
+			Spec: corev1.ServiceSpec{
+				Type:      corev1.ServiceTypeNodePort,
+				ClusterIP: "10.96.0.10",
+				Ports: []corev1.ServicePort{
+					{Port: 80, NodePort: 30080, Protocol: corev1.ProtocolTCP},
+					{Port: 53, Protocol: corev1.ProtocolUDP},
+				},
+			},
+		},
+		&corev1.Service{
+			ObjectMeta: meta("web", "lb"),
+			Spec:       corev1.ServiceSpec{Type: corev1.ServiceTypeLoadBalancer},
+			Status: corev1.ServiceStatus{LoadBalancer: corev1.LoadBalancerStatus{
+				Ingress: []corev1.LoadBalancerIngress{{IP: "203.0.113.5"}},
+			}},
+		},
+	)
+
+	services, err := listServices(context.Background(), client, Query{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ports := strings.Join(services[0].Ports, " "); ports != "80:30080/TCP 53/UDP" {
+		t.Errorf("ports = %q", ports)
+	}
+	if ips := services[1].ExternalIPs; len(ips) != 1 || ips[0] != "203.0.113.5" {
+		t.Errorf("external IPs = %v", ips)
+	}
+}
+
+func TestListIngresses(t *testing.T) {
+	client := fake.NewClientset(&networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:   "web",
+			Name:        "site",
+			Annotations: map[string]string{"kubernetes.io/ingress.class": "nginx"},
+		},
+		Spec: networkingv1.IngressSpec{
+			TLS: []networkingv1.IngressTLS{{Hosts: []string{"example.com"}}},
+			Rules: []networkingv1.IngressRule{
+				{Host: "example.com"}, {Host: "example.com"}, {Host: ""},
+			},
+		},
+	})
+
+	ingresses, err := listIngresses(context.Background(), client, Query{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ing := ingresses[0]
+	if ing.Class != "nginx" || !ing.TLS || strings.Join(ing.Hosts, ",") != "example.com,*" {
+		t.Errorf("unexpected ingress row: %+v", ing)
 	}
 }

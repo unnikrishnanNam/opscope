@@ -38,6 +38,10 @@ var Listers = map[string]Lister{
 	"daemonsets":   asLister(listDaemonSets),
 	"jobs":         asLister(listJobs),
 	"cronjobs":     asLister(listCronJobs),
+	"configmaps":   asLister(listConfigMaps),
+	"secrets":      asLister(listSecrets),
+	"services":     asLister(listServices),
+	"ingresses":    asLister(listIngresses),
 }
 
 // asLister wraps a typed list function (returning e.g. []Pod) so it fits in

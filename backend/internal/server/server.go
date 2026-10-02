@@ -40,6 +40,9 @@ func New(cfg Config, manager *clusters.Manager, logger *slog.Logger) http.Handle
 	// the one above for /api/clusters/{id}/overview.
 	mux.HandleFunc("GET /api/clusters/{id}/overview", getOverview(manager))
 
+	// One value of one secret, fetched only when the user clicks "Reveal".
+	mux.HandleFunc("GET /api/clusters/{id}/secrets/{namespace}/{name}/{key}", getSecretValue(manager))
+
 	// Any other /api/ path is a 404 in JSON, so the frontend never gets
 	// index.html back when it asked for data.
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {

@@ -17,6 +17,77 @@ const created = {
 const status = { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> };
 
 export const columns = {
+  configmaps: [
+    name,
+    namespace,
+    {
+      key: "keys",
+      label: "Keys",
+      className: "num",
+      render: (row) => <span title={row.keys.join("\n")}>{row.keys.length}</span>,
+      sortValue: (row) => row.keys.length,
+    },
+    created,
+  ],
+
+  secrets: [
+    name,
+    namespace,
+    { key: "type", label: "Type", className: "mono" },
+    {
+      key: "keys",
+      label: "Keys",
+      className: "num",
+      render: (row) => row.keys.length,
+      sortValue: (row) => row.keys.length,
+    },
+    created,
+  ],
+
+  services: [
+    name,
+    namespace,
+    { key: "type", label: "Type" },
+    { key: "clusterIP", label: "Cluster IP", className: "mono" },
+    {
+      key: "externalIPs",
+      label: "External IP",
+      className: "mono",
+      render: (row) => <List items={row.externalIPs} />,
+      sortValue: (row) => row.externalIPs.join(","),
+    },
+    {
+      key: "ports",
+      label: "Ports",
+      className: "mono",
+      render: (row) => <List items={row.ports} />,
+      sortValue: (row) => row.ports.join(","),
+    },
+    created,
+  ],
+
+  ingresses: [
+    name,
+    namespace,
+    { key: "class", label: "Class", render: (row) => row.class || <span className="muted">–</span> },
+    {
+      key: "hosts",
+      label: "Hosts",
+      className: "mono",
+      render: (row) => <List items={row.hosts} />,
+      sortValue: (row) => row.hosts.join(","),
+    },
+    {
+      key: "addresses",
+      label: "Address",
+      className: "mono",
+      render: (row) => <List items={row.addresses} />,
+      sortValue: (row) => row.addresses.join(","),
+    },
+    { key: "tls", label: "TLS", render: (row) => (row.tls ? "Yes" : <span className="muted">No</span>) },
+    created,
+  ],
+
   nodes: [
     name,
     {
@@ -158,6 +229,12 @@ export const columns = {
     created,
   ],
 };
+
+// A list of short values (IPs, ports, hosts) on one line, or a dash.
+function List({ items }) {
+  if (!items?.length) return <span className="muted">–</span>;
+  return items.join(", ");
+}
 
 // key=value pairs as small tags.
 function Labels({ labels }) {

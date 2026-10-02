@@ -928,3 +928,81 @@ code,
 .card .table td:first-child {
   padding-left: 0;
 }
+
+/* ==========================================================================
+   Expandable rows and secret keys (Phase 4)
+   ========================================================================== */
+
+.expand-toggle {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.expand-toggle:hover {
+  color: var(--accent);
+}
+
+.expand-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.chevron {
+  width: 10px;
+  color: var(--ink-faint);
+  font-size: 11px;
+}
+
+.table tr.row-open td {
+  background: #fbfbf9;
+  border-bottom: none;
+}
+
+.table tr.row-panel > td {
+  background: #fbfbf9;
+  padding: var(--space-1) var(--space-3) var(--space-4) 34px;
+  white-space: normal;
+}
+
+.secret-keys .field-hint {
+  margin: 0 0 var(--space-2);
+}
+
+.secret-key {
+  padding: 6px 0;
+  border-top: 1px solid #ecebe6;
+}
+
+.secret-key-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.secret-key-name {
+  min-width: 200px;
+  color: var(--ink);
+}
+
+.secret-mask {
+  color: var(--ink-faint);
+  letter-spacing: 2px;
+}
+
+.secret-value {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) var(--space-3);
+  max-height: 200px;
+  max-width: 900px;
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}

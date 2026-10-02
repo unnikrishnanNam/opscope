@@ -37,6 +37,8 @@ func Explain(err error, server string) string {
 		return "The API server's certificate isn't signed by the CA in the kubeconfig."
 	case apierrors.IsUnauthorized(err):
 		return "The cluster rejected the credentials in the kubeconfig. They may have expired."
+	case apierrors.IsNotFound(err):
+		return "It doesn't exist (any more). It may have just been deleted."
 	case apierrors.IsForbidden(err):
 		return "The credentials work, but this user isn't allowed to read this."
 	case errors.As(err, &netErr), strings.Contains(err.Error(), "connection refused"), strings.Contains(err.Error(), "no such host"):

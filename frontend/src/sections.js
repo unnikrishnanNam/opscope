@@ -29,15 +29,15 @@ export const sections = [
   {
     group: "Config",
     items: [
-      { path: "config/configmaps", label: "ConfigMaps", phase: 4, about: "Plain configuration values used by pods." },
-      { path: "config/secrets", label: "Secrets", phase: 4, about: "Sensitive values. Hidden until you choose to reveal one." },
+      { path: "config/configmaps", resource: "configmaps", label: "ConfigMaps", phase: 4, about: "Plain configuration values used by pods." },
+      { path: "config/secrets", resource: "secrets", label: "Secrets", phase: 4, about: "Sensitive values. Click a name to see its keys; each value stays hidden until you reveal it." },
     ],
   },
   {
     group: "Network",
     items: [
-      { path: "network/services", label: "Services", phase: 4, about: "Stable addresses in front of a set of pods." },
-      { path: "network/ingresses", label: "Ingresses", phase: 4, about: "HTTP routes from outside the cluster to services." },
+      { path: "network/services", resource: "services", label: "Services", phase: 4, about: "Stable addresses in front of a set of pods." },
+      { path: "network/ingresses", resource: "ingresses", label: "Ingresses", phase: 4, about: "HTTP routes from outside the cluster to services." },
     ],
   },
 ];

@@ -130,11 +130,16 @@ Goal: see the cluster at a glance.
 
 Goal: cover the remaining common resource types.
 
-- [ ] ConfigMaps: name, namespace, number of keys, age
-- [ ] Secrets: name, namespace, type, number of keys, age
-- [ ] Secret values hidden by default; revealing a value is an explicit click per key
-- [ ] Services: name, namespace, type, cluster IP, external IP, ports, age
-- [ ] Ingresses: name, namespace, class, hosts, address, age
+- [x] ConfigMaps: name, namespace, number of keys, age
+- [x] Secrets: name, namespace, type, number of keys, age
+- [x] Secret values hidden by default; revealing a value is an explicit click per key
+      (click a secret's name to open its keys; `GET /api/clusters/{id}/secrets/{namespace}/{name}/{key}`)
+- [x] The secrets list never contains values (tested on the JSON); the value endpoint sends `Cache-Control: no-store`
+- [x] Binary secret values are shown as base64 and labelled as such
+- [x] Services: name, namespace, type, cluster IP, external IP, ports, age
+- [x] Ingresses: name, namespace, class, hosts, address, age, TLS
+- [x] A missing object now returns 404 with "It doesn't exist (any more)" instead of a generic 502
+- [x] Go tests for all four listers and secret values
 
 ## Phase 5: Resource details
 
@@ -257,3 +262,18 @@ Things that came up while building, decisions made, and anything that moved betw
   `cluster.name`). Layout now shows "Loading…" until the cluster is known, for every page.
 - Nodes without a role label show "–" in both the Nodes table and the overview (Kubernetes has no
   "worker" role; it's only a convention).
+
+### Phase 4
+
+- Checked against the multipass cluster in the browser and in Docker: 38 ConfigMaps, 20 Secrets
+  (Opaque, TLS and Helm release types) and 22 Services, including NodePorts shown as `80:32049/TCP`.
+  The cluster has no Ingresses (it uses nginx-gateway / the Gateway API), so that page was only seen
+  empty; its logic is covered by unit tests.
+- Reveal was tested on a TLS certificate (`tls.crt`, public by design) so no real secret ended up in
+  screenshots. Only the clicked key was fetched; the other key stayed masked. A revealed value survives
+  the 10-second refresh, and Hide or collapsing the row forgets it.
+- `ResourceTable` gained an optional `expand` prop: rows whose name is clicked open a panel underneath.
+  Secrets use it now; Phase 5's detail view may replace or reuse it.
+- ConfigMaps show only the key count (key names on hover). Their values arrive with the detail view in Phase 5.
+- Gateway API resources (Gateway, HTTPRoute) aren't covered. They'd be a natural addition later, since
+  this cluster uses them instead of Ingress.
