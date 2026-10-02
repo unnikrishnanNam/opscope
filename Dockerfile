@@ -15,14 +15,16 @@ RUN npm run build
 # ---- Stage 2: build the Go server into a single binary ----
 FROM golang:1.26-alpine AS backend
 WORKDIR /src
-COPY backend/go.mod ./
-# go.sum appears once we add dependencies (Phase 1); the wildcard keeps this line valid before then.
-COPY backend/go.su[m] ./
+# Copy only the dependency list first, so the download is cached until it changes.
+COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 COPY backend/ ./
 ARG VERSION=dev
 # CGO_ENABLED=0 gives a static binary that runs on a minimal base image.
 RUN CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=${VERSION}" -o /opscope .
+# An empty folder for saved clusters. The runtime image has no shell to run
+# mkdir, so we create it here and copy it over with the right owner.
+RUN mkdir /empty-data
 
 # ---- Stage 3: the small runtime image ----
 # distroless/static has no shell or package manager, only what a static binary needs.
@@ -30,8 +32,13 @@ FROM gcr.io/distroless/static-debian12:nonroot
 WORKDIR /app
 COPY --from=backend /opscope /app/opscope
 COPY --from=frontend /src/dist /app/web
+# Owned by the nonroot user (uid 65532) so OpScope can write saved clusters.
+# Mount a volume here to keep them across restarts.
+COPY --from=backend --chown=65532:65532 /empty-data /data
 ENV PORT=8080 \
-    STATIC_DIR=/app/web
+    STATIC_DIR=/app/web \
+    DATA_DIR=/data
 EXPOSE 8080
+VOLUME /data
 USER nonroot
 ENTRYPOINT ["/app/opscope"]

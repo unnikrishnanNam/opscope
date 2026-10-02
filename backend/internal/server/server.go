@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
+	"opscope/internal/clusters"
 )
 
 // Config holds the settings the server needs.
@@ -17,11 +19,19 @@ type Config struct {
 }
 
 // New returns an http.Handler with every route registered.
-func New(cfg Config, logger *slog.Logger) http.Handler {
+func New(cfg Config, manager *clusters.Manager, logger *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
 
-	// API routes. Go 1.22+ lets us put the HTTP method in the pattern.
+	// API routes. Go 1.22+ lets us put the HTTP method and {placeholders}
+	// in the pattern; handlers read placeholders with r.PathValue("id").
 	mux.HandleFunc("GET /api/health", healthHandler(cfg.Version))
+
+	mux.HandleFunc("GET /api/clusters", listClusters(manager))
+	mux.HandleFunc("POST /api/clusters", addCluster(manager))
+	mux.HandleFunc("POST /api/clusters/inspect", inspectKubeconfig())
+	mux.HandleFunc("GET /api/clusters/{id}", getCluster(manager))
+	mux.HandleFunc("DELETE /api/clusters/{id}", removeCluster(manager))
+	mux.HandleFunc("GET /api/clusters/{id}/namespaces", listNamespaces(manager))
 
 	// Any other /api/ path is a 404 in JSON, so the frontend never gets
 	// index.html back when it asked for data.
@@ -45,6 +55,12 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 // writeError sends an error in the shape {"error": "..."}.
 func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]string{"error": message})
+}
+
+// writeErrorDetail is like writeError but adds the raw error as "detail",
+// for errors where the friendly message hides useful specifics.
+func writeErrorDetail(w http.ResponseWriter, status int, message, detail string) {
+	writeJSON(w, status, map[string]string{"error": message, "detail": detail})
 }
 
 // logRequests is a middleware: it wraps another handler and logs one line

@@ -1,7 +1,8 @@
 // OpScope is a small, read-only Kubernetes dashboard.
 //
 // This file is the entry point: it reads configuration from environment
-// variables, builds the HTTP server and starts listening.
+// variables, loads the known clusters, builds the HTTP server and starts
+// listening.
 package main
 
 import (
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"os"
 
+	"opscope/internal/clusters"
 	"opscope/internal/server"
 )
 
@@ -25,10 +27,32 @@ func main() {
 		StaticDir: getEnv("STATIC_DIR", "../frontend/dist"),
 	}
 	addr := ":" + getEnv("PORT", "8080")
+	dataDir := getEnv("DATA_DIR", "../data")
 
-	logger.Info("starting opscope", "addr", addr, "version", version, "static_dir", cfg.StaticDir)
+	logger.Info("starting opscope", "addr", addr, "version", version, "static_dir", cfg.StaticDir, "data_dir", dataDir)
 
-	handler := server.New(cfg, logger)
+	manager := clusters.NewManager(dataDir)
+
+	// 1. A cluster from the environment, if one is configured. A broken
+	//    setting here is a mistake by whoever started OpScope, so we stop
+	//    with a clear message instead of starting half-configured.
+	if path := os.Getenv("OPSCOPE_KUBECONFIG"); path != "" {
+		cluster, err := manager.LoadFromFile(path, os.Getenv("OPSCOPE_CONTEXT"), os.Getenv("OPSCOPE_CLUSTER_NAME"))
+		if err != nil {
+			logger.Error("can't load OPSCOPE_KUBECONFIG", "path", path, "error", err)
+			os.Exit(1)
+		}
+		logger.Info("loaded cluster from environment", "id", cluster.ID, "server", cluster.Server)
+	}
+
+	// 2. Clusters that were added in the UI earlier.
+	for _, err := range manager.LoadSaved() {
+		logger.Warn("skipping saved cluster", "error", err)
+	}
+
+	logger.Info("clusters ready", "count", len(manager.List()))
+
+	handler := server.New(cfg, manager, logger)
 	if err := http.ListenAndServe(addr, handler); err != nil {
 		logger.Error("server stopped", "error", err)
 		os.Exit(1)

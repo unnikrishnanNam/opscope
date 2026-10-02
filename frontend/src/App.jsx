@@ -1,27 +1,34 @@
 import { Navigate, Route, Routes } from "react-router";
-import Sidebar from "./components/Sidebar.jsx";
-import TopBar from "./components/TopBar.jsx";
+import Layout from "./components/Layout.jsx";
+import Home from "./pages/Home.jsx";
+import ManageClusters from "./pages/ManageClusters.jsx";
+import AddCluster from "./pages/AddCluster.jsx";
 import Placeholder from "./pages/Placeholder.jsx";
 import NotFound from "./pages/NotFound.jsx";
 import { allPages } from "./sections.js";
 
-// The app shell: sidebar on the left, top bar and page content on the right.
+// All routes. Every page renders inside <Layout> (sidebar + top bar).
+//
+//   /                         picks a cluster, or sends you to "Add a cluster"
+//   /clusters                 list and remove clusters
+//   /clusters/add             add a cluster
+//   /c/:clusterId/<page>      a page for one cluster, e.g. /c/lab/workloads/pods
+//   ...?ns=default            the selected namespace (none = all namespaces)
 export default function App() {
   return (
-    <div className="shell">
-      <Sidebar />
-      <div className="main">
-        <TopBar />
-        <main className="content">
-          <Routes>
-            <Route path="/" element={<Navigate to="/overview" replace />} />
-            {allPages.map((page) => (
-              <Route key={page.path} path={page.path} element={<Placeholder page={page} />} />
-            ))}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </main>
-      </div>
-    </div>
+    <Routes>
+      <Route element={<Layout />}>
+        <Route index element={<Home />} />
+        <Route path="clusters" element={<ManageClusters />} />
+        <Route path="clusters/add" element={<AddCluster />} />
+        <Route path="c/:clusterId">
+          <Route index element={<Navigate to="overview" replace />} />
+          {allPages.map((page) => (
+            <Route key={page.path} path={page.path} element={<Placeholder page={page} />} />
+          ))}
+        </Route>
+        <Route path="*" element={<NotFound />} />
+      </Route>
+    </Routes>
   );
 }

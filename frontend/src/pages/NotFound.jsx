@@ -5,7 +5,7 @@ export default function NotFound() {
     <section>
       <h1 className="page-title">Page not found</h1>
       <p className="page-about">
-        There is nothing at this address. <Link to="/overview">Go to the overview</Link>.
+        There is nothing at this address. <Link to="/">Go to the start</Link>.
       </p>
     </section>
   );

@@ -1,42 +1,26 @@
-import { useEffect, useState } from "react";
+import { useApi } from "../api.js";
 
 const CHECK_EVERY_MS = 15_000;
 
-// Calls /api/health on load and every 15 seconds, and shows whether the
-// backend answered.
+// Shows whether the OpScope backend answers, and its version.
+// (This is about OpScope itself, not about a cluster.)
 export default function HealthBadge() {
-  // "checking" until the first answer, then "ok" or "down".
-  const [state, setState] = useState("checking");
-  const [version, setVersion] = useState("");
+  const { data, error } = useApi("/health", { refreshMs: CHECK_EVERY_MS });
 
-  useEffect(() => {
-    async function check() {
-      try {
-        const res = await fetch("/api/health");
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const body = await res.json();
-        setVersion(body.version);
-        setState("ok");
-      } catch {
-        setState("down");
-      }
-    }
-
-    check();
-    const timer = setInterval(check, CHECK_EVERY_MS);
-    return () => clearInterval(timer); // stop when the component goes away
-  }, []);
-
-  const label = {
-    checking: "Checking API",
-    ok: `API ok · ${version}`,
-    down: "API unreachable",
-  }[state];
+  let state = "checking";
+  let label = "Checking server";
+  if (error) {
+    state = "down";
+    label = "Server unreachable";
+  } else if (data) {
+    state = "ok";
+    label = `OpScope ${data.version}`;
+  }
 
   return (
-    <span className={`badge badge-${state}`}>
+    <div className={`health health-${state}`}>
       <span className="dot" />
       {label}
-    </span>
+    </div>
   );
 }

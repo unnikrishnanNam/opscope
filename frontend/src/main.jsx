@@ -12,11 +12,14 @@ import "@fontsource/ibm-plex-mono/500.css";
 
 import "./styles.css";
 import App from "./App.jsx";
+import { ClustersProvider } from "./clusters.jsx";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <BrowserRouter>
-      <App />
+      <ClustersProvider>
+        <App />
+      </ClustersProvider>
     </BrowserRouter>
   </StrictMode>,
 );

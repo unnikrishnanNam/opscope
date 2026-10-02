@@ -113,9 +113,27 @@ a {
 .sidebar {
   width: var(--sidebar-width);
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
   background: var(--sidebar);
   border-right: 1px solid var(--border);
+}
+
+.sidebar-nav {
+  flex: 1;
   overflow-y: auto;
+  padding-bottom: var(--space-4);
+}
+
+.sidebar-empty {
+  margin: var(--space-4);
+  color: var(--ink-faint);
+  font-size: var(--text-sm);
+}
+
+.sidebar-footer {
+  padding: var(--space-2);
+  border-top: 1px solid var(--border);
 }
 
 .brand {
@@ -128,6 +146,8 @@ a {
   font-weight: 600;
   font-size: 15px;
   letter-spacing: -0.01em;
+  color: var(--ink);
+  text-decoration: none;
 }
 
 .nav-group {
@@ -277,4 +297,299 @@ a {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   white-space: nowrap;
+}
+
+/* OpScope server status, in the sidebar footer */
+
+.health {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: var(--space-2) var(--space-2) var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+.health .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+}
+
+.health-ok .dot {
+  background: var(--ok);
+}
+
+.health-down {
+  color: var(--bad);
+}
+
+.health-down .dot {
+  background: var(--bad);
+}
+
+/* ==========================================================================
+   Form controls
+   ========================================================================== */
+
+.picker {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.picker-label {
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+.input,
+.select {
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 5px var(--space-2);
+}
+
+.input:focus,
+.select:focus,
+.button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.select {
+  appearance: none;
+  padding-right: 26px;
+  max-width: 220px;
+  /* A small chevron drawn with an inline SVG. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2380858c' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  cursor: pointer;
+}
+
+.select:disabled {
+  color: var(--ink-faint);
+  cursor: default;
+}
+
+.textarea {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px var(--space-3);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.button:hover {
+  background: var(--bg);
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.button-primary {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.button-primary:hover {
+  background: #163256;
+}
+
+.button-quiet {
+  padding: 3px var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+
+/* ==========================================================================
+   Forms
+   ========================================================================== */
+
+.narrow {
+  max-width: 640px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.field-label {
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.field .select {
+  max-width: none;
+}
+
+.field-hint {
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+  line-height: 1.6;
+}
+
+.field-error {
+  font-size: var(--text-sm);
+  color: var(--bad);
+}
+
+code,
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+/* ==========================================================================
+   Messages
+   ========================================================================== */
+
+.error-box {
+  margin-bottom: var(--space-6);
+  padding: var(--space-3) var(--space-4);
+  max-width: 760px;
+  background: var(--bad-soft);
+  border: 1px solid #e7c3bf;
+  border-left: 3px solid var(--bad);
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+}
+
+.error-title {
+  font-weight: 600;
+  color: var(--bad);
+  margin-bottom: 2px;
+}
+
+.error-box details {
+  margin-top: var(--space-2);
+  color: var(--ink-soft);
+}
+
+.error-box summary {
+  cursor: pointer;
+  font-size: var(--text-xs);
+}
+
+.error-box code {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  word-break: break-all;
+}
+
+.empty {
+  padding: var(--space-6);
+  background: var(--surface);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+
+/* ==========================================================================
+   Tables
+   ========================================================================== */
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: var(--text-sm);
+}
+
+.table th {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--ink-faint);
+  background: #fafaf8;
+  border-bottom: 1px solid var(--border);
+}
+
+.table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid #ecebe6;
+  vertical-align: middle;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.table a {
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.table a:hover {
+  text-decoration: underline;
+}
+
+.table td.mono {
+  white-space: nowrap;
+}
+
+.table .actions {
+  text-align: right;
+}
+
+.tag {
+  display: inline-block;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
 }
