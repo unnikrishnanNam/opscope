@@ -8,6 +8,7 @@ import (
 
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -102,26 +103,36 @@ func checkSafeForUpload(config *clientcmdapi.Config) error {
 	return nil
 }
 
-// newClient builds the two Kubernetes clients for the current context of
-// config. It does not contact the cluster yet.
-//
-//   - kube is the typed client: Go structs for built-in kinds (Pods, Services, ...)
-//   - dyn is the dynamic client: works with any kind, including custom
-//     resources like Gateway API objects, as plain maps
-func newClient(config *clientcmdapi.Config) (kube *kubernetes.Clientset, dyn *dynamic.DynamicClient, host string, err error) {
+// clientSet holds the clients OpScope keeps for one cluster.
+type clientSet struct {
+	kube   *kubernetes.Clientset  // typed: Go structs for built-in kinds (Pods, Services, ...)
+	dyn    *dynamic.DynamicClient // dynamic: any kind as plain maps, incl. custom resources
+	stream *kubernetes.Clientset  // typed, but with no timeout: for long streams like following logs
+}
+
+// newClients builds the clients for the current context of config. It does
+// not contact the cluster yet. It also returns the API server address.
+func newClients(config *clientcmdapi.Config) (clientSet, string, error) {
 	restConfig, err := clientcmd.NewDefaultClientConfig(*config, &clientcmd.ConfigOverrides{}).ClientConfig()
 	if err != nil {
-		return nil, nil, "", fmt.Errorf("can't build a client from this kubeconfig: %w", err)
+		return clientSet{}, "", fmt.Errorf("can't build a client from this kubeconfig: %w", err)
 	}
+
+	// The stream client is a copy made before the timeout is set: a timeout
+	// covers the whole response, which would cut a log stream after 10 seconds.
+	// Streams end instead when the browser goes away (the request context).
+	streamConfig := rest.CopyConfig(restConfig)
 	restConfig.Timeout = requestTimeout
 
-	kube, err = kubernetes.NewForConfig(restConfig)
-	if err != nil {
-		return nil, nil, "", err
+	var c clientSet
+	if c.kube, err = kubernetes.NewForConfig(restConfig); err != nil {
+		return clientSet{}, "", err
 	}
-	dyn, err = dynamic.NewForConfig(restConfig)
-	if err != nil {
-		return nil, nil, "", err
+	if c.dyn, err = dynamic.NewForConfig(restConfig); err != nil {
+		return clientSet{}, "", err
 	}
-	return kube, dyn, restConfig.Host, nil
+	if c.stream, err = kubernetes.NewForConfig(streamConfig); err != nil {
+		return clientSet{}, "", err
+	}
+	return c, restConfig.Host, nil
 }

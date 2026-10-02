@@ -95,6 +95,24 @@ Open http://localhost:8080. Saved clusters are kept in the `opscope-data` Docker
 The container must be able to reach the cluster's API server. A `server:` address of
 `127.0.0.1` or `localhost` in the kubeconfig points at the container itself, not your machine.
 
+### Using a kind cluster with Docker
+
+kind clusters run in Docker and publish their API server on your machine's `127.0.0.1`, which a
+container can't reach. Put OpScope on kind's Docker network instead, and use the kubeconfig kind
+writes for that network (it uses the node's container name, which kind's certificate includes):
+
+```bash
+kind get kubeconfig --internal --name <cluster> > data/kind.internal.kubeconfig
+```
+
+Then either start OpScope with `--network kind` added to `docker run`, or connect a running one:
+
+```bash
+docker network connect kind <opscope-container>
+```
+
+When OpScope runs directly on your machine (`make dev-backend`), the normal kubeconfig works.
+
 ## Configuration
 
 | Variable                 | Default              | What it does                                                   |
@@ -119,6 +137,9 @@ The container must be able to reach the cluster's API server. A `server:` addres
 | GET    | `/api/clusters/{id}/{resource}` | Rows for one resource type; `?namespace=` to limit to one namespace |
 | GET    | `/api/clusters/{id}/overview`   | Counts, node health and pods by status; `?namespace=` limits the namespaced counts |
 | GET    | `/api/clusters/{id}/secrets/{namespace}/{name}/{key}` | One secret value: `{"value", "base64"}`; sent with `Cache-Control: no-store` |
+| GET    | `/api/clusters/{id}/{resource}/{namespace}/{name}` | One object: summary fields, containers, conditions, tables, events, YAML |
+| GET    | `/api/clusters/{id}/{resource}/{name}` | The same for cluster-wide kinds (nodes, namespaces, gatewayclasses) |
+| GET    | `/api/clusters/{id}/pods/{namespace}/{name}/logs` | Plain-text logs; `?container=`, `?tail=` (default 500, max 10000), `?previous=true`, `?follow=true` streams |
 
 `{resource}` is one of `namespaces`, `nodes`, `events`, `pods`, `deployments`, `statefulsets`,
 `daemonsets`, `jobs`, `cronjobs`, `configmaps`, `secrets`, `services`, `ingresses`, `gateways`,
@@ -128,6 +149,10 @@ returned newest first (at most 100) and accept `?type=Warning` or `?type=Normal`
 Gateway API types are read with client-go's dynamic client (`gateway.networking.k8s.io/v1`). On a
 cluster without Gateway API they answer `404` with `"code": "not_installed"`, and the overview's
 `gatewayAPI` field is `null`.
+
+Secret detail pages show key names too; their YAML has every value replaced with
+`(hidden, about N bytes)` and leaves out kubectl's `last-applied-configuration` annotation,
+which would otherwise contain the values.
 
 The secrets list only ever contains key names. A value is sent only by the endpoint above, one key
 at a time, when someone clicks "Reveal" in the UI.

@@ -43,6 +43,13 @@ func New(cfg Config, manager *clusters.Manager, logger *slog.Logger) http.Handle
 	// One value of one secret, fetched only when the user clicks "Reveal".
 	mux.HandleFunc("GET /api/clusters/{id}/secrets/{namespace}/{name}/{key}", getSecretValue(manager))
 
+	// One object's details: with a namespace, or without for cluster-wide kinds.
+	mux.HandleFunc("GET /api/clusters/{id}/{resource}/{namespace}/{name}", getDetail(manager))
+	mux.HandleFunc("GET /api/clusters/{id}/{resource}/{name}", getDetail(manager))
+
+	// A pod's logs, streamed as plain text.
+	mux.HandleFunc("GET /api/clusters/{id}/pods/{namespace}/{name}/logs", streamLogs(manager))
+
 	// Any other /api/ path is a 404 in JSON, so the frontend never gets
 	// index.html back when it asked for data.
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
@@ -101,4 +108,10 @@ type statusRecorder struct {
 func (s *statusRecorder) WriteHeader(code int) {
 	s.status = code
 	s.ResponseWriter.WriteHeader(code)
+}
+
+// Unwrap gives access to the original ResponseWriter. http.ResponseController
+// uses it to reach the real writer's Flush, which streaming logs need.
+func (s *statusRecorder) Unwrap() http.ResponseWriter {
+	return s.ResponseWriter
 }

@@ -49,3 +49,22 @@ export const sections = [
 export const allPages = sections.flatMap((section) =>
   section.items.map((item) => ({ ...item, group: section.group })),
 );
+
+// detailPath builds the URL of one object's detail page, e.g.
+// detailPath("lab", "pods", "web", "api-1") -> "/c/lab/workloads/pods/web/api-1".
+// Cluster-wide kinds (like nodes) have no namespace in the URL.
+// Returns null for kinds without a page.
+export function detailPath(clusterId, resource, namespace, name) {
+  const page = allPages.find((p) => p.resource === resource);
+  if (!page) return null;
+  const parts = page.clusterScoped ? [name] : [namespace, name];
+  return `/c/${clusterId}/${page.path}/${parts.map(encodeURIComponent).join("/")}`;
+}
+
+// nsQuery keeps only the namespace from a query string, for links that
+// should remember the selected namespace but nothing page-specific:
+// nsQuery("?ns=web&tab=logs") -> "?ns=web".
+export function nsQuery(search) {
+  const ns = new URLSearchParams(search).get("ns");
+  return ns ? `?ns=${encodeURIComponent(ns)}` : "";
+}

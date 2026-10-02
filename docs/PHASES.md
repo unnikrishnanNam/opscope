@@ -174,13 +174,20 @@ controller-specific resources (like `gateway.nginx.org` policies). They'd follow
 
 Goal: click any row to see more about it.
 
-- [ ] `GET /api/clusters/{id}/{resource}/{namespace}/{name}` returns details for one object
-- [ ] Detail panel: metadata, labels, annotations, owner references
-- [ ] Type-specific sections (containers for pods, replica info for deployments, keys for ConfigMaps, ...)
-- [ ] YAML view (read-only, with managed fields removed)
-- [ ] Events for the object
-- [ ] Pod logs: pick a container, show the last N lines, optional follow (streamed)
-- [ ] Works for Gateway API objects too (Gateway listeners and conditions; HTTPRoute rules with
+- [x] `GET /api/clusters/{id}/{resource}/{namespace}/{name}` returns details for one object
+      (and `/{resource}/{name}` for cluster-wide kinds like nodes)
+- [x] Every kind is fetched the same way, with the dynamic client; kind-specific sections convert to typed structs
+- [x] Detail panel: metadata, labels, annotations, owner references
+- [x] Type-specific sections (containers for pods, replica info for deployments, keys for ConfigMaps, ...)
+- [x] YAML view (read-only, with managed fields removed)
+- [x] Secrets: YAML values replaced with a placeholder, and the `last-applied-configuration` annotation dropped
+      (kubectl stores the full Secret, values included, in it)
+- [x] Events for the object
+- [x] Pod logs: pick a container, show the last N lines, optional follow (streamed)
+- [x] "Previous run" logs, for seeing why a crash-looping container died
+- [x] Table names link to detail pages; owners and events link to their objects when OpScope has a page for them
+- [x] Go tests: secret redaction, pod containers and conditions, HTTPRoute rules and per-gateway status
+- [x] Works for Gateway API objects too (Gateway listeners and conditions; HTTPRoute rules with
       their matches and backends)
 
 ## Phase 7: Live resource usage
@@ -347,3 +354,27 @@ Things that came up while building, decisions made, and anything that moved betw
 - Testing on a narrow window there showed two overview layout bugs, now fixed: long node names wrapped
   onto several lines (now cut off with "…", full name on hover), and the warnings table spilled out
   of its card (now scrolls inside it).
+
+### Phase 6
+
+- Checked in the browser and in Docker against both clusters: a crash-looping pod (state, last exit
+  code, 616 restarts, conditions, events, current and previous logs), a node (resources in GiB,
+  conditions), an HTTPRoute (rules, status per gateway), a Gateway, a Service, a Secret (keys with
+  Reveal; YAML shows only placeholders) and a ConfigMap (data).
+- Log following was checked with a small pod printing a line every 2 seconds in the `opscope-test`
+  kind cluster (deleted afterwards): new lines arrived live, the stream stayed open well past
+  10 seconds, and it closed on the server as soon as the tab was left (27 s request in the log).
+- Each cluster now has a third client without a timeout, used only for log streams. The normal
+  clients keep their 10-second timeout, which would otherwise cut a followed log stream short.
+- The request-logging middleware's wrapper got an `Unwrap()` method, so `http.ResponseController`
+  can reach the real writer to flush each log chunk.
+- The detail page is a route (`/c/<id>/<page>/<namespace>/<name>`), not a side panel, so it can be
+  linked to and the back button works. The open tab is kept in the URL (`?tab=logs`).
+- The Phase 4 expandable Secret rows were replaced by the detail page, which shows the keys with
+  Reveal; `ResourceTable` now has a `linkTo` prop instead of `expand`.
+- Fixed along the way: navigation links copied the whole query string (so `?tab=logs` followed you
+  to other pages); they now keep only `?ns`. The breadcrumb also crashed on a fresh page load before
+  the cluster list arrived.
+- Spotted while testing: argocd-server on the multipass cluster crash-loops with
+  `the server could not find the requested resource (post appprojects.argoproj.io)`, which points
+  at a missing or outdated Argo CD `AppProject` CRD.

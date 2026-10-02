@@ -1,7 +1,7 @@
-import { useLocation, useNavigate, useSearchParams } from "react-router";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { useApi } from "../api.js";
 import { useClusters } from "../clusters.jsx";
-import { allPages } from "../sections.js";
+import { allPages, nsQuery } from "../sections.js";
 
 // Crumbs for pages that don't belong to a cluster.
 const otherPages = {
@@ -10,8 +10,12 @@ const otherPages = {
 };
 
 export default function TopBar({ cluster, pagePath, status }) {
-  const { pathname } = useLocation();
-  const page = allPages.find((p) => p.path === pagePath);
+  const { pathname, search: fullSearch } = useLocation();
+  const search = nsQuery(fullSearch);
+  // The page this URL belongs to: "workloads/pods" itself, or a detail page
+  // under it like "workloads/pods/web/api-1".
+  const page = allPages.find((p) => pagePath === p.path || pagePath?.startsWith(p.path + "/"));
+  const objectName = page && pagePath !== page.path ? decodeURIComponent(pagePath.split("/").pop()) : null;
   const [group, label] = page ? [page.group, page.label] : (otherPages[pathname] ?? [null, null]);
 
   return (
@@ -23,11 +27,23 @@ export default function TopBar({ cluster, pagePath, status }) {
             <span className="crumb-sep">/</span>
           </>
         )}
-        <span className="crumb-page">{label}</span>
+        {/* `cluster` is still undefined for a moment while the cluster list loads. */}
+        {objectName && cluster ? (
+          <>
+            <Link className="crumb-link" to={{ pathname: `/c/${cluster.id}/${page.path}`, search }}>
+              {label}
+            </Link>
+            <span className="crumb-sep">/</span>
+            <span className="crumb-page">{objectName}</span>
+          </>
+        ) : (
+          <span className="crumb-page">{label}</span>
+        )}
       </div>
 
       <div className="topbar-right">
-        <ClusterSwitcher cluster={cluster} pagePath={pagePath} />
+        {/* Switching cluster from a detail page goes to the list: the object is in the old cluster. */}
+        <ClusterSwitcher cluster={cluster} pagePath={page?.path ?? pagePath} />
         {cluster && (
           <NamespacePicker cluster={cluster} reachable={status?.data?.reachable} clusterScoped={page?.clusterScoped} />
         )}

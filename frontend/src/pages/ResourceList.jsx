@@ -1,16 +1,10 @@
-import { useOutletContext, useSearchParams } from "react-router";
+import { useLocation, useOutletContext, useSearchParams } from "react-router";
 import { useApi } from "../api.js";
 import { columns as allColumns } from "../columns.jsx";
 import { clock } from "../format.js";
 import ResourceTable from "../components/ResourceTable.jsx";
 import ErrorBox from "../components/ErrorBox.jsx";
-import SecretKeys from "../components/SecretKeys.jsx";
-
-// Resource types whose rows can be opened to show more. Each entry gets the
-// row and the cluster and returns what to show under the row.
-const expanders = {
-  secrets: (row, cluster) => <SecretKeys cluster={cluster} secret={row} />,
-};
+import { detailPath, nsQuery } from "../sections.js";
 
 const REFRESH_MS = 10_000;
 
@@ -20,6 +14,7 @@ export default function ResourceList({ page }) {
   // Layout passes the selected cluster down through the router's <Outlet>.
   const { cluster, reachable } = useOutletContext();
   const [searchParams] = useSearchParams();
+  const search = nsQuery(useLocation().search); // detail links keep ?ns
   // Cluster-scoped resources (like nodes) ignore the namespace picker.
   const namespace = page.clusterScoped ? "" : (searchParams.get("ns") ?? "");
 
@@ -51,7 +46,7 @@ export default function ResourceList({ page }) {
           columns={columns}
           rows={data}
           noun={noun}
-          expand={expanders[page.resource] && ((row) => expanders[page.resource](row, cluster))}
+          linkTo={(row) => detailPath(cluster.id, page.resource, row.namespace, row.name) + search}
           emptyText={namespace ? `No ${noun} in ${namespace}.` : `No ${noun} in this cluster.`}
           toolbar={
             <>

@@ -1,12 +1,12 @@
 import { Link, NavLink, useLocation } from "react-router";
-import { sections } from "../sections.js";
+import { nsQuery, sections } from "../sections.js";
 import HealthBadge from "./HealthBadge.jsx";
 
 // Left-hand navigation. `clusterId` is the cluster the links point to;
 // without one there is nothing to browse yet.
 export default function Sidebar({ clusterId }) {
   // Keep ?ns=... when moving between pages, so the namespace stays selected.
-  const { search } = useLocation();
+  const search = nsQuery(useLocation().search);
 
   return (
     <aside className="sidebar">

@@ -1,4 +1,5 @@
-import { Fragment, useState } from "react";
+import { useState } from "react";
+import { Link } from "react-router";
 
 // A table for any list of resources, with a text filter and sortable columns.
 //
@@ -11,16 +12,11 @@ import { Fragment, useState } from "react";
 //
 // The filter matches the text of the name and every plain-text column.
 //
-// With `expand`, a (row) => JSX function, clicking a row's name opens a
-// panel under that row (used to show a secret's keys).
-export default function ResourceTable({ columns, rows, noun, emptyText, toolbar, expand }) {
+// With `linkTo`, a (row) => URL function, the first column links to that
+// URL (each object's detail page).
+export default function ResourceTable({ columns, rows, noun, emptyText, toolbar, linkTo }) {
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState(null); // { key, ascending } or null for the server's order
-  const [open, setOpen] = useState({}); // row key -> true when expanded
-
-  function toggleOpen(key) {
-    setOpen((prev) => ({ ...prev, [key]: !prev[key] }));
-  }
 
   const visible = sortRows(filterRows(rows ?? [], columns, filter), columns, sort);
 
@@ -62,39 +58,18 @@ export default function ResourceTable({ columns, rows, noun, emptyText, toolbar,
             </tr>
           </thead>
           <tbody>
-            {visible.map((row) => {
-              const key = `${row.namespace ?? ""}/${row.name}`;
-              const isOpen = expand && open[key];
-              return (
-                // A Fragment groups the row and its optional panel without adding a DOM element.
-                <Fragment key={key}>
-                  <tr className={isOpen ? "row-open" : undefined}>
-                    {columns.map((col, i) => {
-                      const content = col.render ? col.render(row) : row[col.key];
-                      return (
-                        <td key={col.key} className={col.className}>
-                          {expand && i === 0 ? (
-                            <button type="button" className="expand-toggle" aria-expanded={!!isOpen} onClick={() => toggleOpen(key)}>
-                              <span className="chevron" aria-hidden="true">
-                                {isOpen ? "▾" : "▸"}
-                              </span>
-                              {content}
-                            </button>
-                          ) : (
-                            content
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                  {isOpen && (
-                    <tr className="row-panel">
-                      <td colSpan={columns.length}>{expand(row)}</td>
-                    </tr>
-                  )}
-                </Fragment>
-              );
-            })}
+            {visible.map((row) => (
+              <tr key={`${row.namespace ?? ""}/${row.name}`}>
+                {columns.map((col, i) => {
+                  const content = col.render ? col.render(row) : row[col.key];
+                  return (
+                    <td key={col.key} className={col.className}>
+                      {linkTo && i === 0 ? <Link to={linkTo(row)}>{content}</Link> : content}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
             {rows && visible.length === 0 && (
               <tr>
                 <td colSpan={columns.length} className="table-empty">

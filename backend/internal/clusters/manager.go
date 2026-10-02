@@ -39,6 +39,7 @@ type Cluster struct {
 
 	Client  *kubernetes.Clientset `json:"-"` // typed client for built-in kinds
 	Dynamic dynamic.Interface     `json:"-"` // dynamic client for custom resources (Gateway API)
+	Stream  *kubernetes.Clientset `json:"-"` // typed client without a timeout, for log streams
 }
 
 // savedCluster is the file format for clusters added in the UI.
@@ -82,7 +83,7 @@ func (m *Manager) LoadFromFile(path, contextName, name string) (*Cluster, error)
 		return nil, err
 	}
 
-	client, dyn, server, err := newClient(config)
+	clients, server, err := newClients(config)
 	if err != nil {
 		return nil, err
 	}
@@ -96,8 +97,9 @@ func (m *Manager) LoadFromFile(path, contextName, name string) (*Cluster, error)
 		Source:  SourceEnv,
 		Context: config.CurrentContext,
 		Server:  server,
-		Client:  client,
-		Dynamic: dyn,
+		Client:  clients.kube,
+		Dynamic: clients.dyn,
+		Stream:  clients.stream,
 	}
 	m.mu.Lock()
 	m.clusters[cluster.ID] = cluster
@@ -135,7 +137,7 @@ func (m *Manager) loadSavedFile(file string) error {
 	if err != nil {
 		return err
 	}
-	client, dyn, server, err := newClient(config)
+	clients, server, err := newClients(config)
 	if err != nil {
 		return err
 	}
@@ -151,8 +153,9 @@ func (m *Manager) loadSavedFile(file string) error {
 		Source:  SourceUI,
 		Context: saved.Context,
 		Server:  server,
-		Client:  client,
-		Dynamic: dyn,
+		Client:  clients.kube,
+		Dynamic: clients.dyn,
+		Stream:  clients.stream,
 	}
 	return nil
 }
@@ -184,7 +187,7 @@ func (m *Manager) Add(name string, kubeconfig []byte, contextName string) (*Clus
 		return nil, err
 	}
 
-	client, dyn, server, err := newClient(config)
+	clients, server, err := newClients(config)
 	if err != nil {
 		return nil, err
 	}
@@ -194,8 +197,9 @@ func (m *Manager) Add(name string, kubeconfig []byte, contextName string) (*Clus
 		Source:  SourceUI,
 		Context: config.CurrentContext,
 		Server:  server,
-		Client:  client,
-		Dynamic: dyn,
+		Client:  clients.kube,
+		Dynamic: clients.dyn,
+		Stream:  clients.stream,
 	}
 
 	// Only save clusters we can actually talk to.

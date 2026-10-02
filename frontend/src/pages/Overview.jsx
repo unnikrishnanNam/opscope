@@ -1,9 +1,11 @@
 import { Link, useLocation, useOutletContext, useParams, useSearchParams } from "react-router";
 import { useApi } from "../api.js";
-import { age, clock } from "../format.js";
+import { clock } from "../format.js";
 import ErrorBox from "../components/ErrorBox.jsx";
 import PodStatusBar from "../components/PodStatusBar.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
+import EventsTable from "../components/EventsTable.jsx";
+import { detailPath, nsQuery } from "../sections.js";
 
 const REFRESH_MS = 10_000;
 const WARNINGS_SHOWN = 8;
@@ -89,7 +91,7 @@ export default function Overview({ page }) {
 
             <div className="card">
               <h2 className="card-title">Nodes</h2>
-              <NodeList nodes={nodes.data} />
+              <NodeList nodes={nodes.data} clusterId={cluster.id} />
             </div>
           </div>
         </>
@@ -103,7 +105,12 @@ export default function Overview({ page }) {
               <span className="muted"> · newest {WARNINGS_SHOWN} of {warnings.data.length}</span>
             )}
           </h2>
-          <WarningList events={warnings.data.slice(0, WARNINGS_SHOWN)} showNamespace={!namespace} />
+          <EventsTable
+            clusterId={cluster.id}
+            events={warnings.data.slice(0, WARNINGS_SHOWN)}
+            showNamespace={!namespace}
+            emptyText="No warnings. Nothing has complained recently."
+          />
         </div>
       )}
     </section>
@@ -120,7 +127,7 @@ function unhealthyPods(byStatus) {
 // A count with a label; links to its page when `to` is given.
 function Tile({ to, label, value, children }) {
   const { clusterId } = useParams();
-  const { search } = useLocation(); // keep ?ns=... when following the link
+  const search = nsQuery(useLocation().search); // keep ?ns=... when following the link
   const body = (
     <>
       <div className="tile-label">{label}</div>
@@ -149,58 +156,20 @@ function Health({ bad, problem, okText }) {
   return <span className="muted">{okText}</span>;
 }
 
-function NodeList({ nodes }) {
+function NodeList({ nodes, clusterId }) {
   if (!nodes) return <p className="muted">Loading…</p>;
   return (
     <ul className="node-list">
       {nodes.map((n) => (
         <li key={n.name}>
-          <span className="node-name" title={n.name}>
+          <Link className="node-name" title={n.name} to={detailPath(clusterId, "nodes", "", n.name)}>
             {n.name}
-          </span>
+          </Link>
           <span className="muted">{n.roles.join(", ") || "–"}</span>
           <span className="mono muted">{n.version}</span>
           <StatusBadge status={n.status} />
         </li>
       ))}
     </ul>
-  );
-}
-
-function WarningList({ events, showNamespace }) {
-  if (events.length === 0) return <p className="muted">No warnings. Nothing has complained recently.</p>;
-  return (
-    // On narrow screens the table scrolls sideways inside the card instead of spilling out.
-    <div className="card-scroll">
-      <table className="table events-table">
-        <thead>
-          <tr>
-            <th className="num">Last seen</th>
-            <th>Object</th>
-            <th>Reason</th>
-            <th>Message</th>
-            <th className="num">Count</th>
-          </tr>
-        </thead>
-        <tbody>
-          {events.map((e) => (
-            <tr key={`${e.namespace}/${e.name}`}>
-              <td className="num">{age(e.lastSeen)} ago</td>
-              <td className="mono">
-                {showNamespace && <span className="muted">{e.namespace}/</span>}
-                {e.object}
-              </td>
-              <td>
-                <span className="status status-warn">{e.reason}</span>
-              </td>
-              <td className="message" title={e.message}>
-                <div className="clamp-2">{e.message}</div>
-              </td>
-              <td className="num">×{e.count}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
   );
 }

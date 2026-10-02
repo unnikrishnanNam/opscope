@@ -67,7 +67,8 @@ type gatewayObject struct {
 		} `json:"addresses"`
 		Conditions []metav1.Condition `json:"conditions"`
 		Listeners  []struct {
-			AttachedRoutes int32 `json:"attachedRoutes"`
+			Name           string `json:"name"`
+			AttachedRoutes int32  `json:"attachedRoutes"`
 		} `json:"listeners"`
 	} `json:"status"`
 }

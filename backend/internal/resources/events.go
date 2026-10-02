@@ -19,12 +19,16 @@ const maxEvents = 100
 // like a failed image pull or a pod being scheduled.
 type Event struct {
 	Meta
-	Type     string    `json:"type"`   // Normal or Warning
-	Reason   string    `json:"reason"` // short CamelCase word, e.g. BackOff
-	Message  string    `json:"message"`
-	Object   string    `json:"object"` // what it happened to, e.g. "Pod/web-7d9f"
-	Count    int32     `json:"count"`  // how many times it happened
-	LastSeen time.Time `json:"lastSeen"`
+	Type    string `json:"type"`   // Normal or Warning
+	Reason  string `json:"reason"` // short CamelCase word, e.g. BackOff
+	Message string `json:"message"`
+	Object  string `json:"object"` // what it happened to, e.g. "Pod/web-7d9f"
+	// The same object as parts, so the UI can link to it. ObjectResource is
+	// empty for kinds OpScope has no page for (like ReplicaSet).
+	ObjectName     string    `json:"objectName"`
+	ObjectResource string    `json:"objectResource,omitempty"`
+	Count          int32     `json:"count"` // how many times it happened
+	LastSeen       time.Time `json:"lastSeen"`
 }
 
 // listEvents returns the newest events first. q.Type limits them to one type
@@ -44,15 +48,7 @@ func listEvents(ctx context.Context, client kubernetes.Interface, q Query) ([]Ev
 
 	rows := make([]Event, 0, len(list.Items))
 	for _, e := range list.Items {
-		rows = append(rows, Event{
-			Meta:     metaOf(e.ObjectMeta),
-			Type:     e.Type,
-			Reason:   e.Reason,
-			Message:  e.Message,
-			Object:   e.InvolvedObject.Kind + "/" + e.InvolvedObject.Name,
-			Count:    eventCount(&e),
-			LastSeen: eventLastSeen(&e),
-		})
+		rows = append(rows, eventRow(&e))
 	}
 
 	sort.Slice(rows, func(i, j int) bool { return rows[i].LastSeen.After(rows[j].LastSeen) })
@@ -60,6 +56,21 @@ func listEvents(ctx context.Context, client kubernetes.Interface, q Query) ([]Ev
 		rows = rows[:maxEvents]
 	}
 	return rows, nil
+}
+
+// eventRow turns a Kubernetes event into a row.
+func eventRow(e *corev1.Event) Event {
+	return Event{
+		Meta:           metaOf(e.ObjectMeta),
+		Type:           e.Type,
+		Reason:         e.Reason,
+		Message:        e.Message,
+		Object:         e.InvolvedObject.Kind + "/" + e.InvolvedObject.Name,
+		ObjectName:     e.InvolvedObject.Name,
+		ObjectResource: resourceForKind(e.InvolvedObject.Kind),
+		Count:          eventCount(e),
+		LastSeen:       eventLastSeen(e),
+	}
 }
 
 // Events have been reported in a few different ways over the years, so the

@@ -6,6 +6,7 @@ import AddCluster from "./pages/AddCluster.jsx";
 import Placeholder from "./pages/Placeholder.jsx";
 import ResourceList from "./pages/ResourceList.jsx";
 import Overview from "./pages/Overview.jsx";
+import ResourceDetail from "./pages/ResourceDetail.jsx";
 import NotFound from "./pages/NotFound.jsx";
 import { allPages } from "./sections.js";
 
@@ -15,6 +16,8 @@ import { allPages } from "./sections.js";
 //   /clusters                 list and remove clusters
 //   /clusters/add             add a cluster
 //   /c/:clusterId/<page>      a page for one cluster, e.g. /c/lab/workloads/pods
+//   /c/:clusterId/<page>/:namespace/:name   one object, e.g. /c/lab/workloads/pods/web/api-1
+//   /c/:clusterId/<page>/:name              one cluster-wide object, e.g. /c/lab/nodes/worker-1
 //   ...?ns=default            the selected namespace (none = all namespaces)
 export default function App() {
   return (
@@ -28,6 +31,15 @@ export default function App() {
           {allPages.map((page) => (
             <Route key={page.path} path={page.path} element={pageElement(page)} />
           ))}
+          {allPages
+            .filter((page) => page.resource)
+            .map((page) => (
+              <Route
+                key={`${page.path}/detail`}
+                path={page.clusterScoped ? `${page.path}/:name` : `${page.path}/:namespace/:name`}
+                element={<ResourceDetail page={page} />}
+              />
+            ))}
         </Route>
         <Route path="*" element={<NotFound />} />
       </Route>
