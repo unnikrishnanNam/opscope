@@ -1,7 +1,8 @@
 // Table columns for each resource type, keyed by the name used in the API
 // URL (/api/clusters/{id}/pods). See ResourceTable.jsx for what each field means.
 import StatusBadge, { Fraction } from "./components/StatusBadge.jsx";
-import { age, bytes, cores, duration } from "./format.js";
+import { age, bytes, cores, cpu, duration } from "./format.js";
+import { Sparkline, UsageBar } from "./components/Usage.jsx";
 
 // Columns that most tables share.
 const name = { key: "name", label: "Name", className: "name" };
@@ -184,8 +185,30 @@ export const columns = {
       label: "OS",
       render: (row) => <span title={row.osImage}>{`${row.os}/${row.arch}`}</span>,
     },
-    { key: "cpu", label: "CPU", className: "num", render: (row) => cores(row.cpu) },
-    { key: "memory", label: "Memory", className: "num", render: (row) => bytes(row.memory) },
+    // With metrics-server: usage against allocatable, plus the last 15 minutes.
+    // Without: just the node's capacity.
+    {
+      key: "cpu",
+      label: "CPU",
+      render: (row) =>
+        row.usage ? (
+          <NodeUsage usage={row.usage} field="cpu" total="cpuAllocatable" format={cpu} what="CPU" />
+        ) : (
+          cores(row.cpu)
+        ),
+      sortValue: (row) => (row.usage ? row.usage.cpu / row.usage.cpuAllocatable : row.cpu),
+    },
+    {
+      key: "memory",
+      label: "Memory",
+      render: (row) =>
+        row.usage ? (
+          <NodeUsage usage={row.usage} field="memory" total="memoryAllocatable" format={bytes} what="Memory" />
+        ) : (
+          bytes(row.memory)
+        ),
+      sortValue: (row) => (row.usage ? row.usage.memory / row.usage.memoryAllocatable : row.memory),
+    },
     created,
   ],
 
@@ -201,6 +224,20 @@ export const columns = {
     },
     { key: "restarts", label: "Restarts", className: "num" },
     { key: "node", label: "Node", className: "mono" },
+    {
+      key: "cpuUsage",
+      label: "CPU",
+      className: "num",
+      render: (row) => (row.usage ? cpu(row.usage.cpu) : <span className="muted">–</span>),
+      sortValue: (row) => row.usage?.cpu,
+    },
+    {
+      key: "memoryUsage",
+      label: "Memory",
+      className: "num",
+      render: (row) => (row.usage ? bytes(row.usage.memory) : <span className="muted">–</span>),
+      sortValue: (row) => row.usage?.memory,
+    },
     created,
   ],
 
@@ -296,6 +333,16 @@ export const columns = {
     created,
   ],
 };
+
+// A node's usage of one resource: bar with percentage, then a sparkline.
+function NodeUsage({ usage, field, total, format, what }) {
+  return (
+    <span className="usage-cell">
+      <UsageBar used={usage[field]} total={usage[total]} label={`${format(usage[field])} of ${format(usage[total])} used`} />
+      <Sparkline points={usage.history} field={field} format={format} what={what} />
+    </span>
+  );
+}
 
 // A list of short values (IPs, ports, hosts) on one line, or a dash.
 function List({ items }) {

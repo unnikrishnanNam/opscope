@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"opscope/internal/clusters"
+	"opscope/internal/metrics"
 )
 
 // Config holds the settings the server needs.
@@ -19,7 +20,7 @@ type Config struct {
 }
 
 // New returns an http.Handler with every route registered.
-func New(cfg Config, manager *clusters.Manager, logger *slog.Logger) http.Handler {
+func New(cfg Config, manager *clusters.Manager, history *metrics.History, logger *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
 
 	// API routes. Go 1.22+ lets us put the HTTP method and {placeholders}
@@ -39,6 +40,10 @@ func New(cfg Config, manager *clusters.Manager, logger *slog.Logger) http.Handle
 	// A fixed path segment beats a {placeholder}, so this route wins over
 	// the one above for /api/clusters/{id}/overview.
 	mux.HandleFunc("GET /api/clusters/{id}/overview", getOverview(manager))
+
+	// Live CPU and memory usage from metrics-server.
+	mux.HandleFunc("GET /api/clusters/{id}/metrics/nodes", getNodeMetrics(manager, history))
+	mux.HandleFunc("GET /api/clusters/{id}/metrics/pods", getPodMetrics(manager))
 
 	// One value of one secret, fetched only when the user clicks "Reveal".
 	mux.HandleFunc("GET /api/clusters/{id}/secrets/{namespace}/{name}/{key}", getSecretValue(manager))

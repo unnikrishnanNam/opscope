@@ -5,6 +5,7 @@
 // /c/<cluster-id>/workloads/pods in the address bar.
 // `resource` is the API name for pages that show a table (see columns.jsx).
 // `clusterScoped` marks resources that don't live in a namespace (like nodes).
+// `metrics` marks pages that also show live usage from metrics-server.
 // `phase` is the build phase that brings the real page (see docs/PHASES.md).
 
 export const sections = [
@@ -12,13 +13,13 @@ export const sections = [
     group: "Cluster",
     items: [
       { path: "overview", label: "Overview", phase: 3, about: "Counts, node health and recent warnings at a glance." },
-      { path: "nodes", resource: "nodes", clusterScoped: true, label: "Nodes", phase: 3, about: "Machines in the cluster, their status, capacity and usage." },
+      { path: "nodes", resource: "nodes", clusterScoped: true, metrics: "nodes", label: "Nodes", phase: 3, about: "Machines in the cluster, their status, capacity and usage." },
     ],
   },
   {
     group: "Workloads",
     items: [
-      { path: "workloads/pods", resource: "pods", label: "Pods", phase: 2, about: "Running containers, their status, restarts and the node they run on." },
+      { path: "workloads/pods", resource: "pods", metrics: "pods", label: "Pods", phase: 2, about: "Running containers, their status, restarts and the node they run on." },
       { path: "workloads/deployments", resource: "deployments", label: "Deployments", phase: 2, about: "Stateless apps and how many of their replicas are ready." },
       { path: "workloads/statefulsets", resource: "statefulsets", label: "StatefulSets", phase: 2, about: "Apps with stable names and storage, such as databases." },
       { path: "workloads/daemonsets", resource: "daemonsets", label: "DaemonSets", phase: 2, about: "Pods that run on every node (or a chosen set of nodes)." },

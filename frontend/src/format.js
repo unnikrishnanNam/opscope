@@ -53,3 +53,14 @@ export function bytes(n) {
   }
   return `${i === 0 ? n : n.toFixed(1)} ${units[i]}`;
 }
+
+// cpu(63) -> "63m", cpu(1500) -> "1.5 cores". Small values read better in
+// millicores, which is also how Kubernetes writes them.
+export function cpu(millicores) {
+  return millicores < 1000 ? `${millicores}m` : cores(millicores);
+}
+
+// percent(1, 3) -> 33. Returns 0 when there's nothing to divide by.
+export function percent(part, whole) {
+  return whole > 0 ? Math.round((part / whole) * 100) : 0;
+}

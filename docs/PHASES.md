@@ -194,14 +194,18 @@ Goal: click any row to see more about it.
 
 Goal: basic live CPU and memory numbers.
 
-- [ ] Read metrics from metrics-server (`metrics.k8s.io` API)
-- [ ] `GET /api/clusters/{id}/metrics/nodes` and `.../metrics/pods?namespace=...`
-- [ ] Detect when metrics-server is missing and show how to install it instead of failing
-- [ ] Nodes table: CPU and memory usage as a bar against allocatable
-- [ ] Pods table: CPU and memory usage columns
-- [ ] Overview: cluster-wide CPU and memory usage
-- [ ] Short in-memory history (last ~15 minutes) kept in the backend, shown as small sparklines
-- [ ] Live updates via polling every few seconds (kept simple; no WebSockets)
+- [x] Read metrics from metrics-server (`metrics.k8s.io` API), with the dynamic client like Gateway API
+- [x] `GET /api/clusters/{id}/metrics/nodes` and `.../metrics/pods?namespace=...`
+- [x] Detect when metrics-server is missing and show how to install it instead of failing
+- [x] Nodes table: CPU and memory usage as a bar against allocatable
+- [x] Pods table: CPU and memory usage columns
+- [x] Overview: cluster-wide CPU and memory usage
+- [x] Short in-memory history (last ~15 minutes) kept in the backend, shown as small sparklines
+      (a background goroutine samples every cluster every 15 seconds)
+- [x] Live updates via polling every few seconds (kept simple; no WebSockets)
+      (every 15 seconds: metrics-server's own resolution, so faster polling would return the same numbers)
+- [x] Go tests: quantity parsing (nanocores), joining allocatable, summing containers, missing
+      metrics-server (404 and 503), history length and forgetting removed nodes and clusters
 
 ## Phase 8: Packaging and running in a cluster
 
@@ -378,3 +382,24 @@ Things that came up while building, decisions made, and anything that moved betw
 - Spotted while testing: argocd-server on the multipass cluster crash-loops with
   `the server could not find the requested resource (post appprojects.argoproj.io)`, which points
   at a missing or outdated Argo CD `AppProject` CRD.
+
+### Phase 7
+
+- Checked against both clusters in the browser and in Docker. multipass: usage per node (e.g.
+  kubemaster 3% CPU, 69% memory), usage per pod, cluster totals and history. `opscope-test` (kind,
+  no metrics-server): the Nodes page shows install instructions (with the kind-specific
+  `--kubelet-insecure-tls` note) and falls back to capacity; the overview shows a one-line note.
+- metrics-server is read with the dynamic client and small structs, so there's no new dependency
+  (the alternative, `k8s.io/metrics`, would add a typed client just for two calls).
+- "Unavailable" covers both a missing metrics API (404) and an installed but unhealthy
+  metrics-server (503).
+- Usage per node is shown against **allocatable**, not capacity: allocatable is what's actually left
+  for pods after the system's reservation.
+- Sparklines are drawn on a fixed 15-minute time axis, so a short history fills only the right part.
+  Until there's a minute of data they show "collecting…", and a faint baseline spans the full width.
+  Their y-axis runs from 0 to just above the highest value, so trends are visible at low usage; the
+  exact low/high/now values are in the hover text.
+- Usage bars use the accent colour, amber from 75% and red from 90%, and always show the percentage.
+- The collector logs failures at Debug level only: unreachable clusters and clusters without
+  metrics-server are normal and would otherwise fill the log every 15 seconds.
+- Fixed: node names on the overview (links since Phase 6) were underlined like plain browser links.

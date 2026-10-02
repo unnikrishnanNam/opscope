@@ -1,14 +1,16 @@
 import { Link, useLocation, useOutletContext, useParams, useSearchParams } from "react-router";
 import { useApi } from "../api.js";
-import { clock } from "../format.js";
+import { bytes, clock, cpu } from "../format.js";
 import ErrorBox from "../components/ErrorBox.jsx";
 import PodStatusBar from "../components/PodStatusBar.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
 import EventsTable from "../components/EventsTable.jsx";
 import { detailPath, nsQuery } from "../sections.js";
+import { MetricsUnavailable, Sparkline, UsageBar } from "../components/Usage.jsx";
 
 const REFRESH_MS = 10_000;
 const WARNINGS_SHOWN = 8;
+const METRICS_REFRESH_MS = 15_000; // metrics-server's own refresh interval
 
 // What each workload count links to and how its "unhealthy" number reads.
 const WORKLOADS = {
@@ -31,6 +33,8 @@ export default function Overview({ page }) {
   const base = reachable ? `/clusters/${cluster.id}` : null;
   const overview = useApi(base && `${base}/overview${query}`, { refreshMs: REFRESH_MS });
   const nodes = useApi(base && `${base}/nodes`, { refreshMs: REFRESH_MS });
+  // Usage is cluster-wide (it comes from the nodes), whatever namespace is picked.
+  const usage = useApi(base && `${base}/metrics/nodes`, { refreshMs: METRICS_REFRESH_MS });
   const warningsQuery = namespace ? `&namespace=${encodeURIComponent(namespace)}` : "";
   const warnings = useApi(base && `${base}/events?type=Warning${warningsQuery}`, { refreshMs: REFRESH_MS });
 
@@ -81,6 +85,11 @@ export default function Overview({ page }) {
                 </Tile>
               );
             })}
+          </div>
+
+          <div className="card usage-card">
+            <h2 className="card-title">Cluster usage</h2>
+            <ClusterUsage usage={usage} />
           </div>
 
           <div className="cards">
@@ -171,5 +180,35 @@ function NodeList({ nodes, clusterId }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+// CPU and memory for the whole cluster: all nodes added up.
+function ClusterUsage({ usage }) {
+  if (usage.error?.code === "metrics_unavailable") return <MetricsUnavailable compact />;
+  if (usage.error) return <p className="muted">Usage isn't available right now: {usage.error.message}</p>;
+  if (!usage.data) return <p className="muted">Loading…</p>;
+
+  const { total, history } = usage.data;
+  const rows = [
+    { what: "CPU", field: "cpu", used: total.cpu, of: total.cpuAllocatable, format: cpu },
+    { what: "Memory", field: "memory", used: total.memory, of: total.memoryAllocatable, format: bytes },
+  ];
+  return (
+    <div className="usage-rows">
+      {rows.map((r) => (
+        <div key={r.field} className="usage-row">
+          <span className="usage-row-label">{r.what}</span>
+          <UsageBar used={r.used} total={r.of} label={`${r.format(r.used)} of ${r.format(r.of)} used`} />
+          <span className="muted">
+            {r.format(r.used)} of {r.format(r.of)}
+          </span>
+          <Sparkline points={history} field={r.field} format={r.format} what={r.what} width={220} height={28} />
+        </div>
+      ))}
+      <p className="muted small">
+        Of what nodes can give to pods (allocatable). The line shows the last 15 minutes.
+      </p>
+    </div>
   );
 }

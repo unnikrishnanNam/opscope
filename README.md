@@ -12,6 +12,7 @@ backend/                  Go server
   internal/clusters/      known clusters: from env or added in the UI, one client each
   internal/resources/     one file per resource type: lists it and flattens it into table rows
                           (gatewayapi.go reads Gateway API custom resources with the dynamic client)
+  internal/metrics/       live usage from metrics-server, and the in-memory history
   internal/server/        HTTP routes, middleware, static file serving
 frontend/                 React app (Vite, plain JavaScript)
   src/api.js              fetch helper and the useApi hook
@@ -140,11 +141,18 @@ When OpScope runs directly on your machine (`make dev-backend`), the normal kube
 | GET    | `/api/clusters/{id}/{resource}/{namespace}/{name}` | One object: summary fields, containers, conditions, tables, events, YAML |
 | GET    | `/api/clusters/{id}/{resource}/{name}` | The same for cluster-wide kinds (nodes, namespaces, gatewayclasses) |
 | GET    | `/api/clusters/{id}/pods/{namespace}/{name}/logs` | Plain-text logs; `?container=`, `?tail=` (default 500, max 10000), `?previous=true`, `?follow=true` streams |
+| GET    | `/api/clusters/{id}/metrics/nodes` | Usage per node vs allocatable, cluster total, and 15 minutes of history |
+| GET    | `/api/clusters/{id}/metrics/pods` | Usage per pod (containers summed); `?namespace=` |
 
 `{resource}` is one of `namespaces`, `nodes`, `events`, `pods`, `deployments`, `statefulsets`,
 `daemonsets`, `jobs`, `cronjobs`, `configmaps`, `secrets`, `services`, `ingresses`, `gateways`,
 `httproutes` or `gatewayclasses` (see `backend/internal/resources/resources.go`). Events are
 returned newest first (at most 100) and accept `?type=Warning` or `?type=Normal`.
+
+Live usage needs [metrics-server](https://github.com/kubernetes-sigs/metrics-server) in the cluster.
+Without it, the metrics endpoints answer `404` with `"code": "metrics_unavailable"` and the UI shows
+how to install it. OpScope samples every cluster every 15 seconds in the background and keeps the
+last 15 minutes in memory for the sparklines; the history starts empty after a restart.
 
 Gateway API types are read with client-go's dynamic client (`gateway.networking.k8s.io/v1`). On a
 cluster without Gateway API they answer `404` with `"code": "not_installed"`, and the overview's

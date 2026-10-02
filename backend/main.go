@@ -6,11 +6,13 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"os"
 
 	"opscope/internal/clusters"
+	"opscope/internal/metrics"
 	"opscope/internal/server"
 )
 
@@ -52,7 +54,12 @@ func main() {
 
 	logger.Info("clusters ready", "count", len(manager.List()))
 
-	handler := server.New(cfg, manager, logger)
+	// Sample CPU and memory usage in the background, for the sparklines.
+	// context.Background() means "run until the program exits".
+	history := metrics.NewHistory()
+	go history.Collect(context.Background(), manager, logger)
+
+	handler := server.New(cfg, manager, history, logger)
 	if err := http.ListenAndServe(addr, handler); err != nil {
 		logger.Error("server stopped", "error", err)
 		os.Exit(1)
