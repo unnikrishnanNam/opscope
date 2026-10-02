@@ -3,6 +3,7 @@
 //
 // `path` is relative to the selected cluster: "workloads/pods" becomes
 // /c/<cluster-id>/workloads/pods in the address bar.
+// `resource` is the API name for pages that show a table (see columns.jsx).
 // `phase` is the build phase that brings the real page (see docs/PHASES.md).
 
 export const sections = [
@@ -16,12 +17,12 @@ export const sections = [
   {
     group: "Workloads",
     items: [
-      { path: "workloads/pods", label: "Pods", phase: 2, about: "Running containers, their status, restarts and the node they run on." },
-      { path: "workloads/deployments", label: "Deployments", phase: 2, about: "Stateless apps and how many of their replicas are ready." },
-      { path: "workloads/statefulsets", label: "StatefulSets", phase: 2, about: "Apps with stable names and storage, such as databases." },
-      { path: "workloads/daemonsets", label: "DaemonSets", phase: 2, about: "Pods that run on every node (or a chosen set of nodes)." },
-      { path: "workloads/jobs", label: "Jobs", phase: 2, about: "One-off tasks that run until they finish." },
-      { path: "workloads/cronjobs", label: "CronJobs", phase: 2, about: "Jobs that run on a schedule." },
+      { path: "workloads/pods", resource: "pods", label: "Pods", phase: 2, about: "Running containers, their status, restarts and the node they run on." },
+      { path: "workloads/deployments", resource: "deployments", label: "Deployments", phase: 2, about: "Stateless apps and how many of their replicas are ready." },
+      { path: "workloads/statefulsets", resource: "statefulsets", label: "StatefulSets", phase: 2, about: "Apps with stable names and storage, such as databases." },
+      { path: "workloads/daemonsets", resource: "daemonsets", label: "DaemonSets", phase: 2, about: "Pods that run on every node (or a chosen set of nodes)." },
+      { path: "workloads/jobs", resource: "jobs", label: "Jobs", phase: 2, about: "One-off tasks that run until they finish." },
+      { path: "workloads/cronjobs", resource: "cronjobs", label: "CronJobs", phase: 2, about: "Jobs that run on a schedule." },
     ],
   },
   {

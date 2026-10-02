@@ -42,7 +42,8 @@ export default function Layout() {
               </p>
             </section>
           ) : (
-            <Outlet />
+            // Pages read these with useOutletContext().
+            <Outlet context={{ cluster, reachable: status.data?.reachable }} />
           )}
         </main>
       </div>

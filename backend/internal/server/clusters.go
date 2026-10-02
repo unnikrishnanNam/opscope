@@ -4,9 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"time"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"opscope/internal/clusters"
 )
@@ -115,40 +112,6 @@ func getCluster(manager *clusters.Manager) http.HandlerFunc {
 			status.Version = version
 		}
 		writeJSON(w, http.StatusOK, status)
-	}
-}
-
-// namespace is one row of GET /api/clusters/{id}/namespaces.
-type namespace struct {
-	Name    string    `json:"name"`
-	Status  string    `json:"status"`
-	Created time.Time `json:"created"`
-}
-
-// GET /api/clusters/{id}/namespaces
-func listNamespaces(manager *clusters.Manager) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		cluster, ok := findCluster(w, r, manager)
-		if !ok {
-			return
-		}
-
-		list, err := cluster.Client.CoreV1().Namespaces().List(r.Context(), metav1.ListOptions{})
-		if err != nil {
-			writeClusterError(w, err, cluster)
-			return
-		}
-
-		// Turn Kubernetes objects into the few fields the UI needs.
-		result := make([]namespace, 0, len(list.Items))
-		for _, ns := range list.Items {
-			result = append(result, namespace{
-				Name:    ns.Name,
-				Status:  string(ns.Status.Phase),
-				Created: ns.CreationTimestamp.Time,
-			})
-		}
-		writeJSON(w, http.StatusOK, result)
 	}
 }
 

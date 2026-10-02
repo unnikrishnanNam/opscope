@@ -31,7 +31,10 @@ func New(cfg Config, manager *clusters.Manager, logger *slog.Logger) http.Handle
 	mux.HandleFunc("POST /api/clusters/inspect", inspectKubeconfig())
 	mux.HandleFunc("GET /api/clusters/{id}", getCluster(manager))
 	mux.HandleFunc("DELETE /api/clusters/{id}", removeCluster(manager))
-	mux.HandleFunc("GET /api/clusters/{id}/namespaces", listNamespaces(manager))
+
+	// One route for every list: namespaces, pods, deployments, ...
+	// The {resource} part picks the lister (see internal/resources).
+	mux.HandleFunc("GET /api/clusters/{id}/{resource}", listResource(manager))
 
 	// Any other /api/ path is a 404 in JSON, so the frontend never gets
 	// index.html back when it asked for data.

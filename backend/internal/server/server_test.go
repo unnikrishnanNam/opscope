@@ -63,3 +63,11 @@ func TestFrontendRoutesFallBackToIndex(t *testing.T) {
 		t.Fatalf("expected index.html, got %q", rec.Body.String())
 	}
 }
+
+func TestUnknownResourceIs404(t *testing.T) {
+	rec := get(newTestServer(t), "/api/clusters/any/widgets")
+
+	if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), "unknown resource type") {
+		t.Fatalf("got %d %s, want 404 unknown resource type", rec.Code, rec.Body.String())
+	}
+}

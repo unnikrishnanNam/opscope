@@ -97,17 +97,21 @@ If nothing is configured, the UI starts on an "Add a cluster" screen.
 
 Goal: list the main workload types in tables.
 
-- [ ] One generic list endpoint shape: `GET /api/clusters/{id}/{resource}?namespace=...`
-- [ ] Backend returns small, flattened objects (only the fields the UI shows), not raw Kubernetes objects
-- [ ] Pods: name, namespace, status, ready containers, restarts, node, age
-- [ ] Deployments: name, namespace, ready/desired replicas, up-to-date, available, age
-- [ ] StatefulSets: name, namespace, ready/desired replicas, age
-- [ ] DaemonSets: name, namespace, desired/current/ready, node selector, age
-- [ ] Jobs: name, namespace, completions, duration, status, age
-- [ ] CronJobs: name, namespace, schedule, suspended, last run, active jobs, age
-- [ ] Reusable `ResourceTable` component (sortable columns, text filter, empty and error states)
-- [ ] Status badges with consistent colors (Running, Pending, Failed, Succeeded, CrashLoopBackOff, ...)
-- [ ] Manual refresh button, plus auto-refresh every 10 seconds
+- [x] One generic list endpoint shape: `GET /api/clusters/{id}/{resource}?namespace=...`
+- [x] Backend returns small, flattened objects (only the fields the UI shows), not raw Kubernetes objects
+- [x] Pods: name, namespace, status, ready containers, restarts, node, age
+- [x] Pod status worked out like `kubectl get pods` (CrashLoopBackOff, Init:1/2, Terminating, ...),
+      including native sidecar containers
+- [x] Deployments: name, namespace, ready/desired replicas, up-to-date, available, age
+- [x] StatefulSets: name, namespace, ready/desired replicas, age
+- [x] DaemonSets: name, namespace, desired/current/ready, node selector, age
+- [x] Jobs: name, namespace, completions, duration, status, age
+- [x] CronJobs: name, namespace, schedule, suspended, last run, active jobs, age
+- [x] Reusable `ResourceTable` component (sortable columns, text filter, empty and error states)
+- [x] Status badges with consistent colors (Running, Pending, Failed, Succeeded, CrashLoopBackOff, ...)
+- [x] Manual refresh button, plus auto-refresh every 10 seconds
+- [x] Namespace column hidden when one namespace is selected
+- [x] Go tests for the listers and pod/job status, using client-go's fake client
 
 ## Phase 3: Nodes and cluster overview
 
@@ -212,3 +216,20 @@ Things that came up while building, decisions made, and anything that moved betw
   skew, but the read-only core APIs OpScope uses are stable; worth keeping in mind if something odd shows up.
 - Cluster status is re-checked every 30 seconds; a cluster that doesn't answer takes up to 10 seconds
   (the client timeout) before showing "Unreachable".
+
+### Phase 2
+
+- Checked against the multipass cluster: 44 pods (Running, CrashLoopBackOff, ContainerCreating,
+  Completed), 20 deployments, 2 statefulsets and 3 daemonsets, in the browser and in Docker.
+  The cluster has no Jobs or CronJobs, so those pages were only seen empty; their logic is
+  covered by unit tests.
+- The namespaces endpoint moved into the same generic `/{resource}` route as the workloads, so every
+  list goes through `internal/resources`.
+- Rows are sorted by namespace and name on the server. Clicking a header sorts in the browser;
+  a third click goes back to the server order.
+- The filter matches any text column (name, namespace, status, node, ...), so typing "crash"
+  finds crash-looping pods.
+- Restart counts are shown as plain numbers. Colouring every non-zero count was noise on a
+  cluster whose VMs have rebooted.
+- A table only loads once its cluster is known to be reachable; otherwise the page shows only the
+  cluster banner, instead of the same error twice.

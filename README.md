@@ -10,12 +10,15 @@ The project is built in phases; see [docs/PHASES.md](docs/PHASES.md) for the pla
 backend/                  Go server
   main.go                 entry point: reads env vars, loads clusters, starts the server
   internal/clusters/      known clusters: from env or added in the UI, one client each
+  internal/resources/     one file per resource type: lists it and flattens it into table rows
   internal/server/        HTTP routes, middleware, static file serving
 frontend/                 React app (Vite, plain JavaScript)
   src/api.js              fetch helper and the useApi hook
   src/clusters.jsx        shared list of clusters (React context)
+  src/columns.jsx         table columns for each resource type
+  src/format.js           ages and durations, kubectl style
   src/sections.js         list of pages; drives the sidebar and the routes
-  src/components/         shared pieces (layout, sidebar, top bar, errors)
+  src/components/         shared pieces (layout, sidebar, top bar, tables, status badges)
   src/pages/              one file per page
   src/styles.css          all styles; design tokens at the top
 data/                     local data (git- and docker-ignored): kubeconfigs, saved clusters
@@ -112,6 +115,9 @@ The container must be able to reach the cluster's API server. A `server:` addres
 | POST   | `/api/clusters`                 | Add a cluster:`{"name", "kubeconfig", "context"}`                 |
 | GET    | `/api/clusters/{id}`            | Cluster plus`reachable`, `version`, or `error` and `detail` |
 | DELETE | `/api/clusters/{id}`            | Remove a cluster added in the UI                                    |
-| GET    | `/api/clusters/{id}/namespaces` | Namespaces (name, status, created)                                  |
+| GET    | `/api/clusters/{id}/{resource}` | Rows for one resource type; `?namespace=` to limit to one namespace |
+
+`{resource}` is one of `namespaces`, `pods`, `deployments`, `statefulsets`, `daemonsets`,
+`jobs` or `cronjobs` (see `backend/internal/resources/resources.go`).
 
 Errors look like `{"error": "readable message", "detail": "original error"}`.

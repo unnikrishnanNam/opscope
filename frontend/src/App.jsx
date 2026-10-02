@@ -4,6 +4,7 @@ import Home from "./pages/Home.jsx";
 import ManageClusters from "./pages/ManageClusters.jsx";
 import AddCluster from "./pages/AddCluster.jsx";
 import Placeholder from "./pages/Placeholder.jsx";
+import ResourceList from "./pages/ResourceList.jsx";
 import NotFound from "./pages/NotFound.jsx";
 import { allPages } from "./sections.js";
 
@@ -24,11 +25,17 @@ export default function App() {
         <Route path="c/:clusterId">
           <Route index element={<Navigate to="overview" replace />} />
           {allPages.map((page) => (
-            <Route key={page.path} path={page.path} element={<Placeholder page={page} />} />
+            <Route key={page.path} path={page.path} element={pageElement(page)} />
           ))}
         </Route>
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
   );
+}
+
+// Pages with a `resource` are tables built in this phase or earlier; the
+// rest are placeholders until their phase arrives.
+function pageElement(page) {
+  return page.resource ? <ResourceList page={page} /> : <Placeholder page={page} />;
 }

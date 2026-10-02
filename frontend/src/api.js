@@ -34,25 +34,27 @@ export async function api(path, { method = "GET", body } = {}) {
 
 // useApi loads `path` when a component appears (and when `path` changes).
 // Pass `null` as the path to skip loading. With `refreshMs` it reloads on a
-// timer. Returns { data, error, loading, reload }.
+// timer. Returns { data, error, loading, updatedAt, reload }.
 export function useApi(path, { refreshMs } = {}) {
-  const [state, setState] = useState({ path, data: null, error: null, loading: true });
+  const [state, setState] = useState({ path, data: null, error: null, loading: true, updatedAt: null });
   const [reloads, setReloads] = useState(0);
 
   useEffect(() => {
     if (!path) {
-      setState({ path, data: null, error: null, loading: false });
+      setState({ path, data: null, error: null, loading: false, updatedAt: null });
       return;
     }
     let cancelled = false; // ignore answers that arrive after we moved on
 
     // A new path starts empty; a reload of the same path keeps showing the old data.
-    setState((s) => (s.path === path ? { ...s, loading: true } : { path, data: null, error: null, loading: true }));
+    setState((s) =>
+      s.path === path ? { ...s, loading: true } : { path, data: null, error: null, loading: true, updatedAt: null },
+    );
 
     async function load() {
       try {
         const data = await api(path);
-        if (!cancelled) setState({ path, data, error: null, loading: false });
+        if (!cancelled) setState({ path, data, error: null, loading: false, updatedAt: new Date() });
       } catch (error) {
         if (!cancelled) setState((s) => ({ ...s, error, loading: false }));
       }
@@ -67,11 +69,12 @@ export function useApi(path, { refreshMs } = {}) {
   }, [path, refreshMs, reloads]);
 
   // Until the effect above catches up, don't hand out data from a previous path.
-  const current = state.path === path ? state : { data: null, error: null, loading: Boolean(path) };
+  const current = state.path === path ? state : { data: null, error: null, loading: Boolean(path), updatedAt: null };
   function reload() {
     setState((s) => ({ ...s, loading: true })); // mark as loading right away, not on the next render
     setReloads((n) => n + 1);
   }
 
-  return { data: current.data, error: current.error, loading: current.loading, reload };
+  const { data, error, loading, updatedAt } = current;
+  return { data, error, loading, updatedAt, reload };
 }
