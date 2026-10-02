@@ -141,7 +141,34 @@ Goal: cover the remaining common resource types.
 - [x] A missing object now returns 404 with "It doesn't exist (any more)" instead of a generic 502
 - [x] Go tests for all four listers and secret values
 
-## Phase 5: Resource details
+## Phase 5: Gateway API
+
+Goal: list Gateway API resources next to Services and Ingresses.
+
+Gateway API objects are CRDs (custom resources), so client-go has no typed client for them. We read
+them with client-go's **dynamic client**, which works with any resource as plain maps. This adds no
+dependency and shows how to read custom resources in general. The test cluster runs Gateway API
+v1.5.1 with `gateway.networking.k8s.io/v1`, which is what we use.
+
+- [ ] Read Gateway API objects with the dynamic client (`gateway.networking.k8s.io/v1`)
+- [ ] Detect when Gateway API isn't installed on a cluster and show a plain message, not an error
+- [ ] Gateways: name, namespace, class, listeners (name, port, protocol, hostname), addresses,
+      Programmed status, attached routes, age
+- [ ] HTTPRoutes: name, namespace, hostnames, parent gateways, backends (service:port),
+      Accepted / ResolvedRefs status, age
+- [ ] GatewayClasses (cluster-wide): name, controller, Accepted status, age
+- [ ] Sidebar: Network → Services, Ingresses, Gateways, HTTPRoutes, GatewayClasses
+- [ ] Statuses use the same badge colours as everything else
+- [ ] Overview: Gateway and HTTPRoute counts (with how many aren't programmed / accepted), shown only
+      when Gateway API is installed
+- [ ] Go tests with client-go's fake dynamic client
+- [ ] Tested against the `topology-test` gateway and routes on the multipass cluster
+- [ ] Re-check the Ingresses page against the new `topology-test` ingress (Phase 4 could only see it empty)
+
+Not in scope for now: GRPCRoute, TLSRoute, ListenerSet, ReferenceGrant, BackendTLSPolicy, and
+controller-specific resources (like `gateway.nginx.org` policies). They'd follow the same pattern.
+
+## Phase 6: Resource details
 
 Goal: click any row to see more about it.
 
@@ -151,8 +178,10 @@ Goal: click any row to see more about it.
 - [ ] YAML view (read-only, with managed fields removed)
 - [ ] Events for the object
 - [ ] Pod logs: pick a container, show the last N lines, optional follow (streamed)
+- [ ] Works for Gateway API objects too (Gateway listeners and conditions; HTTPRoute rules with
+      their matches and backends)
 
-## Phase 6: Live resource usage
+## Phase 7: Live resource usage
 
 Goal: basic live CPU and memory numbers.
 
@@ -165,13 +194,16 @@ Goal: basic live CPU and memory numbers.
 - [ ] Short in-memory history (last ~15 minutes) kept in the backend, shown as small sparklines
 - [ ] Live updates via polling every few seconds (kept simple; no WebSockets)
 
-## Phase 7: Packaging and running in a cluster
+## Phase 8: Packaging and running in a cluster
 
 Goal: OpScope can run inside the cluster it watches.
 
 - [ ] In-cluster mode: with `OPSCOPE_IN_CLUSTER=true`, use the pod's service account as a cluster
       "from environment" (moved here from Phase 1, since it only matters when running inside a cluster)
 - [ ] Kubernetes manifests: Namespace, ServiceAccount, read-only ClusterRole + binding, Deployment, Service
+- [ ] The ClusterRole covers everything OpScope reads, including Gateway API (`gateway.networking.k8s.io`),
+      metrics (`metrics.k8s.io`) and Secrets. Reading Secrets is called out in the README so it's a
+      conscious choice; it can be removed if the reveal feature isn't wanted
 - [ ] Health and readiness probes using `/api/health`
 - [ ] Image runs as a non-root user with a read-only filesystem
 - [ ] Graceful shutdown on SIGTERM
@@ -194,7 +226,7 @@ Things that came up while building, decisions made, and anything that moved betw
 - Confirmed after review: plain JavaScript, serving from a folder, and light theme only all stay as they are.
 - Changed after review: no cluster is built in or picked up by default. Phase 1 now covers clusters from
   the environment (`OPSCOPE_KUBECONFIG`) or added in the UI, and all cluster endpoints moved under
-  `/api/clusters/{id}/`. In-cluster config moved to Phase 7.
+  `/api/clusters/{id}/`. In-cluster config moved to the packaging phase (now Phase 8).
 - Decided: clusters added in the UI are saved to disk, and in Docker a volume is mounted at `/data`
   so they survive restarts. `data/` is in `.gitignore` and `.dockerignore` so credentials never
   reach git or an image.
@@ -273,7 +305,18 @@ Things that came up while building, decisions made, and anything that moved betw
   screenshots. Only the clicked key was fetched; the other key stayed masked. A revealed value survives
   the 10-second refresh, and Hide or collapsing the row forgets it.
 - `ResourceTable` gained an optional `expand` prop: rows whose name is clicked open a panel underneath.
-  Secrets use it now; Phase 5's detail view may replace or reuse it.
-- ConfigMaps show only the key count (key names on hover). Their values arrive with the detail view in Phase 5.
-- Gateway API resources (Gateway, HTTPRoute) aren't covered. They'd be a natural addition later, since
-  this cluster uses them instead of Ingress.
+  Secrets use it now; the detail view (now Phase 6) may replace or reuse it.
+- ConfigMaps show only the key count (key names on hover). Their values arrive with the detail view (now Phase 6).
+- Gateway API resources (Gateway, HTTPRoute) weren't covered. Added as a new Phase 5 after review
+  (see below).
+
+### Plan change after Phase 4
+
+- Gateway API (Gateways, HTTPRoutes, GatewayClasses) is now required and became Phase 5. The phases
+  after it each shifted one number later: Resource details is Phase 6, Live resource usage is Phase 7,
+  Packaging is Phase 8. Doing Gateway API before the detail view means the detail view is built once
+  and covers these resources too.
+- The test cluster gained a `topology-test` namespace with a Gateway, two HTTPRoutes, an Ingress and
+  more Services and Deployments, which gives Phase 5 (and the Phase 4 Ingress page) real data.
+- The packaging phase now spells out that the read-only ClusterRole must include Gateway API,
+  metrics and Secrets.
