@@ -16,8 +16,8 @@ type DaemonSet struct {
 	NodeSelector map[string]string `json:"nodeSelector"`
 }
 
-func listDaemonSets(ctx context.Context, client kubernetes.Interface, namespace string) (any, error) {
-	list, err := client.AppsV1().DaemonSets(namespace).List(ctx, metav1.ListOptions{})
+func listDaemonSets(ctx context.Context, client kubernetes.Interface, q Query) ([]DaemonSet, error) {
+	list, err := client.AppsV1().DaemonSets(q.Namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

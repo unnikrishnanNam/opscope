@@ -20,8 +20,8 @@ type Pod struct {
 	IP         string `json:"ip"`
 }
 
-func listPods(ctx context.Context, client kubernetes.Interface, namespace string) (any, error) {
-	list, err := client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+func listPods(ctx context.Context, client kubernetes.Interface, q Query) ([]Pod, error) {
+	list, err := client.CoreV1().Pods(q.Namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

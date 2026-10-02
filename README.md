@@ -116,8 +116,10 @@ The container must be able to reach the cluster's API server. A `server:` addres
 | GET    | `/api/clusters/{id}`            | Cluster plus`reachable`, `version`, or `error` and `detail` |
 | DELETE | `/api/clusters/{id}`            | Remove a cluster added in the UI                                    |
 | GET    | `/api/clusters/{id}/{resource}` | Rows for one resource type; `?namespace=` to limit to one namespace |
+| GET    | `/api/clusters/{id}/overview`   | Counts, node health and pods by status; `?namespace=` limits the namespaced counts |
 
-`{resource}` is one of `namespaces`, `pods`, `deployments`, `statefulsets`, `daemonsets`,
-`jobs` or `cronjobs` (see `backend/internal/resources/resources.go`).
+`{resource}` is one of `namespaces`, `nodes`, `events`, `pods`, `deployments`, `statefulsets`,
+`daemonsets`, `jobs` or `cronjobs` (see `backend/internal/resources/resources.go`). Events are
+returned newest first (at most 100) and accept `?type=Warning` or `?type=Normal`.
 
 Errors look like `{"error": "readable message", "detail": "original error"}`.

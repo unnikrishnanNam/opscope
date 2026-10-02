@@ -16,8 +16,8 @@ type Deployment struct {
 	Available int32 `json:"available"` // replicas ready for long enough to count
 }
 
-func listDeployments(ctx context.Context, client kubernetes.Interface, namespace string) (any, error) {
-	list, err := client.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
+func listDeployments(ctx context.Context, client kubernetes.Interface, q Query) ([]Deployment, error) {
+	list, err := client.AppsV1().Deployments(q.Namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

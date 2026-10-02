@@ -21,8 +21,8 @@ type Job struct {
 	Finished    *time.Time `json:"finished"` // null while the job is still going
 }
 
-func listJobs(ctx context.Context, client kubernetes.Interface, namespace string) (any, error) {
-	list, err := client.BatchV1().Jobs(namespace).List(ctx, metav1.ListOptions{})
+func listJobs(ctx context.Context, client kubernetes.Interface, q Query) ([]Job, error) {
+	list, err := client.BatchV1().Jobs(q.Namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

@@ -13,7 +13,8 @@ export default function ResourceList({ page }) {
   // Layout passes the selected cluster down through the router's <Outlet>.
   const { cluster, reachable } = useOutletContext();
   const [searchParams] = useSearchParams();
-  const namespace = searchParams.get("ns") ?? "";
+  // Cluster-scoped resources (like nodes) ignore the namespace picker.
+  const namespace = page.clusterScoped ? "" : (searchParams.get("ns") ?? "");
 
   // Don't ask an unreachable cluster; Layout already shows why.
   const query = namespace ? `?namespace=${encodeURIComponent(namespace)}` : "";

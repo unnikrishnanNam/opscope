@@ -13,8 +13,8 @@ type Namespace struct {
 	Status string `json:"status"`
 }
 
-// listNamespaces ignores the namespace argument: namespaces aren't inside one.
-func listNamespaces(ctx context.Context, client kubernetes.Interface, _ string) (any, error) {
+// listNamespaces ignores q.Namespace: namespaces aren't inside one.
+func listNamespaces(ctx context.Context, client kubernetes.Interface, q Query) ([]Namespace, error) {
 	list, err := client.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, err

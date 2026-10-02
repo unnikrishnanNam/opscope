@@ -15,21 +15,38 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// Lister lists one kind of resource. An empty namespace means all namespaces.
-// It takes kubernetes.Interface (not the concrete client) so tests can pass
+// Query holds the URL options a lister may use.
+type Query struct {
+	Namespace string // "" means all namespaces
+	Type      string // events only: "Warning" or "Normal"; "" means both
+}
+
+// Lister lists one kind of resource as JSON-ready rows. It takes
+// kubernetes.Interface (not the concrete client) so tests can pass
 // client-go's fake client.
-type Lister func(ctx context.Context, client kubernetes.Interface, namespace string) (any, error)
+type Lister func(ctx context.Context, client kubernetes.Interface, q Query) (any, error)
 
 // Listers maps the name used in the URL (/api/clusters/{id}/{resource}) to
 // the function that lists it. Adding a resource type means adding a line here.
 var Listers = map[string]Lister{
-	"namespaces":   listNamespaces,
-	"pods":         listPods,
-	"deployments":  listDeployments,
-	"statefulsets": listStatefulSets,
-	"daemonsets":   listDaemonSets,
-	"jobs":         listJobs,
-	"cronjobs":     listCronJobs,
+	"namespaces":   asLister(listNamespaces),
+	"nodes":        asLister(listNodes),
+	"events":       asLister(listEvents),
+	"pods":         asLister(listPods),
+	"deployments":  asLister(listDeployments),
+	"statefulsets": asLister(listStatefulSets),
+	"daemonsets":   asLister(listDaemonSets),
+	"jobs":         asLister(listJobs),
+	"cronjobs":     asLister(listCronJobs),
+}
+
+// asLister wraps a typed list function (returning e.g. []Pod) so it fits in
+// the Listers map. Keeping the functions typed lets other Go code, like the
+// overview, use their results without converting from `any`.
+func asLister[T any](list func(context.Context, kubernetes.Interface, Query) ([]T, error)) Lister {
+	return func(ctx context.Context, client kubernetes.Interface, q Query) (any, error) {
+		return list(ctx, client, q)
+	}
 }
 
 // Meta holds the fields every row has. Row types embed it, and Go's JSON

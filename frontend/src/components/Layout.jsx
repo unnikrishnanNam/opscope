@@ -33,7 +33,11 @@ export default function Layout() {
             <ErrorBox title={`Can't reach ${cluster.name}`} message={status.data.error} detail={status.data.detail} />
           )}
 
-          {unknownCluster ? (
+          {clusterId && !cluster && !unknownCluster ? (
+            // Still loading the cluster list. Waiting here means every page
+            // under /c/<id>/ can rely on `cluster` being set.
+            <p className="muted">Loading…</p>
+          ) : unknownCluster ? (
             <section>
               <h1 className="page-title">Cluster not found</h1>
               <p className="page-about">
@@ -43,7 +47,7 @@ export default function Layout() {
             </section>
           ) : (
             // Pages read these with useOutletContext().
-            <Outlet context={{ cluster, reachable: status.data?.reachable }} />
+            <Outlet context={{ cluster, reachable: status.data?.reachable, status: status.data }} />
           )}
         </main>
       </div>

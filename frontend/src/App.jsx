@@ -5,6 +5,7 @@ import ManageClusters from "./pages/ManageClusters.jsx";
 import AddCluster from "./pages/AddCluster.jsx";
 import Placeholder from "./pages/Placeholder.jsx";
 import ResourceList from "./pages/ResourceList.jsx";
+import Overview from "./pages/Overview.jsx";
 import NotFound from "./pages/NotFound.jsx";
 import { allPages } from "./sections.js";
 
@@ -34,8 +35,9 @@ export default function App() {
   );
 }
 
-// Pages with a `resource` are tables built in this phase or earlier; the
+// The overview has its own page; pages with a `resource` are tables; the
 // rest are placeholders until their phase arrives.
 function pageElement(page) {
+  if (page.path === "overview") return <Overview page={page} />;
   return page.resource ? <ResourceList page={page} /> : <Placeholder page={page} />;
 }

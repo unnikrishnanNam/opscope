@@ -1,7 +1,7 @@
 // Table columns for each resource type, keyed by the name used in the API
 // URL (/api/clusters/{id}/pods). See ResourceTable.jsx for what each field means.
 import StatusBadge, { Fraction } from "./components/StatusBadge.jsx";
-import { age, duration } from "./format.js";
+import { age, bytes, cores, duration } from "./format.js";
 
 // Columns that most tables share.
 const name = { key: "name", label: "Name", className: "name" };
@@ -17,6 +17,40 @@ const created = {
 const status = { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> };
 
 export const columns = {
+  nodes: [
+    name,
+    {
+      key: "status",
+      label: "Status",
+      render: (row) => (
+        <>
+          <StatusBadge status={row.status} />
+          {!row.schedulable && (
+            <span className="tag tag-gap" title="New pods won't be scheduled on this node">
+              Cordoned
+            </span>
+          )}
+        </>
+      ),
+    },
+    {
+      key: "roles",
+      label: "Roles",
+      render: (row) => (row.roles.length ? row.roles.join(", ") : <span className="muted">–</span>),
+      sortValue: (row) => row.roles.join(","),
+    },
+    { key: "version", label: "Version", className: "mono" },
+    { key: "internalIP", label: "Internal IP", className: "mono" },
+    {
+      key: "os",
+      label: "OS",
+      render: (row) => <span title={row.osImage}>{`${row.os}/${row.arch}`}</span>,
+    },
+    { key: "cpu", label: "CPU", className: "num", render: (row) => cores(row.cpu) },
+    { key: "memory", label: "Memory", className: "num", render: (row) => bytes(row.memory) },
+    created,
+  ],
+
   pods: [
     name,
     namespace,

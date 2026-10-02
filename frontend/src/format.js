@@ -35,3 +35,21 @@ function preciseDuration(seconds) {
 export function clock(date) {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
 }
+
+// cores(2000) -> "2 cores", cores(500) -> "0.5 cores". Kubernetes counts CPU
+// in millicores: 1000m is one core.
+export function cores(millicores) {
+  const n = millicores / 1000;
+  return `${Number.isInteger(n) ? n : n.toFixed(1)} ${n === 1 ? "core" : "cores"}`;
+}
+
+// bytes(3113463808) -> "2.9 GiB". Uses powers of 1024, like Kubernetes' Gi/Mi.
+export function bytes(n) {
+  const units = ["B", "KiB", "MiB", "GiB", "TiB"];
+  let i = 0;
+  while (n >= 1024 && i < units.length - 1) {
+    n /= 1024;
+    i++;
+  }
+  return `${i === 0 ? n : n.toFixed(1)} ${units[i]}`;
+}

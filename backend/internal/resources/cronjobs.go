@@ -19,8 +19,8 @@ type CronJob struct {
 	LastSuccess  *time.Time `json:"lastSuccess"`  // when a job last finished successfully
 }
 
-func listCronJobs(ctx context.Context, client kubernetes.Interface, namespace string) (any, error) {
-	list, err := client.BatchV1().CronJobs(namespace).List(ctx, metav1.ListOptions{})
+func listCronJobs(ctx context.Context, client kubernetes.Interface, q Query) ([]CronJob, error) {
+	list, err := client.BatchV1().CronJobs(q.Namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

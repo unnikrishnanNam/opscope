@@ -4,6 +4,7 @@
 // `path` is relative to the selected cluster: "workloads/pods" becomes
 // /c/<cluster-id>/workloads/pods in the address bar.
 // `resource` is the API name for pages that show a table (see columns.jsx).
+// `clusterScoped` marks resources that don't live in a namespace (like nodes).
 // `phase` is the build phase that brings the real page (see docs/PHASES.md).
 
 export const sections = [
@@ -11,7 +12,7 @@ export const sections = [
     group: "Cluster",
     items: [
       { path: "overview", label: "Overview", phase: 3, about: "Counts, node health and recent warnings at a glance." },
-      { path: "nodes", label: "Nodes", phase: 3, about: "Machines in the cluster, their status, capacity and usage." },
+      { path: "nodes", resource: "nodes", clusterScoped: true, label: "Nodes", phase: 3, about: "Machines in the cluster, their status, capacity and usage." },
     ],
   },
   {

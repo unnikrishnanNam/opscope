@@ -14,8 +14,8 @@ type StatefulSet struct {
 	Ready   int32 `json:"ready"`
 }
 
-func listStatefulSets(ctx context.Context, client kubernetes.Interface, namespace string) (any, error) {
-	list, err := client.AppsV1().StatefulSets(namespace).List(ctx, metav1.ListOptions{})
+func listStatefulSets(ctx context.Context, client kubernetes.Interface, q Query) ([]StatefulSet, error) {
+	list, err := client.AppsV1().StatefulSets(q.Namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

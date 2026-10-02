@@ -28,7 +28,9 @@ export default function TopBar({ cluster, pagePath, status }) {
 
       <div className="topbar-right">
         <ClusterSwitcher cluster={cluster} pagePath={pagePath} />
-        {cluster && <NamespacePicker cluster={cluster} reachable={status?.data?.reachable} />}
+        {cluster && (
+          <NamespacePicker cluster={cluster} reachable={status?.data?.reachable} clusterScoped={page?.clusterScoped} />
+        )}
         {cluster && <ConnectionBadge status={status} />}
       </div>
     </header>
@@ -63,10 +65,23 @@ function ClusterSwitcher({ cluster, pagePath }) {
 
 // Namespace dropdown. The choice lives in the URL as ?ns=<name>;
 // no ?ns means "all namespaces".
-function NamespacePicker({ cluster, reachable }) {
+function NamespacePicker({ cluster, reachable, clusterScoped }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const selected = searchParams.get("ns") ?? "";
   const { data: namespaces } = useApi(reachable ? `/clusters/${cluster.id}/namespaces` : null);
+
+  // On pages like Nodes the namespace doesn't apply. We keep ?ns in the URL
+  // so it's still selected when you go back to a namespaced page.
+  if (clusterScoped) {
+    return (
+      <label className="picker" title="This page isn't limited to a namespace">
+        <span className="picker-label">Namespace</span>
+        <select className="select" disabled>
+          <option>Cluster-wide</option>
+        </select>
+      </label>
+    );
+  }
 
   function choose(name) {
     const next = new URLSearchParams(searchParams);

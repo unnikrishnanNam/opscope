@@ -36,6 +36,10 @@ func New(cfg Config, manager *clusters.Manager, logger *slog.Logger) http.Handle
 	// The {resource} part picks the lister (see internal/resources).
 	mux.HandleFunc("GET /api/clusters/{id}/{resource}", listResource(manager))
 
+	// A fixed path segment beats a {placeholder}, so this route wins over
+	// the one above for /api/clusters/{id}/overview.
+	mux.HandleFunc("GET /api/clusters/{id}/overview", getOverview(manager))
+
 	// Any other /api/ path is a 404 in JSON, so the frontend never gets
 	// index.html back when it asked for data.
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
