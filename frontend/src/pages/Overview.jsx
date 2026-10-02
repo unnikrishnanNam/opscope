@@ -15,6 +15,8 @@ const WORKLOADS = {
   daemonsets: { label: "DaemonSets", path: "workloads/daemonsets", problem: "not ready" },
   jobs: { label: "Jobs", path: "workloads/jobs", problem: "failed" },
   cronjobs: { label: "CronJobs", path: "workloads/cronjobs", problem: "" },
+  gateways: { label: "Gateways", path: "network/gateways", problem: "not programmed" },
+  httproutes: { label: "HTTPRoutes", path: "network/httproutes", problem: "not accepted" },
 };
 
 // The cluster's front page: counts, pod health, nodes and recent warnings.
@@ -40,6 +42,7 @@ export default function Overview({ page }) {
           <h1 className="page-title">{cluster.name}</h1>
           <p className="page-about">
             {status?.version ? `Kubernetes ${status.version} · ` : ""}
+            {o ? `${o.namespaces} namespaces · ` : ""}
             <span className="mono">{cluster.server}</span>
             {namespace && (
               <>
@@ -63,7 +66,8 @@ export default function Overview({ page }) {
             <Tile to="workloads/pods" label="Pods" value={o.pods.total}>
               <Health bad={unhealthyPods(o.pods.byStatus)} problem="unhealthy" okText="All healthy" />
             </Tile>
-            {o.workloads.map((w) => {
+            {/* gatewayAPI is null when the cluster doesn't have Gateway API, so no tiles appear. */}
+            {[...o.workloads, ...(o.gatewayAPI ?? [])].map((w) => {
               const info = WORKLOADS[w.resource];
               return (
                 <Tile key={w.resource} to={info.path} label={info.label} value={w.total}>
@@ -75,9 +79,6 @@ export default function Overview({ page }) {
                 </Tile>
               );
             })}
-            <Tile label="Namespaces" value={o.namespaces}>
-              <span className="muted">Cluster-wide</span>
-            </Tile>
           </div>
 
           <div className="cards">
@@ -154,7 +155,9 @@ function NodeList({ nodes }) {
     <ul className="node-list">
       {nodes.map((n) => (
         <li key={n.name}>
-          <span className="node-name">{n.name}</span>
+          <span className="node-name" title={n.name}>
+            {n.name}
+          </span>
           <span className="muted">{n.roles.join(", ") || "–"}</span>
           <span className="mono muted">{n.version}</span>
           <StatusBadge status={n.status} />
@@ -167,34 +170,37 @@ function NodeList({ nodes }) {
 function WarningList({ events, showNamespace }) {
   if (events.length === 0) return <p className="muted">No warnings. Nothing has complained recently.</p>;
   return (
-    <table className="table events-table">
-      <thead>
-        <tr>
-          <th className="num">Last seen</th>
-          <th>Object</th>
-          <th>Reason</th>
-          <th>Message</th>
-          <th className="num">Count</th>
-        </tr>
-      </thead>
-      <tbody>
-        {events.map((e) => (
-          <tr key={`${e.namespace}/${e.name}`}>
-            <td className="num">{age(e.lastSeen)} ago</td>
-            <td className="mono">
-              {showNamespace && <span className="muted">{e.namespace}/</span>}
-              {e.object}
-            </td>
-            <td>
-              <span className="status status-warn">{e.reason}</span>
-            </td>
-            <td className="message" title={e.message}>
-              <div className="clamp-2">{e.message}</div>
-            </td>
-            <td className="num">×{e.count}</td>
+    // On narrow screens the table scrolls sideways inside the card instead of spilling out.
+    <div className="card-scroll">
+      <table className="table events-table">
+        <thead>
+          <tr>
+            <th className="num">Last seen</th>
+            <th>Object</th>
+            <th>Reason</th>
+            <th>Message</th>
+            <th className="num">Count</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {events.map((e) => (
+            <tr key={`${e.namespace}/${e.name}`}>
+              <td className="num">{age(e.lastSeen)} ago</td>
+              <td className="mono">
+                {showNamespace && <span className="muted">{e.namespace}/</span>}
+                {e.object}
+              </td>
+              <td>
+                <span className="status status-warn">{e.reason}</span>
+              </td>
+              <td className="message" title={e.message}>
+                <div className="clamp-2">{e.message}</div>
+              </td>
+              <td className="num">×{e.count}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

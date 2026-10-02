@@ -6,7 +6,7 @@
 //   bad     broken and probably needs a person
 //   neutral nothing to worry about either way
 
-const OK = ["Running", "Succeeded", "Completed", "Complete", "Active", "Ready"];
+const OK = ["Running", "Succeeded", "Completed", "Complete", "Active", "Ready", "Programmed", "Accepted"];
 const WARN = ["Pending", "ContainerCreating", "PodInitializing", "Terminating", "Suspended", "NotReady"];
 const BAD = [
   "Failed",
@@ -20,6 +20,9 @@ const BAD = [
   "OOMKilled",
   "Evicted",
   "Unknown",
+  "NotProgrammed",
+  "NotAccepted",
+  "UnresolvedRefs",
 ];
 
 export function statusTone(status) {
@@ -32,8 +35,13 @@ export function statusTone(status) {
   return "neutral";
 }
 
-export default function StatusBadge({ status }) {
-  return <span className={`status status-${statusTone(status)}`}>{status || "–"}</span>;
+// `title` is shown on hover, e.g. the reason a gateway isn't programmed.
+export default function StatusBadge({ status, title }) {
+  return (
+    <span className={`status status-${statusTone(status)}`} title={title || undefined}>
+      {status || "–"}
+    </span>
+  );
 }
 
 // "2/3" for ready-style counts, highlighted when fewer than wanted are ready.

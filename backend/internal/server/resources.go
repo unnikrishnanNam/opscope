@@ -27,7 +27,13 @@ func listResource(manager *clusters.Manager) http.HandlerFunc {
 			return
 		}
 
-		rows, err := lister(r.Context(), cluster.Client, queryFrom(r))
+		rows, err := lister(r.Context(), clientsOf(cluster), queryFrom(r))
+		if errors.Is(err, resources.ErrGatewayAPINotInstalled) {
+			// Not a failure, just a missing feature: the "code" lets the UI
+			// show a calm note instead of an error box.
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error(), "code": "not_installed"})
+			return
+		}
 		if err != nil {
 			writeClusterError(w, err, cluster)
 			return
@@ -46,7 +52,7 @@ func getOverview(manager *clusters.Manager) http.HandlerFunc {
 			return
 		}
 
-		overview, err := resources.GetOverview(r.Context(), cluster.Client, queryFrom(r))
+		overview, err := resources.GetOverview(r.Context(), clientsOf(cluster), queryFrom(r))
 		if err != nil {
 			writeClusterError(w, err, cluster)
 			return
@@ -79,6 +85,11 @@ func getSecretValue(manager *clusters.Manager) http.HandlerFunc {
 			writeJSON(w, http.StatusOK, value)
 		}
 	}
+}
+
+// clientsOf bundles a cluster's clients for the resources package.
+func clientsOf(cluster *clusters.Cluster) resources.Clients {
+	return resources.Clients{Kube: cluster.Client, Dynamic: cluster.Dynamic}
 }
 
 // queryFrom reads the list options from the URL's query string.

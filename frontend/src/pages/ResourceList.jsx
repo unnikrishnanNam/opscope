@@ -37,9 +37,16 @@ export default function ResourceList({ page }) {
       <h1 className="page-title">{page.label}</h1>
       <p className="page-about">{page.about}</p>
 
-      {error && <ErrorBox title={`Couldn't load ${noun}`} message={error.message} detail={error.detail} />}
+      {error?.code === "not_installed" ? (
+        // A missing optional feature, not a failure: say so calmly instead of showing an error.
+        <div className="empty">
+          {error.message}. Install the Gateway API CRDs and a controller to use {page.label}.
+        </div>
+      ) : (
+        error && <ErrorBox title={`Couldn't load ${noun}`} message={error.message} detail={error.detail} />
+      )}
 
-      {reachable && (
+      {reachable && error?.code !== "not_installed" && (
         <ResourceTable
           columns={columns}
           rows={data}

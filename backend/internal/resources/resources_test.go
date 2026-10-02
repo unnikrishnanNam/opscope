@@ -231,9 +231,9 @@ func TestListCronJobs(t *testing.T) {
 }
 
 func TestEveryListerWorksOnAnEmptyCluster(t *testing.T) {
-	client := fake.NewClientset()
+	clients := Clients{Kube: fake.NewClientset(), Dynamic: fakeDynamic()}
 	for name, lister := range Listers {
-		if _, err := lister(context.Background(), client, Query{}); err != nil {
+		if _, err := lister(context.Background(), clients, Query{}); err != nil {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
@@ -317,7 +317,7 @@ func TestOverview(t *testing.T) {
 			Status: appsv1.DeploymentStatus{ReadyReplicas: 1}},
 	)
 
-	o, err := GetOverview(context.Background(), client, Query{})
+	o, err := GetOverview(context.Background(), Clients{Kube: client, Dynamic: fakeDynamic()}, Query{})
 	if err != nil {
 		t.Fatal(err)
 	}

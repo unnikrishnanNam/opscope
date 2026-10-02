@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -36,7 +37,8 @@ type Cluster struct {
 	Context string `json:"context"`
 	Server  string `json:"server"`
 
-	Client *kubernetes.Clientset `json:"-"`
+	Client  *kubernetes.Clientset `json:"-"` // typed client for built-in kinds
+	Dynamic dynamic.Interface     `json:"-"` // dynamic client for custom resources (Gateway API)
 }
 
 // savedCluster is the file format for clusters added in the UI.
@@ -80,7 +82,7 @@ func (m *Manager) LoadFromFile(path, contextName, name string) (*Cluster, error)
 		return nil, err
 	}
 
-	client, server, err := newClient(config)
+	client, dyn, server, err := newClient(config)
 	if err != nil {
 		return nil, err
 	}
@@ -95,6 +97,7 @@ func (m *Manager) LoadFromFile(path, contextName, name string) (*Cluster, error)
 		Context: config.CurrentContext,
 		Server:  server,
 		Client:  client,
+		Dynamic: dyn,
 	}
 	m.mu.Lock()
 	m.clusters[cluster.ID] = cluster
@@ -132,7 +135,7 @@ func (m *Manager) loadSavedFile(file string) error {
 	if err != nil {
 		return err
 	}
-	client, server, err := newClient(config)
+	client, dyn, server, err := newClient(config)
 	if err != nil {
 		return err
 	}
@@ -149,6 +152,7 @@ func (m *Manager) loadSavedFile(file string) error {
 		Context: saved.Context,
 		Server:  server,
 		Client:  client,
+		Dynamic: dyn,
 	}
 	return nil
 }
@@ -180,7 +184,7 @@ func (m *Manager) Add(name string, kubeconfig []byte, contextName string) (*Clus
 		return nil, err
 	}
 
-	client, server, err := newClient(config)
+	client, dyn, server, err := newClient(config)
 	if err != nil {
 		return nil, err
 	}
@@ -191,6 +195,7 @@ func (m *Manager) Add(name string, kubeconfig []byte, contextName string) (*Clus
 		Context: config.CurrentContext,
 		Server:  server,
 		Client:  client,
+		Dynamic: dyn,
 	}
 
 	// Only save clusters we can actually talk to.

@@ -11,6 +11,7 @@ backend/                  Go server
   main.go                 entry point: reads env vars, loads clusters, starts the server
   internal/clusters/      known clusters: from env or added in the UI, one client each
   internal/resources/     one file per resource type: lists it and flattens it into table rows
+                          (gatewayapi.go reads Gateway API custom resources with the dynamic client)
   internal/server/        HTTP routes, middleware, static file serving
 frontend/                 React app (Vite, plain JavaScript)
   src/api.js              fetch helper and the useApi hook
@@ -120,8 +121,13 @@ The container must be able to reach the cluster's API server. A `server:` addres
 | GET    | `/api/clusters/{id}/secrets/{namespace}/{name}/{key}` | One secret value: `{"value", "base64"}`; sent with `Cache-Control: no-store` |
 
 `{resource}` is one of `namespaces`, `nodes`, `events`, `pods`, `deployments`, `statefulsets`,
-`daemonsets`, `jobs`, `cronjobs`, `configmaps`, `secrets`, `services` or `ingresses` (see `backend/internal/resources/resources.go`). Events are
+`daemonsets`, `jobs`, `cronjobs`, `configmaps`, `secrets`, `services`, `ingresses`, `gateways`,
+`httproutes` or `gatewayclasses` (see `backend/internal/resources/resources.go`). Events are
 returned newest first (at most 100) and accept `?type=Warning` or `?type=Normal`.
+
+Gateway API types are read with client-go's dynamic client (`gateway.networking.k8s.io/v1`). On a
+cluster without Gateway API they answer `404` with `"code": "not_installed"`, and the overview's
+`gatewayAPI` field is `null`.
 
 The secrets list only ever contains key names. A value is sent only by the endpoint above, one key
 at a time, when someone clicks "Reveal" in the UI.

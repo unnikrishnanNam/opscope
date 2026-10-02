@@ -2,8 +2,7 @@ package resources
 
 import (
 	"context"
-
-	"k8s.io/client-go/kubernetes"
+	"errors"
 )
 
 // Overview is the summary shown on a cluster's front page.
@@ -12,6 +11,8 @@ type Overview struct {
 	Nodes      NodeSummary     `json:"nodes"`
 	Pods       PodSummary      `json:"pods"`
 	Workloads  []WorkloadCount `json:"workloads"`
+	// Gateways and HTTPRoutes; null when the cluster doesn't have Gateway API.
+	GatewayAPI []WorkloadCount `json:"gatewayAPI"`
 }
 
 type NodeSummary struct {
@@ -40,7 +41,8 @@ type WorkloadCount struct {
 // The calls run one after another. That's a handful of requests, and it
 // keeps the code easy to follow; running them in parallel would be the next
 // step if this ever feels slow.
-func GetOverview(ctx context.Context, client kubernetes.Interface, q Query) (*Overview, error) {
+func GetOverview(ctx context.Context, clients Clients, q Query) (*Overview, error) {
+	client := clients.Kube
 	result := &Overview{}
 
 	namespaces, err := listNamespaces(ctx, client, q)
@@ -103,6 +105,23 @@ func GetOverview(ctx context.Context, client kubernetes.Interface, q Query) (*Ov
 	}
 	result.Workloads = append(result.Workloads, countWorkloads("cronjobs", cronJobs,
 		func(CronJob) bool { return false }))
+
+	// Gateway API is optional: a cluster without it simply gets no counts.
+	gateways, err := listGateways(ctx, clients.Dynamic, q)
+	if errors.Is(err, ErrGatewayAPINotInstalled) {
+		return result, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	httpRoutes, err := listHTTPRoutes(ctx, clients.Dynamic, q)
+	if err != nil {
+		return nil, err
+	}
+	result.GatewayAPI = []WorkloadCount{
+		countWorkloads("gateways", gateways, func(g Gateway) bool { return g.Status != "Programmed" }),
+		countWorkloads("httproutes", httpRoutes, func(r HTTPRoute) bool { return r.Status != "Accepted" }),
+	}
 
 	return result, nil
 }

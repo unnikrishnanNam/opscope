@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 
-// ApiError carries the message from the backend ({"error": "...", "detail": "..."}).
+// ApiError carries the message from the backend:
+// {"error": "...", "detail": "...", "code": "..."}. `code` marks special
+// cases the UI handles on its own, like "not_installed".
 export class ApiError extends Error {
-  constructor(message, status, detail) {
+  constructor(message, status, detail, code) {
     super(message);
     this.status = status;
     this.detail = detail;
+    this.code = code;
   }
 }
 
@@ -27,7 +30,7 @@ export async function api(path, { method = "GET", body } = {}) {
   // 204 No Content has no body.
   const data = res.status === 204 ? null : await res.json().catch(() => null);
   if (!res.ok) {
-    throw new ApiError(data?.error ?? `Request failed (HTTP ${res.status})`, res.status, data?.detail);
+    throw new ApiError(data?.error ?? `Request failed (HTTP ${res.status})`, res.status, data?.detail, data?.code);
   }
   return data;
 }

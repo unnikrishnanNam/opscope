@@ -150,20 +150,22 @@ them with client-go's **dynamic client**, which works with any resource as plain
 dependency and shows how to read custom resources in general. The test cluster runs Gateway API
 v1.5.1 with `gateway.networking.k8s.io/v1`, which is what we use.
 
-- [ ] Read Gateway API objects with the dynamic client (`gateway.networking.k8s.io/v1`)
-- [ ] Detect when Gateway API isn't installed on a cluster and show a plain message, not an error
-- [ ] Gateways: name, namespace, class, listeners (name, port, protocol, hostname), addresses,
+- [x] Read Gateway API objects with the dynamic client (`gateway.networking.k8s.io/v1`)
+- [x] Detect when Gateway API isn't installed on a cluster and show a plain message, not an error
+      (checked on the `opscope-test` kind cluster, which has no Gateway API)
+- [x] Gateways: name, namespace, class, listeners (name, port, protocol, hostname), addresses,
       Programmed status, attached routes, age
-- [ ] HTTPRoutes: name, namespace, hostnames, parent gateways, backends (service:port),
+- [x] HTTPRoutes: name, namespace, hostnames, parent gateways, backends (service:port),
       Accepted / ResolvedRefs status, age
-- [ ] GatewayClasses (cluster-wide): name, controller, Accepted status, age
-- [ ] Sidebar: Network → Services, Ingresses, Gateways, HTTPRoutes, GatewayClasses
-- [ ] Statuses use the same badge colours as everything else
-- [ ] Overview: Gateway and HTTPRoute counts (with how many aren't programmed / accepted), shown only
+- [x] GatewayClasses (cluster-wide): name, controller, Accepted status, age
+- [x] Sidebar: Network → Services, Ingresses, Gateways, HTTPRoutes, GatewayClasses
+- [x] Statuses use the same badge colours as everything else
+- [x] Overview: Gateway and HTTPRoute counts (with how many aren't programmed / accepted), shown only
       when Gateway API is installed
-- [ ] Go tests with client-go's fake dynamic client
-- [ ] Tested against the `topology-test` gateway and routes on the multipass cluster
-- [ ] Re-check the Ingresses page against the new `topology-test` ingress (Phase 4 could only see it empty)
+- [x] Go tests with client-go's fake dynamic client
+- [x] Each cluster now has a dynamic client next to the typed one; listers receive both in a `Clients` struct
+- [x] Tested against the `topology-test` gateway and routes on the multipass cluster
+- [x] Re-check the Ingresses page against the new `topology-test` ingress (Phase 4 could only see it empty)
 
 Not in scope for now: GRPCRoute, TLSRoute, ListenerSet, ReferenceGrant, BackendTLSPolicy, and
 controller-specific resources (like `gateway.nginx.org` policies). They'd follow the same pattern.
@@ -320,3 +322,28 @@ Things that came up while building, decisions made, and anything that moved betw
   more Services and Deployments, which gives Phase 5 (and the Phase 4 Ingress page) real data.
 - The packaging phase now spells out that the read-only ClusterRole must include Gateway API,
   metrics and Secrets.
+
+### Phase 5
+
+- Checked against the multipass cluster in the browser and in Docker: `main-gateway` (Programmed,
+  80/HTTP, 10.99.38.200, 2 routes), `api-route` and `web-route` (Accepted, with their backends),
+  GatewayClass `nginx` (Accepted). The Ingresses page now shows `web-ingress`.
+- Custom resources are converted from the dynamic client's maps into small local structs with
+  `runtime.DefaultUnstructuredConverter.FromUnstructured`. Each struct lists only the fields we use,
+  which keeps the code close to the Gateway API spec and avoids long chains of map lookups.
+- A route's status is its worst parent: one Gateway rejecting it (NotAccepted) outranks a missing
+  backend (UnresolvedRefs), which outranks Accepted. The reason is shown on hover.
+- "Not installed" is a 404 with `"code": "not_installed"` from the list endpoints; the page shows a
+  calm note instead of an error box, and the overview simply leaves out the Gateway API tiles.
+  Checked on a real cluster without Gateway API (see "Second test cluster" below).
+- Test gotcha: client-go's fake dynamic client guesses resource names from kinds and turns
+  "Gateway" into "gatewaies", so tests add objects with an explicit resource via `Tracker().Create`.
+- With two more tiles the overview no longer fit one row, so the namespace count moved into the
+  header line ("17 namespaces"), where it reads just as well and isn't a health signal anyway.
+- Second test cluster: `opscope-test`, a single-node kind cluster (Kubernetes v1.35) running in Docker,
+  created for scenarios the multipass cluster can't show: no Gateway API, and no metrics-server
+  (useful in Phase 7). Its kubeconfig is `data/kind-opscope-test.kubeconfig`; `~/.kube/config` was
+  left alone. Remove it with `kind delete cluster --name opscope-test`.
+- Testing on a narrow window there showed two overview layout bugs, now fixed: long node names wrapped
+  onto several lines (now cut off with "…", full name on hover), and the warnings table spilled out
+  of its card (now scrolls inside it).

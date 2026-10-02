@@ -38,6 +38,9 @@ export const sections = [
     items: [
       { path: "network/services", resource: "services", label: "Services", phase: 4, about: "Stable addresses in front of a set of pods." },
       { path: "network/ingresses", resource: "ingresses", label: "Ingresses", phase: 4, about: "HTTP routes from outside the cluster to services." },
+      { path: "network/gateways", resource: "gateways", label: "Gateways", phase: 5, about: "Gateway API entry points: where traffic comes in, on which ports." },
+      { path: "network/httproutes", resource: "httproutes", label: "HTTPRoutes", phase: 5, about: "Gateway API rules that send HTTP traffic from a gateway to services." },
+      { path: "network/gatewayclasses", resource: "gatewayclasses", clusterScoped: true, label: "GatewayClasses", phase: 5, about: "The controllers that run gateways, such as nginx or Envoy." },
     ],
   },
 ];

@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -101,18 +102,26 @@ func checkSafeForUpload(config *clientcmdapi.Config) error {
 	return nil
 }
 
-// newClient builds a Kubernetes client for the current context of config.
-// It does not contact the cluster yet.
-func newClient(config *clientcmdapi.Config) (*kubernetes.Clientset, string, error) {
+// newClient builds the two Kubernetes clients for the current context of
+// config. It does not contact the cluster yet.
+//
+//   - kube is the typed client: Go structs for built-in kinds (Pods, Services, ...)
+//   - dyn is the dynamic client: works with any kind, including custom
+//     resources like Gateway API objects, as plain maps
+func newClient(config *clientcmdapi.Config) (kube *kubernetes.Clientset, dyn *dynamic.DynamicClient, host string, err error) {
 	restConfig, err := clientcmd.NewDefaultClientConfig(*config, &clientcmd.ConfigOverrides{}).ClientConfig()
 	if err != nil {
-		return nil, "", fmt.Errorf("can't build a client from this kubeconfig: %w", err)
+		return nil, nil, "", fmt.Errorf("can't build a client from this kubeconfig: %w", err)
 	}
 	restConfig.Timeout = requestTimeout
 
-	client, err := kubernetes.NewForConfig(restConfig)
+	kube, err = kubernetes.NewForConfig(restConfig)
 	if err != nil {
-		return nil, "", err
+		return nil, nil, "", err
 	}
-	return client, restConfig.Host, nil
+	dyn, err = dynamic.NewForConfig(restConfig)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	return kube, dyn, restConfig.Host, nil
 }

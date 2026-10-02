@@ -16,6 +16,13 @@ const created = {
 };
 const status = { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> };
 
+// Gateway API objects carry a `message` explaining a bad status; show it on hover.
+const gatewayStatus = {
+  key: "status",
+  label: "Status",
+  render: (row) => <StatusBadge status={row.status} title={row.message} />,
+};
+
 export const columns = {
   configmaps: [
     name,
@@ -63,6 +70,66 @@ export const columns = {
       render: (row) => <List items={row.ports} />,
       sortValue: (row) => row.ports.join(","),
     },
+    created,
+  ],
+
+  gateways: [
+    name,
+    namespace,
+    gatewayStatus,
+    { key: "class", label: "Class" },
+    {
+      key: "listeners",
+      label: "Listeners",
+      className: "mono",
+      // "80/HTTP, 443/HTTPS app.local", one per port the gateway accepts traffic on.
+      render: (row) => <List items={row.listeners.map((l) => `${l.port}/${l.protocol}${l.hostname ? ` ${l.hostname}` : ""}`)} />,
+      sortValue: (row) => row.listeners.length,
+    },
+    {
+      key: "addresses",
+      label: "Address",
+      className: "mono",
+      render: (row) => <List items={row.addresses} />,
+      sortValue: (row) => row.addresses.join(","),
+    },
+    { key: "attachedRoutes", label: "Routes", className: "num" },
+    created,
+  ],
+
+  httproutes: [
+    name,
+    namespace,
+    gatewayStatus,
+    {
+      key: "hostnames",
+      label: "Hostnames",
+      className: "mono",
+      render: (row) => <List items={row.hostnames} />,
+      sortValue: (row) => row.hostnames.join(","),
+    },
+    {
+      key: "parents",
+      label: "Gateways",
+      render: (row) => <List items={row.parents} />,
+      sortValue: (row) => row.parents.join(","),
+    },
+    {
+      key: "backends",
+      label: "Backends",
+      className: "mono",
+      render: (row) => <List items={row.backends} />,
+      sortValue: (row) => row.backends.join(","),
+    },
+    { key: "rules", label: "Rules", className: "num" },
+    created,
+  ],
+
+  gatewayclasses: [
+    name,
+    gatewayStatus,
+    { key: "controller", label: "Controller", className: "mono" },
+    { key: "description", label: "Description", render: (row) => row.description || <span className="muted">–</span> },
     created,
   ],
 
