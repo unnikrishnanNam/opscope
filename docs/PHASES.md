@@ -17,6 +17,7 @@ After a phase is done, we come back here, tick the boxes, and note anything that
 - **Keep it boring.** Use the Go standard library where possible, plain CSS, and few dependencies.
   Every file should make sense to someone learning the stack.
 - **One image.** The Go binary serves the API (`/api/*`) and the built React app (everything else).
+- **No built-in cluster.** Clusters come from the environment or are added in the UI. Every cluster endpoint lives under `/api/clusters/{id}/`.
 - **Fail clearly.** If the cluster or metrics-server can't be reached, show a plain message, not a blank screen.
 
 ---
@@ -42,25 +43,58 @@ Goal: the skeleton runs end to end (browser → React → Go → JSON) with no K
 - [x] `Makefile` with dev, build and docker targets
 - [x] `README.md` with how to run in dev and in Docker
 
-## Phase 1: Connect to the cluster
+## Phase 1: Connect to clusters
 
-Goal: the backend can talk to a cluster, and the UI shows which one.
+Goal: the backend can talk to one or more clusters, chosen from the environment or added in the UI.
 
-- [ ] Add `client-go` and build a client from kubeconfig (local) or in-cluster config (when running in a pod)
-- [ ] Config: `KUBECONFIG` path and optional context name
-- [ ] `GET /api/cluster` returns context name, API server URL and Kubernetes version
-- [ ] `GET /api/namespaces` lists namespaces
-- [ ] Mount `~/.kube/config` into the Docker container (documented in README)
-- [ ] Top bar shows the cluster name, version and a connected/disconnected badge
-- [ ] Namespace picker in the top bar ("All namespaces" + list), remembered in the URL
-- [ ] Small `api.js` helper on the frontend for fetching JSON and handling errors
-- [ ] Clear error state when the cluster can't be reached
+No cluster is built into the code, and OpScope never falls back to `~/.kube/config` on its own.
+If nothing is configured, the UI starts on an "Add a cluster" screen.
+
+**Where clusters come from**
+
+- [ ] Environment: `OPSCOPE_KUBECONFIG` (path to a kubeconfig file) and optional `OPSCOPE_CONTEXT`.
+      If set, that cluster is loaded at startup and marked "from environment" (it can't be removed in the UI).
+      We use our own variable name instead of `KUBECONFIG` so a cluster is never picked up by accident.
+- [ ] UI: paste a kubeconfig or upload the file, pick a context, give it a display name
+- [ ] The backend tests the connection before saving and shows a clear error if it fails
+- [ ] Clusters added in the UI are saved to `DATA_DIR` (default `./data`; `/data` in Docker as a volume),
+      one file per cluster, readable only by the OpScope user (`0600`)
+- [ ] Remove a UI-added cluster
+
+**Backend**
+
+- [ ] Add `client-go`; a small `clusters` package keeps a client per cluster
+- [ ] `GET /api/clusters`: list clusters (id, name, source, context, server URL). Never returns credentials
+- [ ] `POST /api/clusters/inspect`: read a pasted kubeconfig and return its context names
+- [ ] `POST /api/clusters`: add a cluster (name, kubeconfig, context)
+- [ ] `DELETE /api/clusters/{id}`: remove a UI-added cluster
+- [ ] `GET /api/clusters/{id}`: name, server URL, Kubernetes version, reachable or not
+- [ ] `GET /api/clusters/{id}/namespaces`: list namespaces
+
+**Frontend**
+
+- [ ] Small `api.js` helper for fetching JSON and handling errors
+- [ ] "Add a cluster" page (paste or upload, pick context, name, test and save)
+- [ ] Cluster switcher in the top bar, plus a "Manage clusters" page to remove ones you added
+- [ ] The selected cluster and namespace are part of the URL, so links and refresh keep them
+- [ ] Top bar shows cluster name, version and a connected/unreachable badge
+- [ ] Namespace picker ("All namespaces" + list)
+- [ ] Clear error state when a cluster can't be reached, naming the likely cause
+      (address unreachable, certificate doesn't match the address, credentials rejected)
+
+**Docker and safety**
+
+- [ ] README: mount a kubeconfig and set `OPSCOPE_KUBECONFIG`, or mount a volume at `/data` and add clusters in the UI
+- [ ] `make docker-run` publishes the port on `127.0.0.1` only. OpScope has no login, so anyone who can
+      open the page can read every saved cluster; it should not be exposed on a network as is
+- [ ] Check that the container can reach the multipass VMs (Docker Desktop networking on macOS)
+- [ ] Tested against the multipass cluster (kubemaster, kubeworker01, kubeworker02)
 
 ## Phase 2: Workloads
 
 Goal: list the main workload types in tables.
 
-- [ ] One generic list endpoint shape: `GET /api/{resource}?namespace=...`
+- [ ] One generic list endpoint shape: `GET /api/clusters/{id}/{resource}?namespace=...`
 - [ ] Backend returns small, flattened objects (only the fields the UI shows), not raw Kubernetes objects
 - [ ] Pods: name, namespace, status, ready containers, restarts, node, age
 - [ ] Deployments: name, namespace, ready/desired replicas, up-to-date, available, age
@@ -78,7 +112,7 @@ Goal: see the cluster at a glance.
 
 - [ ] Nodes list: name, status, roles, version, internal IP, OS/arch, CPU and memory capacity, age
 - [ ] Overview page: counts per resource type, node health summary, pods by phase
-- [ ] Recent warning events across the cluster (`GET /api/events?type=Warning`)
+- [ ] Recent warning events across the cluster (`GET /api/clusters/{id}/events?type=Warning`)
 
 ## Phase 4: Config and networking
 
@@ -94,7 +128,7 @@ Goal: cover the remaining common resource types.
 
 Goal: click any row to see more about it.
 
-- [ ] `GET /api/{resource}/{namespace}/{name}` returns details for one object
+- [ ] `GET /api/clusters/{id}/{resource}/{namespace}/{name}` returns details for one object
 - [ ] Detail panel: metadata, labels, annotations, owner references
 - [ ] Type-specific sections (containers for pods, replica info for deployments, keys for ConfigMaps, ...)
 - [ ] YAML view (read-only, with managed fields removed)
@@ -106,7 +140,7 @@ Goal: click any row to see more about it.
 Goal: basic live CPU and memory numbers.
 
 - [ ] Read metrics from metrics-server (`metrics.k8s.io` API)
-- [ ] `GET /api/metrics/nodes` and `GET /api/metrics/pods?namespace=...`
+- [ ] `GET /api/clusters/{id}/metrics/nodes` and `.../metrics/pods?namespace=...`
 - [ ] Detect when metrics-server is missing and show how to install it instead of failing
 - [ ] Nodes table: CPU and memory usage as a bar against allocatable
 - [ ] Pods table: CPU and memory usage columns
@@ -118,6 +152,8 @@ Goal: basic live CPU and memory numbers.
 
 Goal: OpScope can run inside the cluster it watches.
 
+- [ ] In-cluster mode: with `OPSCOPE_IN_CLUSTER=true`, use the pod's service account as a cluster
+      "from environment" (moved here from Phase 1, since it only matters when running inside a cluster)
 - [ ] Kubernetes manifests: Namespace, ServiceAccount, read-only ClusterRole + binding, Deployment, Service
 - [ ] Health and readiness probes using `/api/health`
 - [ ] Image runs as a non-root user with a read-only filesystem
@@ -138,6 +174,16 @@ Things that came up while building, decisions made, and anything that moved betw
   This is easier to follow; embedding with `go:embed` is a possible later improvement.
 - Routing uses React Router. Styling is plain CSS with variables; no CSS framework.
 - Light theme only for now.
+- Confirmed after review: plain JavaScript, serving from a folder, and light theme only all stay as they are.
+- Changed after review: no cluster is built in or picked up by default. Phase 1 now covers clusters from
+  the environment (`OPSCOPE_KUBECONFIG`) or added in the UI, and all cluster endpoints moved under
+  `/api/clusters/{id}/`. In-cluster config moved to Phase 7.
+- Decided: clusters added in the UI are saved to disk, and in Docker a volume is mounted at `/data`
+  so they survive restarts. `data/` is in `.gitignore` and `.dockerignore` so credentials never
+  reach git or an image.
+- Test cluster: multipass kubeadm cluster (1 control plane + 2 workers, v1.31, metrics-server installed).
+  From the Mac, the API server is reachable at `192.168.252.2:6443`, but its certificate only lists
+  `192.168.73.101` and `kubemaster`, so the kubeconfig needs `tls-server-name: kubemaster`.
 - The Docker image was not built during Phase 0 because Docker Desktop wasn't running. Everything
   the image does was checked locally: the Go server serving `frontend/dist`, `/api/health`, the
   JSON 404 for unknown API routes, and the `index.html` fallback for deep links. Run

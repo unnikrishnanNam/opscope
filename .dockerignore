@@ -3,3 +3,4 @@ frontend/dist
 .git
 docs
 *.md
+data
