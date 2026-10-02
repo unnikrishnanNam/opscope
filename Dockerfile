@@ -1,0 +1,37 @@
+# OpScope: one image that serves both the API and the web UI.
+#
+# Built in three stages. Only the last one ends up in the final image;
+# the first two are thrown away after their output is copied out.
+
+# ---- Stage 1: build the React app into static files ----
+FROM node:24-alpine AS frontend
+WORKDIR /src
+# Copy package files first so `npm ci` is cached until dependencies change.
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
+# ---- Stage 2: build the Go server into a single binary ----
+FROM golang:1.26-alpine AS backend
+WORKDIR /src
+COPY backend/go.mod ./
+# go.sum appears once we add dependencies (Phase 1); the wildcard keeps this line valid before then.
+COPY backend/go.su[m] ./
+RUN go mod download
+COPY backend/ ./
+ARG VERSION=dev
+# CGO_ENABLED=0 gives a static binary that runs on a minimal base image.
+RUN CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=${VERSION}" -o /opscope .
+
+# ---- Stage 3: the small runtime image ----
+# distroless/static has no shell or package manager, only what a static binary needs.
+FROM gcr.io/distroless/static-debian12:nonroot
+WORKDIR /app
+COPY --from=backend /opscope /app/opscope
+COPY --from=frontend /src/dist /app/web
+ENV PORT=8080 \
+    STATIC_DIR=/app/web
+EXPOSE 8080
+USER nonroot
+ENTRYPOINT ["/app/opscope"]

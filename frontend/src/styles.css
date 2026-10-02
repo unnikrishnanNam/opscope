@@ -1,0 +1,280 @@
+/* ==========================================================================
+   Design tokens
+   Change a value here and it changes everywhere it is used.
+   ========================================================================== */
+
+:root {
+  /* Type */
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-lg: 22px;
+
+  /* Neutrals: warm paper background, near-black ink */
+  --bg: #f6f6f3;
+  --surface: #ffffff;
+  --sidebar: #efeeea;
+  --border: #dddcd6;
+  --border-strong: #c9c8c1;
+  --ink: #1c2026;
+  --ink-soft: #4d535c;
+  --ink-faint: #80858c;
+
+  /* One accent color: a steady navy */
+  --accent: #1d3f6e;
+  --accent-soft: #e3e9f2;
+
+  /* Status colors, kept muted so they don't shout */
+  --ok: #2e7a4f;
+  --ok-soft: #e2f0e7;
+  --warn: #9a6512;
+  --warn-soft: #f6ecd9;
+  --bad: #a83a32;
+  --bad-soft: #f5e1df;
+
+  /* Spacing scale (4px steps) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  --radius: 4px;
+  --sidebar-width: 220px;
+  --topbar-height: 52px;
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  /* Numbers line up in columns (useful for tables later). */
+  font-variant-numeric: tabular-nums;
+}
+
+a {
+  color: var(--accent);
+}
+
+.muted {
+  color: var(--ink-faint);
+  font-size: var(--text-sm);
+}
+
+/* ==========================================================================
+   Layout: sidebar + main column
+   ========================================================================== */
+
+.shell {
+  display: flex;
+  height: 100%;
+}
+
+.main {
+  flex: 1;
+  min-width: 0; /* lets wide tables scroll instead of stretching the page */
+  display: flex;
+  flex-direction: column;
+}
+
+.content {
+  flex: 1;
+  overflow: auto;
+  padding: var(--space-8);
+}
+
+/* ==========================================================================
+   Sidebar
+   ========================================================================== */
+
+.sidebar {
+  width: var(--sidebar-width);
+  flex-shrink: 0;
+  background: var(--sidebar);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--topbar-height);
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+
+.nav-group {
+  padding: var(--space-4) var(--space-2) 0;
+}
+
+.nav-group-title {
+  padding: 0 var(--space-2) var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+
+.nav-link {
+  display: block;
+  padding: 5px var(--space-2);
+  border-radius: var(--radius);
+  color: var(--ink-soft);
+  text-decoration: none;
+  font-size: var(--text-sm);
+}
+
+.nav-link:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--ink);
+}
+
+.nav-link.active {
+  background: var(--surface);
+  color: var(--accent);
+  font-weight: 500;
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+/* ==========================================================================
+   Top bar
+   ========================================================================== */
+
+.topbar {
+  height: var(--topbar-height);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-8);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.crumbs {
+  font-size: var(--text-sm);
+}
+
+.crumb-group {
+  color: var(--ink-faint);
+}
+
+.crumb-sep {
+  margin: 0 var(--space-2);
+  color: var(--border-strong);
+}
+
+.crumb-page {
+  font-weight: 500;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+/* ==========================================================================
+   Badge (small status pill)
+   ========================================================================== */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  border: 1px solid transparent;
+}
+
+.badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.badge-ok {
+  color: var(--ok);
+  background: var(--ok-soft);
+}
+
+.badge-down {
+  color: var(--bad);
+  background: var(--bad-soft);
+}
+
+.badge-checking {
+  color: var(--ink-faint);
+  border-color: var(--border);
+}
+
+/* ==========================================================================
+   Page content
+   ========================================================================== */
+
+.page-title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.page-about {
+  margin: 0 0 var(--space-6);
+  color: var(--ink-soft);
+  max-width: 60ch;
+}
+
+.notice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 560px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+
+.notice-label {
+  padding: 1px var(--space-2);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
