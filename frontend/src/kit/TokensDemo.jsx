@@ -38,6 +38,8 @@ const COLOUR_GROUPS = [
       { name: "primary-text", checks: [["primary", TEXT]] },
       { name: "signal", note: "you are here", checks: [["bg", MARK], ["surface", MARK]] },
       { name: "focus", checks: [["bg", MARK], ["surface", MARK]] },
+      { name: "danger", note: "button fill" },
+      { name: "danger-text", checks: [["danger", TEXT]] },
     ],
   },
   {
@@ -61,6 +63,13 @@ const COLOUR_GROUPS = [
       { name: "data", note: "usage bars, sparklines", checks: [["surface", MARK], ["data-track", MARK]] },
       { name: "data-track" },
     ],
+  },
+  {
+    title: "Code",
+    tokens: ["code-key", "code-string", "code-literal", "code-comment"].map((name) => ({
+      name,
+      checks: [["surface-2", TEXT]],
+    })),
   },
 ];
 

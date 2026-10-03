@@ -87,19 +87,19 @@ export default function Overview({ page }) {
             })}
           </div>
 
-          <div className="card usage-card">
-            <h2 className="card-title">Cluster usage</h2>
+          <div className="old-card usage-card">
+            <h2 className="old-card-title">Cluster usage</h2>
             <ClusterUsage usage={usage} />
           </div>
 
           <div className="cards">
-            <div className="card">
-              <h2 className="card-title">Pods by status</h2>
+            <div className="old-card">
+              <h2 className="old-card-title">Pods by status</h2>
               <PodStatusBar byStatus={o.pods.byStatus} total={o.pods.total} />
             </div>
 
-            <div className="card">
-              <h2 className="card-title">Nodes</h2>
+            <div className="old-card">
+              <h2 className="old-card-title">Nodes</h2>
               <NodeList nodes={nodes.data} clusterId={cluster.id} />
             </div>
           </div>
@@ -107,8 +107,8 @@ export default function Overview({ page }) {
       )}
 
       {warnings.data && (
-        <div className="card">
-          <h2 className="card-title">
+        <div className="old-card">
+          <h2 className="old-card-title">
             Recent warnings
             {warnings.data.length > WARNINGS_SHOWN && (
               <span className="muted"> · newest {WARNINGS_SHOWN} of {warnings.data.length}</span>

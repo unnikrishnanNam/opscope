@@ -311,6 +311,22 @@
   font-weight: var(--weight-strong);
 }
 
+.kit-flush-body {
+  padding: var(--space-4);
+}
+
+.kit-boxed {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.kit-two {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-3);
+}
+
 /* Shape */
 
 .kit-shapes {

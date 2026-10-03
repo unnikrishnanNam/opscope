@@ -2,6 +2,9 @@
 // sparkline of the last 15 minutes. Both are plain HTML/SVG; no chart library.
 
 import { percent } from "../format.js";
+import { Callout } from "./Callout.jsx";
+import CodeBlock from "./CodeBlock.jsx";
+import "./Usage.css";
 
 // How much of the 15-minute window the sparkline covers, in milliseconds.
 // It matches the history the backend keeps.
@@ -74,23 +77,25 @@ export function Sparkline({ points, field, format, width = 96, height = 24, what
 }
 
 // MetricsUnavailable: what to do when a cluster has no metrics-server.
+// `compact` is a one-line note, for places where usage is a side detail.
 export function MetricsUnavailable({ compact = false }) {
   if (compact) {
-    return <p className="muted">Usage needs metrics-server, which isn't installed on this cluster.</p>;
+    return <Callout compact>Usage needs metrics-server, which isn't installed on this cluster.</Callout>;
   }
   return (
-    <div className="empty metrics-help">
+    <Callout title="Live usage needs metrics-server">
       <p>
-        Live CPU and memory usage need <strong>metrics-server</strong>, which isn't installed (or isn't answering) on
-        this cluster. To install it:
+        metrics-server isn't installed (or isn't answering) on this cluster, so CPU and memory show capacity only. To
+        install it:
       </p>
-      <pre className="code-box">
-        kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
-      </pre>
-      <p className="muted">
+      <CodeBlock
+        lineNumbers={false}
+        code="kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml"
+      />
+      <p>
         On kind and other local clusters, the kubelets use self-signed certificates, so metrics-server also needs the{" "}
         <code>--kubelet-insecure-tls</code> flag.
       </p>
-    </div>
+    </Callout>
   );
 }

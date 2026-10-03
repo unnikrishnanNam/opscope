@@ -5,6 +5,7 @@ import { Checkbox, SegmentedControl } from "../components/Toggle.jsx";
 import { MonitorIcon, MoonIcon, SunIcon } from "../components/icons.jsx";
 import { tokenSections } from "./TokensDemo.jsx";
 import { basicSections } from "./BasicsDemo.jsx";
+import { dataSections } from "./DataDemo.jsx";
 import "./kit.css";
 
 // /kit: every design token and component, in every state, in both themes.
@@ -13,7 +14,7 @@ import "./kit.css";
 //
 // Each demo file exports a list of sections: { id, title, about, render },
 // where render(theme) draws the section for one theme ("light" or "dark").
-const sections = [...tokenSections, ...basicSections];
+const sections = [...tokenSections, ...basicSections, ...dataSections];
 
 export default function Kit() {
   const [both, setBoth] = useState(true);

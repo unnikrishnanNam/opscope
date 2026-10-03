@@ -1,0 +1,75 @@
+/* One bar, a 2px gap between parts, rounded ends. */
+.stack-bar {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  margin-bottom: var(--space-3);
+}
+
+.stack-segment {
+  min-width: 4px; /* even a single item stays visible and hoverable */
+}
+
+.stack-segment:first-child {
+  border-radius: 5px 0 0 5px;
+}
+
+.stack-segment:last-child {
+  border-radius: 0 5px 5px 0;
+}
+
+.stack-segment:only-child {
+  border-radius: 5px;
+}
+
+.tone-ok {
+  background: var(--ok-mark);
+}
+
+.tone-warn {
+  background: var(--warn-mark);
+}
+
+.tone-bad {
+  background: var(--bad-mark);
+}
+
+.tone-neutral {
+  background: var(--neutral-mark);
+}
+
+.stack-legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 6px var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.stack-legend li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.stack-swatch {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border-radius: 3px;
+}
+
+.stack-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stack-value {
+  margin-left: auto;
+  font-weight: var(--weight-strong);
+  color: var(--text-muted);
+}

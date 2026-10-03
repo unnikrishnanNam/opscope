@@ -68,6 +68,13 @@
   border-color: var(--danger-hover);
 }
 
+/* A toggle button that's on (aria-pressed), e.g. "wrap lines". */
+.button[aria-pressed="true"] {
+  color: var(--text);
+  background: var(--surface-hover);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+
 .button-sm {
   height: var(--control-sm);
   padding: 0 10px;

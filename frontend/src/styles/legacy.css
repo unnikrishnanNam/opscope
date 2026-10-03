@@ -563,7 +563,7 @@ code,
   margin-bottom: var(--space-4);
 }
 
-.card {
+.old-card {
   padding: var(--space-4);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -571,83 +571,17 @@ code,
   min-width: 0;
 }
 
-.card-title {
+.old-card-title {
   margin: 0 0 var(--space-3);
   font-size: var(--text-sm);
   font-weight: 700;
 }
 
-.card-title .muted {
+.old-card-title .muted {
   font-weight: 500;
 }
 
 /* Pods by status: one bar, a 2px gap between segments, rounded ends. */
-.stack-bar {
-  display: flex;
-  gap: 2px;
-  height: 12px;
-  margin-bottom: var(--space-3);
-}
-
-.stack-segment {
-  min-width: 4px; /* even one pod stays visible and hoverable */
-}
-
-.stack-segment:first-child {
-  border-radius: 4px 0 0 4px;
-}
-
-.stack-segment:last-child {
-  border-radius: 0 4px 4px 0;
-}
-
-.stack-segment:only-child {
-  border-radius: 4px;
-}
-
-.tone-ok {
-  background: var(--ok-mark);
-}
-
-.tone-warn {
-  background: var(--warn-mark);
-}
-
-.tone-bad {
-  background: var(--bad-mark);
-}
-
-.tone-neutral {
-  background: var(--neutral-mark);
-}
-
-.legend {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 4px var(--space-4);
-  font-size: var(--text-sm);
-}
-
-.legend li {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.legend-swatch {
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-
-.legend-value {
-  margin-left: auto;
-  color: var(--ink-soft);
-}
 
 .node-list {
   list-style: none;
@@ -702,16 +636,16 @@ a.node-name:hover {
 }
 
 /* A table inside a card uses the card's border instead of its own. */
-.card .table {
+.old-card .table {
   border: none;
 }
 
-.card .table th {
+.old-card .table th {
   background: none;
 }
 
-.card .table th:first-child,
-.card .table td:first-child {
+.old-card .table th:first-child,
+.old-card .table td:first-child {
   padding-left: 0;
 }
 
@@ -787,14 +721,14 @@ a.node-name:hover {
   word-break: break-all;
 }
 
-.tabs {
+.old-tabs {
   display: flex;
   gap: var(--space-1);
   margin-bottom: var(--space-6);
   border-bottom: 1px solid var(--border);
 }
 
-.tab {
+.old-tab {
   all: unset;
   cursor: pointer;
   padding: var(--space-2) var(--space-3);
@@ -804,16 +738,16 @@ a.node-name:hover {
   border-bottom: 2px solid transparent;
 }
 
-.tab:hover {
+.old-tab:hover {
   color: var(--ink);
 }
 
-.tab:focus-visible {
+.old-tab:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: -2px;
 }
 
-.tab-active {
+.old-tab-active {
   color: var(--accent);
   font-weight: 600;
   border-bottom-color: var(--signal);
@@ -934,98 +868,8 @@ a.node-name:hover {
 }
 
 /* ==========================================================================
-   Usage bars and sparklines (Phase 7)
+   Overview usage card (Phase 7)
    ========================================================================== */
-
-.usage-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.usage {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.usage-track {
-  width: 64px;
-  height: 6px;
-  border-radius: 3px;
-  background: var(--data-track);
-  overflow: hidden;
-}
-
-.usage-fill {
-  display: block;
-  height: 100%;
-  border-radius: 3px;
-  min-width: 2px; /* a sliver stays visible at 1% */
-}
-
-.usage-ok {
-  background: var(--data);
-}
-
-.usage-warn {
-  background: var(--warn-mark);
-}
-
-.usage-bad {
-  background: var(--bad-mark);
-}
-
-.usage-pct {
-  width: 3.2em;
-  text-align: right;
-  font-size: var(--text-sm);
-  color: var(--ink-soft);
-}
-
-.sparkline {
-  display: block;
-  overflow: visible;
-}
-
-.sparkline-line {
-  fill: none;
-  stroke: var(--data);
-  stroke-width: 1.5;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-}
-
-.sparkline-base {
-  stroke: var(--border);
-  stroke-width: 1;
-}
-
-.sparkline-area {
-  fill: var(--data);
-  opacity: 0.08;
-}
-
-.sparkline-empty {
-  display: inline-block;
-  font-size: var(--text-xs);
-  color: var(--ink-faint);
-}
-
-.metrics-help {
-  margin-bottom: var(--space-4);
-  max-width: 820px;
-}
-
-.metrics-help p {
-  margin: 0 0 var(--space-2);
-}
-
-.metrics-help .code-box {
-  margin-bottom: var(--space-2);
-  white-space: pre-wrap;
-  word-break: break-all;
-}
 
 .usage-card {
   margin-bottom: var(--space-4);

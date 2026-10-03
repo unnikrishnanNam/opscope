@@ -62,14 +62,14 @@ export default function ResourceDetail({ page }) {
 
       {error && <ErrorBox title={`Couldn't load ${name}`} message={error.message} detail={error.detail} />}
 
-      <div className="tabs" role="tablist">
+      <div className="old-tabs" role="tablist">
         {tabs.map(([key, label]) => (
           <button
             key={key}
             type="button"
             role="tab"
             aria-selected={tab === key}
-            className={`tab ${tab === key ? "tab-active" : ""}`}
+            className={`old-tab ${tab === key ? "old-tab-active" : ""}`}
             onClick={() => openTab(key)}
           >
             {label}
@@ -176,7 +176,7 @@ function Summary({ d, cluster, resource }) {
 function Section({ title, children }) {
   return (
     <div className="detail-section">
-      <h2 className="card-title">{title}</h2>
+      <h2 className="old-card-title">{title}</h2>
       {children}
     </div>
   );

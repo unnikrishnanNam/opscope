@@ -1,0 +1,83 @@
+/* Usage bar: a short track, filled in the neutral data colour, amber from
+   75% and red from 90%. The percentage is always written next to it. */
+
+.usage {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.usage-track {
+  width: 64px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--data-track);
+  overflow: hidden;
+}
+
+.usage-fill {
+  display: block;
+  height: 100%;
+  min-width: 2px; /* a sliver stays visible at 1% */
+  border-radius: 3px;
+}
+
+.usage-ok {
+  background: var(--data);
+}
+
+.usage-warn {
+  background: var(--warn-mark);
+}
+
+.usage-bad {
+  background: var(--bad-mark);
+}
+
+.usage-pct {
+  width: 3.2em;
+  text-align: right;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-strong);
+  color: var(--text-muted);
+}
+
+/* Sparkline */
+
+.sparkline {
+  display: block;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.sparkline-line {
+  fill: none;
+  stroke: var(--data);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.sparkline-base {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.sparkline-area {
+  fill: var(--data);
+  opacity: 0.08;
+}
+
+.sparkline-empty {
+  display: inline-block;
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+}
+
+/* A bar and a sparkline side by side, as in the Nodes table. */
+.usage-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}

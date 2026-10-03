@@ -8,7 +8,7 @@ We work the same way as before: one small phase at a time, each ending with a wo
 ticked boxes and notes at the bottom of this file. Phases are numbered **R0–R8** so they don't mix
 with the build phases 0–8.
 
-**Status (2026-10-03):** R0 and R1 done; R2 next.
+**Status (2026-10-03):** R0–R2 done; R3 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -147,23 +147,23 @@ Goal: the small building blocks, each with all its states.
 
 Goal: everything that shows cluster data, tested on realistic sample data before it touches a page.
 
-- [ ] Sample data in `src/kit/samples.js`, shaped like real API responses (long names, zero rows,
+- [x] Sample data in `src/kit/samples.js`, shaped like real API responses (long names, zero rows,
       errors, crash loops; no real secrets)
-- [ ] `Card` and `Section` (title, optional action on the right, body)
-- [ ] `StatTile` (label, big number, health line; clickable)
-- [ ] `DataTable`: the current `ResourceTable` rebuilt. Header stays visible while scrolling, sort
+- [x] `Card` and `Section` (title, optional action on the right, body)
+- [x] `StatTile` (label, big number, health line; clickable)
+- [x] `DataTable`: the current `ResourceTable` rebuilt. Header stays visible while scrolling, sort
       icons, row hover, a whole-row link (not only the name), skeleton rows while loading, empty and
       "no match" states, comfortable and compact density
-- [ ] `Tabs` (with counts, keyboard arrows between tabs)
-- [ ] `Callout`: info, warning and error, replacing `ErrorBox`, `.notice`, `.empty` and the
+- [x] `Tabs` (with counts, keyboard arrows between tabs)
+- [x] `Callout`: info, warning and error, replacing `ErrorBox`, `.notice`, `.empty` and the
       metrics-server help box; technical details still folded away
-- [ ] `EmptyState` (icon, one sentence, optional action)
-- [ ] `CodeBlock` for YAML and config data: line numbers, copy button, wrap on/off, light YAML
+- [x] `EmptyState` (icon, one sentence, optional action)
+- [x] `CodeBlock` for YAML and config data: line numbers, copy button, wrap on/off, light YAML
       colouring (keys, values, comments) that works in both themes
-- [ ] `LogView` surface: mono, line wrap, "live" indicator while following, jump to newest
-- [ ] `UsageBar`, `Sparkline` and `StackBar` with legend, restyled on the new palette
-- [ ] `FactGrid` (label/value pairs) and `KeyValueList` (labels, annotations)
-- [ ] `EventList` (warnings and events, newest first, object links)
+- [x] `LogView` surface: mono, line wrap, "live" indicator while following, jump to newest
+- [x] `UsageBar`, `Sparkline` and `StackBar` with legend, restyled on the new palette
+- [x] `FactGrid` (label/value pairs) and `KeyValueList` (labels, annotations)
+- [x] `EventList` (warnings and events, newest first, object links)
 
 ## Phase R3: Navigation and overlay components
 
@@ -319,4 +319,48 @@ Things that come up while building, decisions made, and anything that moves betw
 - The existing code isn't strictly Prettier-formatted (13 files differ), so no formatter was run;
   new code follows the same style by hand.
 - Build: JS 315 KB (98 KB gzipped), CSS 36 KB. `/kit` is still left out of the bundle.
+
+### Phase R2
+
+- Checked on `/kit` in both themes and at 375 px. Table: sorting, filtering with its "no match"
+  state and Escape, row clicks, the header staying put while the box scrolls, and the loading and
+  empty states. Tabs with the keyboard. Following logs, scrolling up and "Jump to newest". Folded
+  annotations. In the app against multipass: the overview's pods-by-status bar, the Nodes usage
+  bars and sparklines, and a pod's detail page.
+- The new metrics-server notice was only seen on `/kit`. The `opscope-test` kind cluster is down
+  (its container exited, code 137, a few hours before this phase), and it wasn't restarted without asking.
+- Split of work: components that keep their props were rebuilt in place, so pages already use them:
+  `UsageBar`, `Sparkline` and `MetricsUnavailable` (now a `Callout` with a `CodeBlock`), and
+  `PodStatusBar` (now a thin wrapper around the general `StackBar`). Components that replace a
+  different structure are new and get wired in with their pages in R5–R7: `DataTable`, `Card`,
+  `Section`, `StatTile`, `Tabs`, `Callout`, `EmptyState`, `CodeBlock`, `LogView`, `FactGrid`,
+  `KeyValueList` and `EventList`.
+- Class name clashes: the old `.card`, `.card-title`, `.tabs`, `.tab` and `.tab-active` rules would
+  have leaked into the new Card and Tabs, so they were renamed to `old-*` in `legacy.css` and in the
+  overview and detail pages. The other new components use names the old CSS doesn't have
+  (`data-table`, `callout`, `code-block`, ...).
+- `DataTable` keeps `ResourceTable`'s column format, so `columns.jsx` works unchanged; `/kit` uses
+  the real pod columns. Header cells take only the column's alignment, so a `mono` column doesn't
+  set its header in monospace. Clicking anywhere on a row opens it (Cmd/Ctrl-click opens a new tab),
+  except on links and buttons inside it or after selecting text. The name stays a real link for the
+  keyboard and screen readers.
+- The table header sticks inside the table's own box, because a box that scrolls sideways can't
+  also let its header stick to the page. So the header only stays put when the box has a height:
+  `maxHeight`. R5 should decide whether list pages give the table the rest of the window, so it
+  scrolls inside and the header stays visible, or let the page scroll as now.
+- YAML colouring is a line-by-line splitter, not a parser (`yamlParts` in `CodeBlock.jsx`). It
+  colours keys, quoted strings, numbers/true/false/null and comments, and leaves plain values in the
+  normal text colour so the YAML stays calm. Tested on URLs with `#`, quoted `#`, list items, colons
+  inside values and quoted keys. Code colours are tokens (`--code-*`), all at least 5:1 on code blocks.
+- Bugs found on `/kit` and fixed: with line numbers on, each coloured piece of a line became its own
+  grid cell and wrapped (each line's content is now one element); and a code block without a title
+  had an empty header bar (its buttons now sit beside the code instead).
+- `LogView` only keeps the newest line in view while you're at the bottom, so reading older lines
+  while following is no longer interrupted. "Live" is marked in Signal orange (it's what's being watched).
+- `EventList` is a list instead of a table: long messages wrap under the reason and object instead
+  of being cut to two lines in a narrow column.
+- For R5: completed pods show "0/1" ready in the warning colour (the `Fraction` in the pods
+  columns); that's expected for a finished pod and shouldn't look like a problem. A `/` shortcut to
+  focus the filter would also fit the list pages.
+- Build: JS 318 KB (99 KB gzipped), CSS 40 KB. `/kit` and its samples are still left out of the bundle.
 
