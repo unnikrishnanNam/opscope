@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { setThemeChoice, useTheme, useThemeChoice } from "../theme.js";
+import { useTheme } from "../theme.js";
 import { AppIcon } from "../components/Logo.jsx";
-import { Checkbox, SegmentedControl } from "../components/Toggle.jsx";
-import { MonitorIcon, MoonIcon, SunIcon } from "../components/icons.jsx";
+import { Checkbox } from "../components/Toggle.jsx";
+import ThemeSwitch from "../components/ThemeSwitch.jsx";
 import { tokenSections } from "./TokensDemo.jsx";
 import { basicSections } from "./BasicsDemo.jsx";
 import { dataSections } from "./DataDemo.jsx";
+import { navSections } from "./NavDemo.jsx";
 import "./kit.css";
 
 // /kit: every design token and component, in every state, in both themes.
@@ -14,7 +15,7 @@ import "./kit.css";
 //
 // Each demo file exports a list of sections: { id, title, about, render },
 // where render(theme) draws the section for one theme ("light" or "dark").
-const sections = [...tokenSections, ...basicSections, ...dataSections];
+const sections = [...tokenSections, ...basicSections, ...dataSections, ...navSections];
 
 export default function Kit() {
   const [both, setBoth] = useState(true);
@@ -29,7 +30,7 @@ export default function Kit() {
           <Checkbox checked={both} onChange={setBoth}>
             Light and dark side by side
           </Checkbox>
-          <ThemeChoice />
+          <ThemeSwitch showLabels />
         </div>
       </header>
 
@@ -77,19 +78,3 @@ function PageTheme({ render }) {
   return render(useTheme());
 }
 
-// Becomes the real ThemeSwitch in phase R3.
-function ThemeChoice() {
-  return (
-    <SegmentedControl
-      label="Theme"
-      size="sm"
-      value={useThemeChoice()}
-      onChange={setThemeChoice}
-      options={[
-        { value: "system", label: "System", icon: MonitorIcon },
-        { value: "light", label: "Light", icon: SunIcon },
-        { value: "dark", label: "Dark", icon: MoonIcon },
-      ]}
-    />
-  );
-}

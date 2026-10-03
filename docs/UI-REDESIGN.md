@@ -8,7 +8,7 @@ We work the same way as before: one small phase at a time, each ending with a wo
 ticked boxes and notes at the bottom of this file. Phases are numbered **R0–R8** so they don't mix
 with the build phases 0–8.
 
-**Status (2026-10-03):** R0–R2 done; R3 next.
+**Status (2026-10-03):** R0–R3 done; R4 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -169,14 +169,14 @@ Goal: everything that shows cluster data, tested on realistic sample data before
 
 Goal: the interactive pieces of the frame, fully usable with the keyboard.
 
-- [ ] `Popover` / `Menu`: opens under its button, closes on Escape and outside click, arrow-key navigation
-- [ ] `Combobox` for the namespace picker: type to filter, arrow keys, Enter, "All namespaces" on top
-- [ ] `ClusterSwitcher`: each cluster with its status dot and version, and "Manage clusters" at the bottom
-- [ ] `Breadcrumbs`
-- [ ] `PageHeader`: title, short description, actions and "updated 10:42" on the right
-- [ ] `ThemeSwitch` (System / Light / Dark)
-- [ ] `Drawer` for the sidebar on narrow screens
-- [ ] `Dialog`, so removing a cluster asks in-app instead of with `window.confirm`
+- [x] `Popover` / `Menu`: opens under its button, closes on Escape and outside click, arrow-key navigation
+- [x] `Combobox` for the namespace picker: type to filter, arrow keys, Enter, "All namespaces" on top
+- [x] `ClusterSwitcher`: each cluster with its status dot and version, and "Manage clusters" at the bottom
+- [x] `Breadcrumbs`
+- [x] `PageHeader`: title, short description, actions and "updated 10:42" on the right
+- [x] `ThemeSwitch` (System / Light / Dark)
+- [x] `Drawer` for the sidebar on narrow screens
+- [x] `Dialog`, so removing a cluster asks in-app instead of with `window.confirm`
 
 ## Phase R4: App shell
 
@@ -363,4 +363,43 @@ Things that come up while building, decisions made, and anything that moves betw
   columns); that's expected for a finished pod and shouldn't look like a problem. A `/` shortcut to
   focus the filter would also fit the list pages.
 - Build: JS 318 KB (99 KB gzipped), CSS 40 KB. `/kit` and its samples are still left out of the bundle.
+
+### Phase R3
+
+- Checked on `/kit` in both themes and at 375 px, mostly with the keyboard. Namespace picker:
+  typing filters, arrows move, Enter picks and returns focus to the button, Escape closes, a click
+  outside closes. Cluster switcher with reachable, unreachable and still-checking clusters. Menu:
+  Enter opens on the first item, arrows move, Enter picks. Confirm dialog: focus starts on Cancel,
+  Escape is ignored while it's busy, the error stays inside the dialog, focus goes back to the
+  button. Drawer: Escape and focus return.
+- `opscope-test` was started again (`docker start opscope-test-control-plane`, with your OK). Same
+  API port, so its kubeconfig still works.
+- `Dialog`, `ConfirmDialog` and `Drawer` use the browser's `<dialog>` element with `showModal()`:
+  focus stays inside, the page behind is inert, Escape closes it and focus returns afterwards,
+  with no extra code for any of that. They're controlled (the parent owns `open`). A backdrop click
+  only closes when the press also started on the backdrop, so a text selection dragged out of the
+  dialog doesn't close it. React doesn't pass `autofocus` through, so `data-autofocus` marks what
+  gets focus on open (Cancel, in a confirm dialog).
+- `usePopover` (in `Popover.jsx`) is the shared open/close logic for menus and pickers: Escape,
+  a click outside, and focus leaving all close it. Panels are positioned under their button with
+  CSS, not drawn in a separate layer; nothing that opens one sits inside a scrolling box, so they
+  can't be clipped.
+- `Combobox` follows the ARIA "select-only combobox with a search box" pattern: focus stays in the
+  search box, `aria-activedescendant` points at the highlighted option, and a list without search
+  takes focus itself. Lists of 8 or more get a search box. Its button is always named
+  "Namespace: default" and so on, whether or not the label is shown.
+- `ClusterSwitcher` only draws: it takes each cluster's status from the caller. Fetching every
+  cluster's status for it is R4's job (today only the current cluster is checked).
+- `Menu` passes its `ref` straight to `Button`. React 19 treats `ref` as a normal prop, and
+  `Button` puts it on the real element.
+- New class names avoid the old CSS (`page-header-block`, `breadcrumbs`, `combobox-*`), so nothing
+  had to be renamed this time.
+- The built-in browser used for checking runs CSS animations slowly while the pane isn't focused,
+  so several screenshots caught fade-ins halfway (a picker that looked see-through, a dialog
+  without its dimmed backdrop). Checking the page itself showed the right result each time:
+  `elementFromPoint` found the panel on top and the backdrop present, and opacity reached 1.
+- For R4: open the drawer with the current page's link focused (`data-autofocus`), not the first
+  link. After a failed confirm, focus could move back to Cancel (today it's left on the page, and
+  Tab brings it back into the dialog).
+- Build unchanged from R2 (the new components aren't used by pages yet): JS 318 KB, CSS 40 KB.
 
