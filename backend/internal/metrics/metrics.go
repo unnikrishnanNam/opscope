@@ -4,7 +4,7 @@
 // metrics-server is an add-on that asks every node's kubelet for usage
 // numbers and serves them through the Kubernetes API, under the
 // metrics.k8s.io group. It only knows the current values; the history
-// (for the sparklines) is kept by OpScope itself, in memory.
+// (for the sparklines) is kept by Opscope itself, in memory.
 package metrics
 
 import (

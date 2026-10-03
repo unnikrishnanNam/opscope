@@ -24,7 +24,7 @@ export async function api(path, { method = "GET", body } = {}) {
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch {
-    throw new ApiError("Can't reach the OpScope server.", 0);
+    throw new ApiError("Can't reach the Opscope server.", 0);
   }
 
   // 204 No Content has no body.

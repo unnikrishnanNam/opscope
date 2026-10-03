@@ -2,11 +2,20 @@ import { Link, useLocation, useOutletContext, useParams, useSearchParams } from 
 import { useApi } from "../api.js";
 import { age } from "../format.js";
 import { detailPath, nsQuery } from "../sections.js";
-import ErrorBox from "../components/ErrorBox.jsx";
-import StatusBadge from "../components/StatusBadge.jsx";
-import EventsTable from "../components/EventsTable.jsx";
-import SecretKeys from "../components/SecretKeys.jsx";
+import { Callout } from "../components/Callout.jsx";
+import { Card, Section } from "../components/Card.jsx";
+import CodeBlock from "../components/CodeBlock.jsx";
+import { SimpleTable } from "../components/DataTable.jsx";
+import EventList from "../components/EventList.jsx";
+import { Fact, FactGrid, KeyValueList } from "../components/Facts.jsx";
+import { Skeleton, SkeletonText } from "../components/Loading.jsx";
 import LogViewer from "../components/LogViewer.jsx";
+import { PageHeader } from "../components/PageHeader.jsx";
+import SecretKeys from "../components/SecretKeys.jsx";
+import StatusBadge from "../components/StatusBadge.jsx";
+import { Tag } from "../components/Tag.jsx";
+import Tabs from "../components/Tabs.jsx";
+import "./ResourceDetail.css";
 
 const REFRESH_MS = 10_000;
 
@@ -20,9 +29,7 @@ export default function ResourceDetail({ page }) {
   const tab = searchParams.get("tab") ?? "summary";
 
   const parts = page.clusterScoped ? [name] : [namespace, name];
-  const path = reachable
-    ? `/clusters/${cluster.id}/${page.resource}/${parts.map(encodeURIComponent).join("/")}`
-    : null;
+  const path = reachable ? `/clusters/${cluster.id}/${page.resource}/${parts.map(encodeURIComponent).join("/")}` : null;
   const { data: d, error } = useApi(path, { refreshMs: REFRESH_MS });
 
   function openTab(next) {
@@ -33,124 +40,168 @@ export default function ResourceDetail({ page }) {
   }
 
   const tabs = [
-    ["summary", "Summary"],
-    ["yaml", "YAML"],
-    ["events", d ? `Events (${d.events.length})` : "Events"],
+    { value: "summary", label: "Summary" },
+    { value: "yaml", label: "YAML" },
+    { value: "events", label: "Events", count: d?.events.length },
   ];
-  if (page.resource === "pods") tabs.push(["logs", "Logs"]);
+  if (page.resource === "pods") tabs.push({ value: "logs", label: "Logs" });
 
   const status = d?.fields.find((f) => f.label === "Status")?.value;
 
   return (
-    <section>
-      <div className="detail-header">
-        <span className="tag">{d?.kind ?? page.label}</span>
-        <h1 className="page-title">{name}</h1>
-        {status && <StatusBadge status={status} />}
-      </div>
-      <p className="page-about">
-        {namespace && (
+    <section className="detail-page">
+      <PageHeader
+        before={<Tag>{d?.kind ?? page.label}</Tag>}
+        title={name}
+        after={status && <StatusBadge status={status} />}
+        description={
           <>
-            Namespace <strong>{namespace}</strong> ·{" "}
+            {namespace && (
+              <>
+                Namespace{" "}
+                <Link
+                  className="detail-namespace"
+                  to={`/c/${cluster.id}/${page.path}?ns=${encodeURIComponent(namespace)}`}
+                >
+                  {namespace}
+                </Link>
+                {" · "}
+              </>
+            )}
+            {d && <span title={new Date(d.created).toLocaleString()}>created {age(d.created)} ago</span>}
           </>
-        )}
-        {d ? `created ${age(d.created)} ago` : " "}
-      </p>
+        }
+      />
 
-      {error && <ErrorBox title={`Couldn't load ${name}`} message={error.message} detail={error.detail} />}
-
-      <div className="tabs" role="tablist">
-        {tabs.map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={tab === key}
-            className={`tab ${tab === key ? "tab-active" : ""}`}
-            onClick={() => openTab(key)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {d && tab === "summary" && <Summary d={d} cluster={cluster} resource={page.resource} />}
-      {d && tab === "yaml" && <YamlView d={d} isSecret={page.resource === "secrets"} />}
-      {d && tab === "events" && (
-        <EventsTable clusterId={cluster.id} events={d.events} showObject={false} emptyText="No recent events for this object." />
+      {error && (
+        <Callout tone="error" title={`Couldn't load ${name}`} detail={error.detail}>
+          {error.message}
+        </Callout>
       )}
-      {d && tab === "logs" && (
-        <LogViewer clusterId={cluster.id} namespace={namespace} pod={name} containers={d.containers} />
+
+      {!d && !error && reachable && <DetailSkeleton />}
+
+      {d && (
+        <Tabs label={`${d.kind} details`} value={tab} onChange={openTab} tabs={tabs}>
+          {tab === "summary" && <Summary d={d} cluster={cluster} resource={page.resource} />}
+          {tab === "yaml" && (
+            <CodeBlock
+              code={d.yaml}
+              language="yaml"
+              title={`Read-only. managedFields are left out${page.resource === "secrets" ? "; secret values are hidden" : ""}.`}
+            />
+          )}
+          {tab === "events" && (
+            <EventList
+              clusterId={cluster.id}
+              events={d.events}
+              showObject={false}
+              emptyText="No recent events for this object."
+            />
+          )}
+          {tab === "logs" && (
+            <LogViewer clusterId={cluster.id} namespace={namespace} pod={name} containers={d.containers} />
+          )}
+        </Tabs>
       )}
     </section>
   );
 }
 
+function DetailSkeleton() {
+  return (
+    <div className="detail-sections" aria-hidden="true">
+      <Skeleton height={40} />
+      <div className="detail-skeleton-card">
+        <SkeletonText lines={4} />
+      </div>
+    </div>
+  );
+}
+
 function Summary({ d, cluster, resource }) {
   const search = nsQuery(useLocation().search);
+  const facts = d.fields.filter((f) => f.label !== "Status"); // already in the header
 
   return (
     <div className="detail-sections">
-      <dl className="facts">
-        {d.fields
-          .filter((f) => f.label !== "Status") // already in the header
-          .map((f) => (
-            <Fact key={f.label} label={f.label}>
-              {f.value}
-            </Fact>
-          ))}
-        {d.owners.map((o) => {
-          const link = o.resource && detailPath(cluster.id, o.resource, d.namespace, o.name);
-          return (
-            <Fact key={`${o.kind}/${o.name}`} label="Owned by">
-              {link ? <Link to={link + search}>{`${o.kind}/${o.name}`}</Link> : `${o.kind}/${o.name}`}
-            </Fact>
-          );
-        })}
-      </dl>
+      {(facts.length > 0 || d.owners.length > 0) && (
+        <Card>
+          <FactGrid>
+            {facts.map((f) => (
+              <Fact key={f.label} label={f.label}>
+                {f.value || <span className="cell-empty">–</span>}
+              </Fact>
+            ))}
+            {d.owners.map((o) => {
+              const link = o.resource && detailPath(cluster.id, o.resource, d.namespace, o.name);
+              return (
+                <Fact key={`${o.kind}/${o.name}`} label="Owned by">
+                  {link ? <Link to={link + search}>{`${o.kind}/${o.name}`}</Link> : `${o.kind}/${o.name}`}
+                </Fact>
+              );
+            })}
+          </FactGrid>
+        </Card>
+      )}
 
       {resource === "secrets" && (
-        <Section title="Keys">
+        <Section title="Keys" aside={d.secretKeys.length || undefined}>
           <SecretKeys cluster={cluster} secret={{ namespace: d.namespace, name: d.name, keys: d.secretKeys }} />
         </Section>
       )}
 
       {d.containers.length > 0 && (
-        <Section title="Containers">
+        <Section title="Containers" aside={d.containers.length}>
           <Containers containers={d.containers} />
         </Section>
       )}
 
       {d.data.length > 0 && (
-        <Section title="Data">
-          {d.data.map((entry) => (
-            <div key={entry.key} className="data-entry">
-              <div className="data-key">
-                <span className="mono">{entry.key}</span>
-                <span className="muted">{entry.size} bytes</span>
-              </div>
-              {entry.binary ? (
-                <p className="muted">Binary data, not shown.</p>
+        <Section title="Data" aside={d.data.length}>
+          <div className="detail-data">
+            {d.data.map((entry) =>
+              entry.binary ? (
+                <div key={entry.key} className="detail-binary">
+                  <span className="mono">{entry.key}</span>
+                  <span>Binary data, {entry.size} bytes, not shown.</span>
+                </div>
               ) : (
-                <pre className="code-box">{entry.value}</pre>
-              )}
-            </div>
-          ))}
+                <CodeBlock
+                  key={entry.key}
+                  code={entry.value}
+                  title={
+                    <>
+                      <span className="mono detail-data-key">{entry.key}</span> · {entry.size} bytes
+                    </>
+                  }
+                  maxHeight="320px"
+                />
+              ),
+            )}
+          </div>
         </Section>
       )}
 
       {d.tables.map((t) => (
         <Section key={t.title} title={t.title}>
-          <SimpleTable columns={t.columns} rows={t.rows} />
+          <SimpleTable label={t.title} columns={t.columns.map((label) => ({ label }))} rows={t.rows} />
         </Section>
       ))}
 
       {d.conditions.length > 0 && (
         <Section title="Conditions">
           <SimpleTable
-            columns={["Type", "Status", "Reason", "Message", "Changed"]}
+            label="Conditions"
+            columns={[
+              { label: "Type", className: "nowrap" },
+              { label: "Status", className: "nowrap" },
+              { label: "Reason", className: "nowrap" },
+              { label: "Message" },
+              { label: "Changed", className: "nowrap" },
+            ]}
             rows={d.conditions.map((c) => [
-              c.type,
+              <strong>{c.type}</strong>,
               c.status,
               c.reason,
               c.message,
@@ -160,30 +211,12 @@ function Summary({ d, cluster, resource }) {
         </Section>
       )}
 
-      <Section title="Labels">
-        <KeyValues values={d.labels} empty="No labels." />
+      <Section title="Labels" aside={Object.keys(d.labels).length || undefined}>
+        <KeyValueList values={d.labels} empty="No labels." />
       </Section>
-      <Section title="Annotations">
-        <KeyValues values={d.annotations} empty="No annotations." />
+      <Section title="Annotations" aside={Object.keys(d.annotations).length || undefined}>
+        <KeyValueList values={d.annotations} empty="No annotations." />
       </Section>
-    </div>
-  );
-}
-
-function Section({ title, children }) {
-  return (
-    <div className="detail-section">
-      <h2 className="card-title">{title}</h2>
-      {children}
-    </div>
-  );
-}
-
-function Fact({ label, children }) {
-  return (
-    <div className="fact">
-      <dt>{label}</dt>
-      <dd>{children}</dd>
     </div>
   );
 }
@@ -191,109 +224,43 @@ function Fact({ label, children }) {
 // Containers with their live state (for pods) or just their spec (for templates).
 function Containers({ containers }) {
   const live = containers.some((c) => c.ready !== null);
-  return (
-    <div className="card-scroll">
-      <table className="table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Image</th>
-            {live && <th>State</th>}
-            {live && <th className="num">Restarts</th>}
-            <th>Ports</th>
-            <th>Requests</th>
-            <th>Limits</th>
-          </tr>
-        </thead>
-        <tbody>
-          {containers.map((c) => (
-            <tr key={c.name}>
-              <td className="name">
-                {c.name}
-                {c.role && <span className="tag tag-gap">{c.role}</span>}
-              </td>
-              <td className="mono">{c.image}</td>
-              {live && (
-                <td>
-                  <StatusBadge status={c.stateReason || c.state} />
-                  {c.lastExit && <div className="muted small">Last exit: {c.lastExit}</div>}
-                </td>
-              )}
-              {live && <td className="num">{c.restarts}</td>}
-              <td className="mono">{c.ports.join(", ") || <span className="muted">–</span>}</td>
-              <td className="mono">{c.requests || <span className="muted">–</span>}</td>
-              <td className="mono">{c.limits || <span className="muted">–</span>}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+  const columns = [
+    { label: "Name", className: "nowrap" },
+    { label: "Image", className: "mono image" },
+    ...(live ? [{ label: "State" }, { label: "Restarts", className: "num" }] : []),
+    { label: "Ports", className: "mono" },
+    { label: "Requests", className: "mono" },
+    { label: "Limits", className: "mono" },
+  ];
+  const rows = containers.map((c) => [
+    <span className="container-name">
+      {c.name}
+      {c.role && <Tag>{c.role}</Tag>}
+    </span>,
+    <BreakAt text={c.image} />,
+    ...(live
+      ? [
+          <>
+            <StatusBadge status={c.stateReason || c.state} />
+            {c.lastExit && <div className="container-last-exit">Last exit: {c.lastExit}</div>}
+          </>,
+          c.restarts,
+        ]
+      : []),
+    c.ports.join(", "),
+    c.requests,
+    c.limits,
+  ]);
+  return <SimpleTable label="Containers" columns={columns} rows={rows} />;
 }
 
-function SimpleTable({ columns, rows }) {
-  return (
-    <div className="card-scroll">
-      <table className="table simple-table">
-        <thead>
-          <tr>
-            {columns.map((c) => (
-              <th key={c}>{c}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={i}>
-              {row.map((cell, j) => (
-                <td key={j}>{cell || <span className="muted">–</span>}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function KeyValues({ values, empty }) {
-  const entries = Object.entries(values).sort(([a], [b]) => a.localeCompare(b));
-  if (entries.length === 0) return <p className="muted">{empty}</p>;
-  return (
-    <dl className="key-values">
-      {entries.map(([k, v]) => (
-        <div key={k}>
-          <dt className="mono">{k}</dt>
-          <dd className="mono clamp-3" title={v}>
-            {v || <span className="muted">(empty)</span>}
-          </dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-function YamlView({ d, isSecret }) {
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(d.yaml);
-    } catch {
-      // Copying can be blocked by the browser; the text is still selectable.
-    }
-  }
-  return (
-    <div>
-      <div className="table-toolbar">
-        <span className="muted">
-          Read-only. managedFields are left out{isSecret ? "; secret values are hidden" : ""}.
-        </span>
-        <div className="table-toolbar-right">
-          <button type="button" className="button button-quiet" onClick={copy}>
-            Copy
-          </button>
-        </div>
-      </div>
-      <pre className="code-box yaml-box">{d.yaml}</pre>
-    </div>
-  );
+// A long image name may wrap only after "/", ":" or "@", so
+// "quay.io/argoproj/argocd:v2.13.0" never splits inside "v2.13.0".
+function BreakAt({ text }) {
+  return text.split(/(?<=[/:@])/).map((part, i) => (
+    <span key={i}>
+      {i > 0 && <wbr />}
+      {part}
+    </span>
+  ));
 }

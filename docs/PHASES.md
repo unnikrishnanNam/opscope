@@ -1,6 +1,6 @@
-# OpScope: Build Phases
+# Opscope: Build Phases
 
-OpScope is a small, read-only Kubernetes dashboard. It has a Go backend that talks to the
+Opscope is a small, read-only Kubernetes dashboard. It has a Go backend that talks to the
 cluster and a React frontend that shows what the backend returns. Everything ships as one
 Docker image.
 
@@ -8,7 +8,9 @@ We build it one phase at a time. Each phase ends with a working app and a short 
 After a phase is done, we come back here, tick the boxes, and note anything that changed.
 
 **Status (2026-10-03):** all phases (0–8) are done. Ideas that were deliberately left out are
-collected under [Possible next steps](#possible-next-steps) at the end.
+collected under [Possible next steps](#possible-next-steps) at the end. The interface was then
+redesigned, with light and dark themes and the "Opscope" name, in phases R0–R8; see
+[UI-REDESIGN.md](UI-REDESIGN.md).
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -16,7 +18,7 @@ collected under [Possible next steps](#possible-next-steps) at the end.
 
 ## Guiding rules
 
-- **Read-only.** OpScope only reads from the cluster. It never creates, edits or deletes anything.
+- **Read-only.** Opscope only reads from the cluster. It never creates, edits or deletes anything.
 - **Keep it boring.** Use the Go standard library where possible, plain CSS, and few dependencies.
   Every file should make sense to someone learning the stack.
 - **One image.** The Go binary serves the API (`/api/*`) and the built React app (everything else).
@@ -51,7 +53,7 @@ Goal: the skeleton runs end to end (browser → React → Go → JSON) with no K
 
 Goal: the backend can talk to one or more clusters, chosen from the environment or added in the UI.
 
-No cluster is built into the code, and OpScope never falls back to `~/.kube/config` on its own.
+No cluster is built into the code, and Opscope never falls back to `~/.kube/config` on its own.
 If nothing is configured, the UI starts on an "Add a cluster" screen.
 
 **Where clusters come from**
@@ -62,10 +64,10 @@ If nothing is configured, the UI starts on an "Add a cluster" screen.
 - [x] UI: paste a kubeconfig or upload the file, pick a context, give it a display name
 - [x] The backend tests the connection before saving and shows a clear error if it fails
 - [x] Clusters added in the UI are saved to `DATA_DIR` (default `../data`, relative to `backend/`; `/data` in Docker as a volume),
-      one file per cluster, readable only by the OpScope user (`0600`)
+      one file per cluster, readable only by the Opscope user (`0600`)
 - [x] Remove a UI-added cluster
 - [x] Kubeconfigs from the UI may not run login commands (`exec`, `auth-provider`) or point at files on disk,
-      since either would let a pasted file run commands or read files on the OpScope server
+      since either would let a pasted file run commands or read files on the Opscope server
 
 **Backend**
 
@@ -91,7 +93,7 @@ If nothing is configured, the UI starts on an "Add a cluster" screen.
 **Docker and safety**
 
 - [x] README: mount a kubeconfig and set `OPSCOPE_KUBECONFIG`, or mount a volume at `/data` and add clusters in the UI
-- [x] `make docker-run` publishes the port on `127.0.0.1` only. OpScope has no login, so anyone who can
+- [x] `make docker-run` publishes the port on `127.0.0.1` only. Opscope has no login, so anyone who can
       open the page can read every saved cluster; it should not be exposed on a network as is
 - [x] Check that the container can reach the multipass VMs (Docker Desktop networking on macOS)
 - [x] Tested against the multipass cluster (kubemaster, kubeworker01, kubeworker02)
@@ -189,7 +191,7 @@ Goal: click any row to see more about it.
 - [x] Events for the object
 - [x] Pod logs: pick a container, show the last N lines, optional follow (streamed)
 - [x] "Previous run" logs, for seeing why a crash-looping container died
-- [x] Table names link to detail pages; owners and events link to their objects when OpScope has a page for them
+- [x] Table names link to detail pages; owners and events link to their objects when Opscope has a page for them
 - [x] Go tests: secret redaction, pod containers and conditions, HTTPRoute rules and per-gateway status
 - [x] Works for Gateway API objects too (Gateway listeners and conditions; HTTPRoute rules with
       their matches and backends)
@@ -213,13 +215,13 @@ Goal: basic live CPU and memory numbers.
 
 ## Phase 8: Packaging and running in a cluster
 
-Goal: OpScope can run inside the cluster it watches.
+Goal: Opscope can run inside the cluster it watches.
 
 - [x] In-cluster mode: with `OPSCOPE_IN_CLUSTER=true`, use the pod's service account as a cluster
       "from environment" (moved here from Phase 1, since it only matters when running inside a cluster)
 - [x] Kubernetes manifests: Namespace, ServiceAccount, read-only ClusterRole + binding, Deployment, Service
       (`deploy/kubernetes/opscope.yaml`)
-- [x] The ClusterRole covers everything OpScope reads, including Gateway API (`gateway.networking.k8s.io`),
+- [x] The ClusterRole covers everything Opscope reads, including Gateway API (`gateway.networking.k8s.io`),
       metrics (`metrics.k8s.io`) and Secrets. Reading Secrets is called out in the README so it's a
       conscious choice; it can be removed if the reveal feature isn't wanted
       (Secrets get their own ClusterRole in `deploy/kubernetes/secrets-access.yaml`, so removing access
@@ -269,7 +271,7 @@ Things that came up while building, decisions made, and anything that moved betw
   mismatch and an invalid kubeconfig.
 - Added `OPSCOPE_CLUSTER_NAME`, because a raw context name like `kubernetes-admin@kubernetes`
   makes a poor display name and URL.
-- The OpScope server status moved from the top bar to the sidebar footer, to make room for the
+- The Opscope server status moved from the top bar to the sidebar footer, to make room for the
   cluster switcher, namespace picker and cluster badge.
 - Security: kubeconfigs added in the UI can't use `exec`/`auth-provider` or file paths (see above).
   The environment path has no such limit, since whoever sets it already controls the server.
@@ -277,7 +279,7 @@ Things that came up while building, decisions made, and anything that moved betw
   pasted file are never written to disk.
 - The image grew to about 42 MB because of client-go. It's still a single static binary on distroless.
 - client-go is v0.37 and the test cluster runs v1.31. That's outside client-go's official version
-  skew, but the read-only core APIs OpScope uses are stable; worth keeping in mind if something odd shows up.
+  skew, but the read-only core APIs Opscope uses are stable; worth keeping in mind if something odd shows up.
 - Cluster status is re-checked every 30 seconds; a cluster that doesn't answer takes up to 10 seconds
   (the client timeout) before showing "Unreachable".
 
@@ -426,13 +428,13 @@ Things that came up while building, decisions made, and anything that moved betw
     within 2 seconds
 - The image was also checked with `docker run --read-only` (only `/data` writable): it runs, and
   adding a cluster writes to `/data` without errors.
-- Shutdown was timed locally: with no open requests OpScope exits at once; with a followed log
+- Shutdown was timed locally: with no open requests Opscope exits at once; with a followed log
   stream open it waits the full 10 seconds, then closes the stream. Ending streams immediately would
   mean cancelling every in-flight request as soon as shutdown starts, so the simpler behaviour stays;
   10 seconds fits well within Kubernetes' default 30-second grace period.
 - Client creation was split into `newClients` (from a kubeconfig) and `clientsFor` (from any
   connection settings), so in-cluster mode reuses the same three clients.
-- OpScope runs as a single replica: the usage history lives in memory, and two copies would each
+- Opscope runs as a single replica: the usage history lives in memory, and two copies would each
   keep their own.
 - The README was rewritten as one document for the finished project: what it shows, three ways to
   connect, security notes in one place, running in a cluster, and a permissions table.
@@ -443,14 +445,14 @@ Things that came up while building, decisions made, and anything that moved betw
 
 Things that were considered and deliberately left out, roughly from most to least useful:
 
-- **Authentication.** OpScope has no login, which is why it stays on `127.0.0.1` or behind a
+- **Authentication.** Opscope has no login, which is why it stays on `127.0.0.1` or behind a
   port-forward. An auth proxy (for example oauth2-proxy) in front of it is the usual answer.
 - **More Gateway API kinds:** GRPCRoute, TLSRoute, ReferenceGrant, BackendTLSPolicy (same pattern as
   `gatewayapi.go`).
 - **Persistent storage in the cluster:** swap the `emptyDir` at `/data` for a PersistentVolumeClaim
   so clusters added in the UI survive pod restarts.
 - **Faster overview on big clusters:** run its list calls in parallel instead of one after another.
-- **Dark theme:** the colours are already tokens at the top of `styles.css`.
+- ~~**Dark theme**~~: done in the UI redesign ([UI-REDESIGN.md](UI-REDESIGN.md)).
 - **Embedding the frontend** in the Go binary with `go:embed` instead of serving a folder.
 - **Watching instead of polling,** with client-go informers and a push channel to the browser. More
   efficient, but a lot more moving parts for a learning project.

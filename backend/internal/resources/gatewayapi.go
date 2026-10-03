@@ -4,7 +4,7 @@ package resources
 // so client-go has no typed client for it. We use the dynamic client, which
 // returns objects as plain maps ("unstructured"), and then copy the parts we
 // need into small structs below. Those structs mirror the Gateway API spec,
-// but only the fields OpScope shows.
+// but only the fields Opscope shows.
 
 import (
 	"context"

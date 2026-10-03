@@ -2,6 +2,9 @@
 // sparkline of the last 15 minutes. Both are plain HTML/SVG; no chart library.
 
 import { percent } from "../format.js";
+import { Callout } from "./Callout.jsx";
+import CodeBlock from "./CodeBlock.jsx";
+import "./Usage.css";
 
 // How much of the 15-minute window the sparkline covers, in milliseconds.
 // It matches the history the backend keeps.
@@ -12,17 +15,20 @@ const MIN_HISTORY_MS = 60 * 1000;
 
 // UsageBar: "34%" with a thin bar, e.g. CPU in use against what's allocatable.
 // `label` (like "0.7 of 2 cores") is shown on hover and read by screen readers.
-export function UsageBar({ used, total, label }) {
+// `width` sets the track's length (px or any CSS length); `showPercent={false}`
+// leaves the number out when it's shown bigger nearby.
+export function UsageBar({ used, total, label, width, showPercent = true }) {
   const pct = percent(used, total);
   // Busy is worth a glance, nearly full is worth acting on. The number is
   // always shown, so colour is never the only signal.
   const tone = pct >= 90 ? "bad" : pct >= 75 ? "warn" : "ok";
   return (
-    <span className="usage" title={label} aria-label={label}>
-      <span className="usage-track">
+    // One picture for screen readers: they read the label, not the parts.
+    <span className="usage" title={label} role="img" aria-label={label}>
+      <span className="usage-track" style={width ? { width } : undefined}>
         <span className={`usage-fill usage-${tone}`} style={{ width: `${Math.min(pct, 100)}%` }} />
       </span>
-      <span className="usage-pct">{pct}%</span>
+      {showPercent && <span className="usage-pct">{pct}%</span>}
     </span>
   );
 }
@@ -33,11 +39,17 @@ export function UsageBar({ used, total, label }) {
 //   format  turns a value into text for the hover label
 // The y-axis starts at 0 and stretches to a bit above the highest value, so
 // changes are visible even when usage is low.
-export function Sparkline({ points, field, format, width = 96, height = 24, what }) {
+// With `fluid`, it stretches to the width of its box (`width` then only sets
+// the drawing's proportions).
+export function Sparkline({ points, field, format, width = 96, height = 24, what, fluid = false }) {
   const span = points?.length ? Date.parse(points[points.length - 1].t) - Date.parse(points[0].t) : 0;
   if (!points || points.length < 2 || span < MIN_HISTORY_MS) {
     return (
-      <span className="sparkline-empty" style={{ width }} title="History builds up over the next minutes">
+      <span
+        className="sparkline-empty"
+        style={{ width: fluid ? "100%" : width, height }}
+        title="History builds up over the next minutes"
+      >
         collecting…
       </span>
     );
@@ -62,7 +74,15 @@ export function Sparkline({ points, field, format, width = 96, height = 24, what
   )}, now ${format(values[values.length - 1])}`;
 
   return (
-    <svg className="sparkline" width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={label}>
+    <svg
+      className="sparkline"
+      width={fluid ? "100%" : width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio={fluid ? "none" : undefined}
+      role="img"
+      aria-label={label}
+    >
       <title>{label}</title>
       {/* A faint baseline across the whole 15 minutes, so a short history reads
           as "the line starts here" rather than as a glitch. */}
@@ -74,23 +94,25 @@ export function Sparkline({ points, field, format, width = 96, height = 24, what
 }
 
 // MetricsUnavailable: what to do when a cluster has no metrics-server.
+// `compact` is a one-line note, for places where usage is a side detail.
 export function MetricsUnavailable({ compact = false }) {
   if (compact) {
-    return <p className="muted">Usage needs metrics-server, which isn't installed on this cluster.</p>;
+    return <Callout compact>Usage needs metrics-server, which isn't installed on this cluster.</Callout>;
   }
   return (
-    <div className="empty metrics-help">
+    <Callout title="Live usage needs metrics-server">
       <p>
-        Live CPU and memory usage need <strong>metrics-server</strong>, which isn't installed (or isn't answering) on
-        this cluster. To install it:
+        metrics-server isn't installed (or isn't answering) on this cluster, so CPU and memory show capacity only. To
+        install it:
       </p>
-      <pre className="code-box">
-        kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
-      </pre>
-      <p className="muted">
+      <CodeBlock
+        lineNumbers={false}
+        code="kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml"
+      />
+      <p>
         On kind and other local clusters, the kubelets use self-signed certificates, so metrics-server also needs the{" "}
         <code>--kubelet-insecure-tls</code> flag.
       </p>
-    </div>
+    </Callout>
   );
 }

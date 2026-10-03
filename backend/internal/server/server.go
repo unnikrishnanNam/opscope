@@ -1,4 +1,4 @@
-// Package server wires up all HTTP routes for OpScope.
+// Package server wires up all HTTP routes for Opscope.
 //
 // Routes starting with /api/ return JSON. Everything else is the React app.
 package server

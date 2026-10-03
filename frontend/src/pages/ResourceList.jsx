@@ -1,11 +1,16 @@
+import { useEffect, useState } from "react";
 import { useLocation, useOutletContext, useSearchParams } from "react-router";
 import { useApi } from "../api.js";
 import { columns as allColumns } from "../columns.jsx";
 import { clock } from "../format.js";
-import ResourceTable from "../components/ResourceTable.jsx";
-import ErrorBox from "../components/ErrorBox.jsx";
-import { detailPath, nsQuery } from "../sections.js";
+import Button from "../components/Button.jsx";
+import { Callout } from "../components/Callout.jsx";
+import DataTable from "../components/DataTable.jsx";
+import { PageHeader } from "../components/PageHeader.jsx";
 import { MetricsUnavailable } from "../components/Usage.jsx";
+import { RefreshIcon } from "../components/icons.jsx";
+import { detailPath, nsQuery } from "../sections.js";
+import "./ResourceList.css";
 
 const REFRESH_MS = 10_000;
 // metrics-server refreshes its numbers every 15 seconds; asking more often
@@ -14,6 +19,8 @@ const METRICS_REFRESH_MS = 15_000;
 
 // A page that lists one resource type for the selected cluster and namespace.
 // `page` comes from sections.js; page.resource is the API name, e.g. "pods".
+// The table fills the rest of the window and scrolls inside, so its column
+// headers stay in view.
 export default function ResourceList({ page }) {
   // Layout passes the selected cluster down through the router's <Outlet>.
   const { cluster, reachable } = useOutletContext();
@@ -32,42 +39,75 @@ export default function ResourceList({ page }) {
   const usage = useApi(metricsPath, { refreshMs: METRICS_REFRESH_MS });
   const rows = data && withUsage(data, usage.data, page.metrics);
 
+  // The refresh button only spins for a refresh someone asked for, not for
+  // the automatic one every 10 seconds.
+  const [refreshing, setRefreshing] = useState(false);
+  useEffect(() => {
+    if (!loading) setRefreshing(false);
+  }, [loading]);
+
   // With one namespace selected, a namespace column would say the same thing on every row.
   const columns = allColumns[page.resource].filter((col) => !(namespace && col.key === "namespace"));
   const noun = page.label.toLowerCase();
+  // Two answers aren't failures: an optional feature that isn't installed,
+  // and RBAC that doesn't allow this kind (often on purpose, for Secrets).
+  const notInstalled = error?.code === "not_installed";
+  const forbidden = error?.status === 403;
 
   return (
-    <section>
-      <h1 className="page-title">{page.label}</h1>
-      <p className="page-about">{page.about}</p>
+    <section className="list-page">
+      <PageHeader title={page.label} description={page.about} />
 
-      {error?.code === "not_installed" ? (
-        // A missing optional feature, not a failure: say so calmly instead of showing an error.
-        <div className="empty">
-          {error.message}. Install the Gateway API CRDs and a controller to use {page.label}.
-        </div>
-      ) : (
-        error && <ErrorBox title={`Couldn't load ${noun}`} message={error.message} detail={error.detail} />
+      {notInstalled && (
+        <Callout title="Gateway API isn't installed on this cluster">
+          It has no <code>gateway.networking.k8s.io/v1</code> resources. Install the Gateway API CRDs and a controller
+          to see {page.label} here.
+        </Callout>
+      )}
+      {forbidden && (
+        <Callout tone="warning" title={`Opscope isn't allowed to read ${noun}`} detail={error.detail}>
+          The Kubernetes user or service account it connects with has no permission for this. See “Permissions” in the
+          README.
+        </Callout>
+      )}
+      {error && !notInstalled && !forbidden && (
+        <Callout tone="error" title={`Couldn't load ${noun}`} detail={error.detail}>
+          {error.message}
+        </Callout>
       )}
 
       {usage.error?.code === "metrics_unavailable" && <MetricsUnavailable compact={page.metrics === "pods"} />}
       {usage.error && usage.error.code !== "metrics_unavailable" && (
-        <p className="muted">Usage isn't available right now: {usage.error.message}</p>
+        <Callout compact tone="warning">
+          Usage isn't available right now: {usage.error.message}
+        </Callout>
       )}
 
-      {reachable && error?.code !== "not_installed" && (
-        <ResourceTable
+      {reachable && !notInstalled && !forbidden && (
+        <DataTable
+          fill
+          shortcut="/"
           columns={columns}
           rows={rows}
           noun={noun}
           linkTo={(row) => detailPath(cluster.id, page.resource, row.namespace, row.name) + search}
+          emptyIcon={page.icon}
           emptyText={namespace ? `No ${noun} in ${namespace}.` : `No ${noun} in this cluster.`}
           toolbar={
             <>
-              {updatedAt && <span className="muted">Updated {clock(updatedAt)}</span>}
-              <button type="button" className="button button-quiet" onClick={reload} disabled={loading}>
-                {loading ? "Refreshing…" : "Refresh"}
-              </button>
+              {updatedAt && <span className="list-updated">Updated {clock(updatedAt)}</span>}
+              <Button
+                variant="quiet"
+                size="sm"
+                icon={RefreshIcon}
+                loading={refreshing}
+                onClick={() => {
+                  setRefreshing(true);
+                  reload();
+                }}
+              >
+                Refresh
+              </Button>
             </>
           }
         />

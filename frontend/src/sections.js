@@ -6,42 +6,44 @@
 // `resource` is the API name for pages that show a table (see columns.jsx).
 // `clusterScoped` marks resources that don't live in a namespace (like nodes).
 // `metrics` marks pages that also show live usage from metrics-server.
-// `phase` is the build phase that brings the real page (see docs/PHASES.md).
+// `icon` is the page's icon in the sidebar.
+
+import * as icons from "./components/icons.jsx";
 
 export const sections = [
   {
     group: "Cluster",
     items: [
-      { path: "overview", label: "Overview", phase: 3, about: "Counts, node health and recent warnings at a glance." },
-      { path: "nodes", resource: "nodes", clusterScoped: true, metrics: "nodes", label: "Nodes", phase: 3, about: "Machines in the cluster, their status, capacity and usage." },
+      { path: "overview", icon: icons.OverviewIcon, label: "Overview", about: "Counts, node health and recent warnings at a glance." },
+      { path: "nodes", icon: icons.NodesIcon, resource: "nodes", clusterScoped: true, metrics: "nodes", label: "Nodes", about: "Machines in the cluster, their status, capacity and usage." },
     ],
   },
   {
     group: "Workloads",
     items: [
-      { path: "workloads/pods", resource: "pods", metrics: "pods", label: "Pods", phase: 2, about: "Running containers, their status, restarts and the node they run on." },
-      { path: "workloads/deployments", resource: "deployments", label: "Deployments", phase: 2, about: "Stateless apps and how many of their replicas are ready." },
-      { path: "workloads/statefulsets", resource: "statefulsets", label: "StatefulSets", phase: 2, about: "Apps with stable names and storage, such as databases." },
-      { path: "workloads/daemonsets", resource: "daemonsets", label: "DaemonSets", phase: 2, about: "Pods that run on every node (or a chosen set of nodes)." },
-      { path: "workloads/jobs", resource: "jobs", label: "Jobs", phase: 2, about: "One-off tasks that run until they finish." },
-      { path: "workloads/cronjobs", resource: "cronjobs", label: "CronJobs", phase: 2, about: "Jobs that run on a schedule." },
+      { path: "workloads/pods", icon: icons.PodsIcon, resource: "pods", metrics: "pods", label: "Pods", about: "Running containers, their status, restarts and the node they run on." },
+      { path: "workloads/deployments", icon: icons.DeploymentsIcon, resource: "deployments", label: "Deployments", about: "Stateless apps and how many of their replicas are ready." },
+      { path: "workloads/statefulsets", icon: icons.StatefulSetsIcon, resource: "statefulsets", label: "StatefulSets", about: "Apps with stable names and storage, such as databases." },
+      { path: "workloads/daemonsets", icon: icons.DaemonSetsIcon, resource: "daemonsets", label: "DaemonSets", about: "Pods that run on every node (or a chosen set of nodes)." },
+      { path: "workloads/jobs", icon: icons.JobsIcon, resource: "jobs", label: "Jobs", about: "One-off tasks that run until they finish." },
+      { path: "workloads/cronjobs", icon: icons.CronJobsIcon, resource: "cronjobs", label: "CronJobs", about: "Jobs that run on a schedule." },
     ],
   },
   {
     group: "Config",
     items: [
-      { path: "config/configmaps", resource: "configmaps", label: "ConfigMaps", phase: 4, about: "Plain configuration values used by pods." },
-      { path: "config/secrets", resource: "secrets", label: "Secrets", phase: 4, about: "Sensitive values. Click a name to see its keys; each value stays hidden until you reveal it." },
+      { path: "config/configmaps", icon: icons.ConfigMapsIcon, resource: "configmaps", label: "ConfigMaps", about: "Plain configuration values used by pods." },
+      { path: "config/secrets", icon: icons.SecretsIcon, resource: "secrets", label: "Secrets", about: "Sensitive values. Click a name to see its keys; each value stays hidden until you reveal it." },
     ],
   },
   {
     group: "Network",
     items: [
-      { path: "network/services", resource: "services", label: "Services", phase: 4, about: "Stable addresses in front of a set of pods." },
-      { path: "network/ingresses", resource: "ingresses", label: "Ingresses", phase: 4, about: "HTTP routes from outside the cluster to services." },
-      { path: "network/gateways", resource: "gateways", label: "Gateways", phase: 5, about: "Gateway API entry points: where traffic comes in, on which ports." },
-      { path: "network/httproutes", resource: "httproutes", label: "HTTPRoutes", phase: 5, about: "Gateway API rules that send HTTP traffic from a gateway to services." },
-      { path: "network/gatewayclasses", resource: "gatewayclasses", clusterScoped: true, label: "GatewayClasses", phase: 5, about: "The controllers that run gateways, such as nginx or Envoy." },
+      { path: "network/services", icon: icons.ServicesIcon, resource: "services", label: "Services", about: "Stable addresses in front of a set of pods." },
+      { path: "network/ingresses", icon: icons.IngressesIcon, resource: "ingresses", label: "Ingresses", about: "HTTP routes from outside the cluster to services." },
+      { path: "network/gateways", icon: icons.GatewaysIcon, resource: "gateways", label: "Gateways", about: "Gateway API entry points: where traffic comes in, on which ports." },
+      { path: "network/httproutes", icon: icons.HTTPRoutesIcon, resource: "httproutes", label: "HTTPRoutes", about: "Gateway API rules that send HTTP traffic from a gateway to services." },
+      { path: "network/gatewayclasses", icon: icons.GatewayClassesIcon, resource: "gatewayclasses", clusterScoped: true, label: "GatewayClasses", about: "The controllers that run gateways, such as nginx or Envoy." },
     ],
   },
 ];

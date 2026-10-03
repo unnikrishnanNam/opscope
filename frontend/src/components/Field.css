@@ -1,0 +1,185 @@
+/* Field: label, control, hint, error */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 20px;
+}
+
+.field-label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-strong);
+}
+
+.field-hint {
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--text-subtle);
+}
+
+.field-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-strong);
+  color: var(--bad);
+}
+
+.field-error svg {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+/* Text inputs, textareas and selects share one look. */
+
+.input,
+.select {
+  height: var(--control-md);
+  padding: 0 10px;
+  min-width: 0;
+  color: var(--text);
+  background-color: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  font-size: var(--text-md);
+  font-weight: var(--weight-body);
+  transition: border-color var(--duration-fast) var(--ease);
+}
+
+.input::placeholder {
+  color: var(--text-subtle);
+  opacity: 1;
+}
+
+.input:hover,
+.select:hover {
+  border-color: var(--text-subtle);
+}
+
+/* The focus ring sits on the border rather than outside it. */
+.input:focus-visible,
+.select:focus-visible {
+  outline-offset: -1px;
+  border-color: transparent;
+}
+
+.input[aria-invalid="true"],
+.select[aria-invalid="true"] {
+  border-color: var(--bad-mark);
+}
+
+.input:disabled,
+.select:disabled {
+  color: var(--text-subtle);
+  background-color: var(--surface-2); /* not the shorthand: that would drop the select's arrow */
+  border-color: var(--border);
+  cursor: not-allowed;
+}
+
+.control-sm {
+  height: var(--control-sm);
+  padding: 0 var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.textarea {
+  height: auto;
+  min-height: 80px;
+  width: 100%;
+  padding: var(--space-2) 10px;
+  line-height: var(--leading);
+  resize: vertical;
+}
+
+.textarea-mono {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.select {
+  appearance: none;
+  padding-right: 32px;
+  max-width: 100%;
+  background-image: var(--chevron);
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  background-size: 16px;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.select.control-sm {
+  padding-right: 28px;
+  background-position: right 7px center;
+  background-size: 14px;
+}
+
+/* Search box: icon on the left, clear button on the right */
+
+.search-input {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.search-input .input {
+  width: 100%;
+  padding-left: 32px;
+  padding-right: 30px;
+}
+
+.search-input-sm .input {
+  padding-left: 28px;
+}
+
+/* The browser's own clear button; ours replaces it. */
+.search-input .input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.search-input-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--text-subtle);
+  pointer-events: none;
+}
+
+.search-input-sm .search-input-icon {
+  left: 8px;
+}
+
+.search-input-shortcut {
+  position: absolute;
+  right: 8px;
+  pointer-events: none;
+}
+
+.search-input-clear {
+  position: absolute;
+  right: 5px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-subtle);
+  cursor: pointer;
+}
+
+.search-input-clear:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}

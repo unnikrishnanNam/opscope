@@ -1,103 +1,115 @@
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
+import { useEffect } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { useApi } from "../api.js";
 import { useClusters } from "../clusters.jsx";
 import { allPages, nsQuery } from "../sections.js";
+import Button from "./Button.jsx";
+import ClusterSwitcher from "./ClusterSwitcher.jsx";
+import Combobox from "./Combobox.jsx";
+import { Breadcrumbs } from "./PageHeader.jsx";
+import { MenuIcon } from "./icons.jsx";
+import "./TopBar.css";
 
-// Crumbs for pages that don't belong to a cluster.
-const otherPages = {
-  "/clusters": ["Settings", "Clusters"],
-  "/clusters/add": ["Clusters", "Add a cluster"],
+// Breadcrumbs for pages that don't belong to a cluster.
+const OTHER_PAGES = {
+  "/": [{ label: "Welcome" }], // only seen before any cluster exists; otherwise "/" opens one
+  "/clusters": [{ label: "Clusters" }],
+  "/clusters/add": [{ label: "Clusters", to: "/clusters" }, { label: "Add a cluster" }],
 };
 
-export default function TopBar({ cluster, pagePath, status }) {
+// The bar above every page: where you are on the left; which cluster and
+// namespace on the right. On narrow screens a menu button opens the
+// sidebar (`onMenu`).
+//   cluster   the cluster in the URL (undefined on pages outside a cluster,
+//             and for a moment while the cluster list loads)
+//   status    that cluster's status: { reachable, version, ... }
+//   pagePath  the rest of the URL after /c/<id>/, e.g. "workloads/pods/web/api-1"
+export default function TopBar({ cluster, status, pagePath, onMenu }) {
   const { pathname, search: fullSearch } = useLocation();
   const search = nsQuery(fullSearch);
   // The page this URL belongs to: "workloads/pods" itself, or a detail page
   // under it like "workloads/pods/web/api-1".
   const page = allPages.find((p) => pagePath === p.path || pagePath?.startsWith(p.path + "/"));
   const objectName = page && pagePath !== page.path ? decodeURIComponent(pagePath.split("/").pop()) : null;
-  const [group, label] = page ? [page.group, page.label] : (otherPages[pathname] ?? [null, null]);
+
+  let crumbs = OTHER_PAGES[pathname] ?? [];
+  if (page) {
+    crumbs = [{ label: page.group }, { label: page.label }];
+    if (objectName && cluster) {
+      crumbs = [
+        { label: page.group },
+        { label: page.label, to: `/c/${cluster.id}/${page.path}${search}` },
+        { label: objectName },
+      ];
+    }
+  }
+
+  // The browser tab's title follows the page: "api-1 · multipass · Opscope".
+  const title = [crumbs.at(-1)?.label, cluster?.name, "Opscope"].filter(Boolean).join(" · ");
+  useEffect(() => {
+    document.title = title;
+  }, [title]);
 
   return (
     <header className="topbar">
-      <div className="crumbs">
-        {group && (
-          <>
-            <span className="crumb-group">{group}</span>
-            <span className="crumb-sep">/</span>
-          </>
-        )}
-        {/* `cluster` is still undefined for a moment while the cluster list loads. */}
-        {objectName && cluster ? (
-          <>
-            <Link className="crumb-link" to={{ pathname: `/c/${cluster.id}/${page.path}`, search }}>
-              {label}
-            </Link>
-            <span className="crumb-sep">/</span>
-            <span className="crumb-page">{objectName}</span>
-          </>
-        ) : (
-          <span className="crumb-page">{label}</span>
-        )}
+      <div className="topbar-start">
+        <span className="topbar-menu">
+          <Button variant="quiet" icon={MenuIcon} label="Open navigation" onClick={onMenu} />
+        </span>
+        {crumbs.length > 0 && <Breadcrumbs items={crumbs} />}
       </div>
-
-      <div className="topbar-right">
+      <div className="topbar-end">
         {/* Switching cluster from a detail page goes to the list: the object is in the old cluster. */}
-        <ClusterSwitcher cluster={cluster} pagePath={page?.path ?? pagePath} />
+        <ClusterPicker cluster={cluster} pagePath={page?.path ?? pagePath} />
         {cluster && (
-          <NamespacePicker cluster={cluster} reachable={status?.data?.reachable} clusterScoped={page?.clusterScoped} />
+          <NamespacePicker cluster={cluster} reachable={status?.reachable} clusterScoped={page?.clusterScoped} />
         )}
-        {cluster && <ConnectionBadge status={status} />}
       </div>
     </header>
   );
 }
 
-// Dropdown to jump to another cluster, staying on the same kind of page.
-function ClusterSwitcher({ cluster, pagePath }) {
-  const { data: clusters } = useClusters();
+// Jump to another cluster, staying on the same kind of page.
+function ClusterPicker({ cluster, pagePath }) {
+  const { data: clusters, statuses } = useClusters();
   const navigate = useNavigate();
-
   if (!clusters?.length) return null;
 
   return (
-    <label className="picker">
-      <span className="picker-label">Cluster</span>
-      <select
-        className="select"
-        value={cluster?.id ?? ""}
-        onChange={(e) => navigate(`/c/${e.target.value}/${pagePath || "overview"}`)}
-      >
-        {!cluster && <option value="">Choose…</option>}
-        {clusters.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
-      </select>
-    </label>
+    <ClusterSwitcher
+      clusters={clusters.map((c) => ({ ...c, status: statuses[c.id] }))}
+      value={cluster?.id}
+      onChange={(id) => navigate(`/c/${id}/${pagePath || "overview"}`)}
+    />
   );
 }
 
-// Namespace dropdown. The choice lives in the URL as ?ns=<name>;
-// no ?ns means "all namespaces".
+// The namespace lives in the URL as ?ns=<name>; no ?ns means "all namespaces".
 function NamespacePicker({ cluster, reachable, clusterScoped }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const selected = searchParams.get("ns") ?? "";
   const { data: namespaces } = useApi(reachable ? `/clusters/${cluster.id}/namespaces` : null);
 
-  // On pages like Nodes the namespace doesn't apply. We keep ?ns in the URL
-  // so it's still selected when you go back to a namespaced page.
+  // On pages like Nodes the namespace doesn't apply. ?ns stays in the URL, so
+  // it's still selected when you go back to a namespaced page.
   if (clusterScoped) {
     return (
-      <label className="picker" title="This page isn't limited to a namespace">
-        <span className="picker-label">Namespace</span>
-        <select className="select" disabled>
-          <option>Cluster-wide</option>
-        </select>
-      </label>
+      <Combobox
+        label="Namespace"
+        showLabel
+        size="sm"
+        value="cluster-wide"
+        options={[{ value: "cluster-wide", label: "Cluster-wide" }]}
+        onChange={() => {}}
+        disabled
+        title="This page isn't limited to a namespace"
+      />
     );
   }
+
+  const names = namespaces?.map((ns) => ns.name) ?? [];
+  // Keep a namespace from the URL selectable even before the list arrives.
+  if (selected && !names.includes(selected)) names.unshift(selected);
 
   function choose(name) {
     const next = new URLSearchParams(searchParams);
@@ -107,44 +119,16 @@ function NamespacePicker({ cluster, reachable, clusterScoped }) {
   }
 
   return (
-    <label className="picker">
-      <span className="picker-label">Namespace</span>
-      <select className="select" value={selected} onChange={(e) => choose(e.target.value)} disabled={!namespaces}>
-        <option value="">All namespaces</option>
-        {/* Keep a namespace from the URL selectable even before the list arrives. */}
-        {selected && !namespaces?.some((ns) => ns.name === selected) && <option value={selected}>{selected}</option>}
-        {namespaces?.map((ns) => (
-          <option key={ns.name} value={ns.name}>
-            {ns.name}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-// Small pill: Kubernetes version when connected, "Unreachable" when not.
-function ConnectionBadge({ status }) {
-  if (!status?.data) {
-    return (
-      <span className="badge badge-checking">
-        <span className="dot" />
-        Connecting
-      </span>
-    );
-  }
-  if (!status.data.reachable) {
-    return (
-      <span className="badge badge-down">
-        <span className="dot" />
-        Unreachable
-      </span>
-    );
-  }
-  return (
-    <span className="badge badge-ok" title={status.data.server}>
-      <span className="dot" />
-      {status.data.version}
-    </span>
+    <Combobox
+      label="Namespace"
+      showLabel
+      size="sm"
+      align="end"
+      noun="namespaces"
+      value={selected}
+      onChange={choose}
+      options={[{ value: "", label: "All namespaces" }, ...names.map((n) => ({ value: n, label: n }))]}
+      disabled={!namespaces}
+    />
   );
 }

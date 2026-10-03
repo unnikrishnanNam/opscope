@@ -1,0 +1,64 @@
+/* Status words: a coloured mark plus text. Calm enough for a table full of
+   them: healthy text stays the normal colour, only problems change it. */
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* The dot. Also used by plain <span class="status status-warn"> markup. */
+.status::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--neutral-mark);
+}
+
+.status-has-icon::before {
+  display: none;
+}
+
+.status-ok::before {
+  background: var(--ok-mark);
+}
+
+.status-warn {
+  color: var(--warn);
+  font-weight: var(--weight-strong);
+}
+
+.status-warn::before {
+  background: var(--warn-mark);
+}
+
+.status-bad {
+  color: var(--bad);
+  font-weight: var(--weight-strong);
+}
+
+.status-bad::before {
+  background: var(--bad-mark);
+}
+
+/* Icons sit a touch wider than the dot, so the text lines up either way. */
+.status-icon {
+  margin: 0 -3px;
+}
+
+.status-warn .status-icon {
+  color: var(--warn-mark);
+}
+
+.status-bad .status-icon {
+  color: var(--bad-mark);
+}
+
+/* "1/3 ready": worth a glance, not an alarm. */
+.fraction-short {
+  color: var(--warn);
+  font-weight: var(--weight-strong);
+}

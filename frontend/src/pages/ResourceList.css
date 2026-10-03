@@ -1,0 +1,28 @@
+/* A list page is a column as tall as the content area: header, any notes,
+   then the table taking the rest (see DataTable's `fill`). */
+.list-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  height: 100%;
+}
+
+.list-page .page-header-block {
+  margin-bottom: 0;
+}
+
+.list-updated {
+  white-space: nowrap;
+}
+
+/* Phones: the page scrolls as a whole instead. */
+@media (max-width: 640px) {
+  .list-page {
+    height: auto;
+  }
+}
+
+/* Notes line up with the table under them. */
+.list-page .callout {
+  max-width: none;
+}

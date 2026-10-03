@@ -1,12 +1,19 @@
-import { Link } from "react-router";
+import Button from "../components/Button.jsx";
+import { EmptyState } from "../components/Callout.jsx";
+import { SearchIcon } from "../components/icons.jsx";
 
 export default function NotFound() {
   return (
-    <section>
-      <h1 className="page-title">Page not found</h1>
-      <p className="page-about">
-        There is nothing at this address. <Link to="/">Go to the start</Link>.
-      </p>
-    </section>
+    <EmptyState
+      icon={SearchIcon}
+      title="Page not found"
+      action={
+        <Button to="/" variant="primary">
+          Go to the start
+        </Button>
+      }
+    >
+      There's nothing at this address.
+    </EmptyState>
   );
 }

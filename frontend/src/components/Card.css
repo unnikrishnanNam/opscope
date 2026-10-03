@@ -1,0 +1,82 @@
+/* Card */
+
+.card {
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: var(--space-3) var(--space-4) 0;
+}
+
+.card-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 var(--space-2);
+  font-size: var(--text-md);
+  font-weight: var(--weight-title);
+  letter-spacing: 0;
+}
+
+.card-aside {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-body);
+  color: var(--text-subtle);
+}
+
+.card-action {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.card-body {
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+.card-flush .card-body {
+  padding: var(--space-2) 0 0;
+}
+
+/* A flush card's header gets a line under it, so the table below starts cleanly. */
+.card-flush .card-header {
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.card-flush .card-body {
+  padding: 0;
+}
+
+/* Section */
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.section-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--text-md);
+  font-weight: var(--weight-title);
+  letter-spacing: 0;
+}
+
+/* A card without a header has even padding all round. */
+.card:not(:has(> .card-header)) > .card-body {
+  padding-top: var(--space-4);
+}

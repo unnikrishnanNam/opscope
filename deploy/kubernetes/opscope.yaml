@@ -1,10 +1,10 @@
-# OpScope running inside the cluster it shows.
+# Opscope running inside the cluster it shows.
 #
 #   kubectl apply -f deploy/kubernetes/
 #   kubectl -n opscope port-forward svc/opscope 8080:80
 #   open http://localhost:8080
 #
-# OpScope has no login of its own: anyone who can reach this Service can read
+# Opscope has no login of its own: anyone who can reach this Service can read
 # everything the ClusterRole below allows. That's why the Service is
 # ClusterIP only and the README uses port-forward. Don't expose it with an
 # Ingress or LoadBalancer unless something in front of it adds authentication.
@@ -17,15 +17,15 @@ kind: Namespace
 metadata:
   name: opscope
 ---
-# The identity OpScope uses to talk to the Kubernetes API.
+# The identity Opscope uses to talk to the Kubernetes API.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: opscope
   namespace: opscope
 ---
-# Read-only access to everything OpScope shows (except Secrets).
-# Only "get" and "list": OpScope never creates, changes or deletes anything,
+# Read-only access to everything Opscope shows (except Secrets).
+# Only "get" and "list": Opscope never creates, changes or deletes anything,
 # and it polls instead of watching.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -125,7 +125,7 @@ spec:
             limits:
               memory: 256Mi
           securityContext:
-            readOnlyRootFilesystem: true # OpScope only writes to /data
+            readOnlyRootFilesystem: true # Opscope only writes to /data
             allowPrivilegeEscalation: false
             capabilities:
               drop: [ALL]

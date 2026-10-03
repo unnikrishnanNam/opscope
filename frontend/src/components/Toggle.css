@@ -1,0 +1,160 @@
+/* The real input is invisible but still there for the keyboard and screen
+   readers; the span after it draws the control. */
+.toggle-input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  pointer-events: none;
+}
+
+.checkbox,
+.switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-body);
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox.is-disabled,
+.switch.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Checkbox */
+
+.checkbox-box {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: transparent;
+  transition:
+    background-color var(--duration-fast) var(--ease),
+    border-color var(--duration-fast) var(--ease);
+}
+
+.checkbox:hover .checkbox-box {
+  border-color: var(--text-subtle);
+}
+
+.toggle-input:checked + .checkbox-box {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-text);
+}
+
+/* Switch */
+
+.switch-track {
+  position: relative;
+  width: 30px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  background: var(--data-track);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+  transition: background-color var(--duration) var(--ease);
+}
+
+.switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-subtle);
+  transition:
+    transform var(--duration) var(--ease),
+    background-color var(--duration) var(--ease);
+}
+
+.toggle-input:checked + .switch-track {
+  background: var(--primary);
+  box-shadow: none;
+}
+
+.toggle-input:checked + .switch-track .switch-thumb {
+  transform: translateX(12px);
+  background: var(--primary-text);
+}
+
+/* Keyboard focus on the hidden input shows on the drawn control. */
+.toggle-input:focus-visible + .checkbox-box,
+.toggle-input:focus-visible + .switch-track,
+.toggle-input:focus-visible + .segmented-face {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Segmented control */
+
+.segmented {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.segmented-option {
+  position: relative;
+  display: flex;
+}
+
+.segmented-face {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: calc(var(--control-md) - 4px);
+  padding: 0 var(--space-3);
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius) - 2px);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-strong);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease),
+    color var(--duration-fast) var(--ease);
+}
+
+.segmented-face:hover {
+  color: var(--text);
+}
+
+.toggle-input:checked + .segmented-face {
+  background: var(--surface);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.segmented-sm .segmented-face {
+  height: calc(var(--control-sm) - 4px);
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+}
+
+/* Icon-only options are square. */
+.segmented-face:has(.visually-hidden) {
+  width: calc(var(--control-md) - 4px);
+  padding: 0;
+  justify-content: center;
+}
+
+.segmented-sm .segmented-face:has(.visually-hidden) {
+  width: calc(var(--control-sm) - 4px);
+}

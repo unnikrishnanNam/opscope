@@ -69,6 +69,16 @@ func TestFrontendRoutesFallBackToIndex(t *testing.T) {
 	}
 }
 
+func TestWebManifestType(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "site.webmanifest"), []byte(`{"name":"Opscope"}`), 0o644)
+
+	rec := get(staticHandler(dir), "/site.webmanifest")
+	if ct := rec.Header().Get("Content-Type"); ct != "application/manifest+json" {
+		t.Fatalf("content-type = %q, want application/manifest+json", ct)
+	}
+}
+
 func TestUnknownResourceIs404(t *testing.T) {
 	rec := get(newTestServer(t), "/api/clusters/any/widgets")
 

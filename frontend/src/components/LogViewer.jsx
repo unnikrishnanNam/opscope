@@ -1,23 +1,32 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import Button from "./Button.jsx";
+import { Callout } from "./Callout.jsx";
+import { Select } from "./Field.jsx";
+import LogView from "./LogView.jsx";
+import { Checkbox, Switch } from "./Toggle.jsx";
+import { RefreshIcon } from "./icons.jsx";
+import "./LogViewer.css";
 
 const LINE_CHOICES = [100, 500, 2000];
 // Keep at most this many lines in the browser while following, so a chatty
 // container can't fill up memory.
 const MAX_LINES = 5000;
 
-// Shows a pod's logs. `containers` comes from the detail endpoint.
+// A pod's logs: which container, how many lines, the previous run, line
+// wrapping and following, above a LogView. `containers` comes from the
+// detail endpoint.
 export default function LogViewer({ clusterId, namespace, pod, containers }) {
   // Start with the first normal container (init containers usually finished long ago).
   const [container, setContainer] = useState((containers.find((c) => !c.role) ?? containers[0])?.name ?? "");
   const [lines, setLines] = useState(500);
   const [previous, setPrevious] = useState(false);
   const [follow, setFollow] = useState(false);
+  const [wrap, setWrap] = useState(true);
   const [reloads, setReloads] = useState(0);
 
   const [text, setText] = useState("");
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
-  const boxRef = useRef(null);
 
   // Fetch the logs whenever an option changes. Each run cancels the one before.
   useEffect(() => {
@@ -58,63 +67,69 @@ export default function LogViewer({ clusterId, namespace, pod, containers }) {
     return () => controller.abort();
   }, [clusterId, namespace, pod, container, lines, previous, follow, reloads]);
 
-  // While following, keep the newest lines in view.
-  useEffect(() => {
-    if (follow && boxRef.current) boxRef.current.scrollTop = boxRef.current.scrollHeight;
-  }, [text, follow]);
-
   return (
-    <div>
+    <div className="log-viewer">
       <div className="log-toolbar">
-        <label className="picker">
-          <span className="picker-label">Container</span>
-          <select className="select" value={container} onChange={(e) => setContainer(e.target.value)}>
+        {containers.length > 1 ? (
+          <Select size="sm" aria-label="Container" value={container} onChange={(e) => setContainer(e.target.value)}>
             {containers.map((c) => (
               <option key={c.name} value={c.name}>
                 {c.name}
                 {c.role ? ` (${c.role})` : ""}
               </option>
             ))}
-          </select>
-        </label>
-        <label className="picker">
-          <span className="picker-label">Last</span>
-          <select className="select" value={lines} onChange={(e) => setLines(Number(e.target.value))}>
-            {LINE_CHOICES.map((n) => (
-              <option key={n} value={n}>
-                {n} lines
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="checkbox" title="Logs from before the container's last restart">
-          <input type="checkbox" checked={previous} onChange={(e) => setPrevious(e.target.checked)} />
+          </Select>
+        ) : (
+          <span className="log-container" title="Container">
+            {container}
+          </span>
+        )}
+        <Select size="sm" aria-label="Lines" value={lines} onChange={(e) => setLines(Number(e.target.value))}>
+          {LINE_CHOICES.map((n) => (
+            <option key={n} value={n}>
+              Last {n} lines
+            </option>
+          ))}
+        </Select>
+        <Checkbox
+          checked={previous}
+          // A finished run has nothing to follow.
+          onChange={(on) => {
+            setPrevious(on);
+            if (on) setFollow(false);
+          }}
+          title="Logs from before the container's last restart"
+        >
           Previous run
-        </label>
-        <div className="table-toolbar-right">
-          {!follow && (
-            <button type="button" className="button button-quiet" onClick={() => setReloads((n) => n + 1)}>
-              Refresh
-            </button>
-          )}
-          <button
-            type="button"
-            className={`button ${follow ? "button-primary" : ""}`}
-            onClick={() => setFollow(!follow)}
+        </Checkbox>
+        <div className="log-toolbar-end">
+          <Switch checked={wrap} onChange={setWrap}>
+            Wrap lines
+          </Switch>
+          <Switch
+            checked={follow}
+            onChange={setFollow}
             disabled={previous}
-            title={previous ? "A previous run has finished, so there's nothing to follow" : undefined}
+            title={
+              previous ? "A previous run has finished, so there's nothing to follow" : "Show new lines as they arrive"
+            }
           >
-            {follow ? "Following… (stop)" : "Follow"}
-          </button>
+            Follow
+          </Switch>
+          {!follow && (
+            <Button variant="quiet" size="sm" icon={RefreshIcon} onClick={() => setReloads((n) => n + 1)}>
+              Refresh
+            </Button>
+          )}
         </div>
       </div>
 
       {error ? (
-        <div className="field-error">{error.message}</div>
+        <Callout tone="error" title="Couldn't load the logs">
+          {error.message}
+        </Callout>
       ) : (
-        <pre ref={boxRef} className="log-box">
-          {text || (loading ? "Loading…" : "No log lines.")}
-        </pre>
+        <LogView text={text} loading={loading} live={follow} wrap={wrap} height="calc(100vh - 330px)" />
       )}
     </div>
   );

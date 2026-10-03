@@ -79,8 +79,8 @@ func minify(config *clientcmdapi.Config, contextName string) (*clientcmdapi.Conf
 // machine but dangerous when the file arrives through the web UI:
 //
 //   - "exec" and "auth-provider" run a program on the server to get a token,
-//     so a pasted file could run any command inside OpScope.
-//   - file paths (client-certificate, token-file, ...) would make OpScope read
+//     so a pasted file could run any command inside Opscope.
+//   - file paths (client-certificate, token-file, ...) would make Opscope read
 //     files from its own disk.
 //
 // Kubeconfigs with everything embedded (like kubeadm's admin.conf) pass.
@@ -103,7 +103,7 @@ func checkSafeForUpload(config *clientcmdapi.Config) error {
 	return nil
 }
 
-// clientSet holds the clients OpScope keeps for one cluster.
+// clientSet holds the clients Opscope keeps for one cluster.
 type clientSet struct {
 	kube   *kubernetes.Clientset  // typed: Go structs for built-in kinds (Pods, Services, ...)
 	dyn    *dynamic.DynamicClient // dynamic: any kind as plain maps, incl. custom resources

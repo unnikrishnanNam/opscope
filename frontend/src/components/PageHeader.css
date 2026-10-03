@@ -1,0 +1,101 @@
+/* Breadcrumbs */
+
+/* min-width: 0 lets it shrink in a flex row, so a long name gets "…". */
+.breadcrumbs {
+  min-width: 0;
+}
+
+.breadcrumbs ol {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-strong);
+}
+
+.breadcrumbs li {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  color: var(--text-subtle);
+  white-space: nowrap;
+}
+
+/* Earlier crumbs keep their size; a long current name gets "…". */
+.breadcrumbs li:not(:last-child) {
+  flex-shrink: 0;
+}
+
+.breadcrumbs-sep {
+  margin: 0 6px;
+  flex-shrink: 0;
+  color: var(--border-strong);
+}
+
+.breadcrumbs a {
+  color: var(--text-subtle);
+  text-decoration: none;
+}
+
+.breadcrumbs a:hover {
+  color: var(--text);
+}
+
+.breadcrumbs-current {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+
+/* Page header */
+
+.page-header-block {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-6);
+  margin-bottom: var(--space-6);
+}
+
+.page-header-main {
+  min-width: 0;
+  flex: 1 1 320px;
+}
+
+.page-header-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.page-header-title {
+  min-width: 0;
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-title);
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.page-header-description {
+  margin-top: 6px;
+  max-width: 72ch;
+  color: var(--text-muted);
+}
+
+.page-header-side {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 36px;
+}
+
+.page-header-meta {
+  font-size: var(--text-sm);
+  color: var(--text-subtle);
+  white-space: nowrap;
+}

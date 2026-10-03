@@ -1,0 +1,363 @@
+.overview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.overview .page-header-block {
+  margin-bottom: var(--space-2);
+}
+
+.overview > .callout {
+  max-width: none;
+}
+
+/* Health chip, next to the cluster's name */
+
+.health-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 13px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-strong);
+  white-space: nowrap;
+}
+
+.health-chip-ok {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.health-chip-warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+  cursor: default;
+}
+
+.health-chip-warn svg {
+  color: var(--warn-mark);
+}
+
+/* Summary strip: one box, four cells. The 1px gap shows the border colour
+   behind, which draws the lines between cells in any arrangement. */
+
+.summary-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+@media (max-width: 1000px) {
+  .summary-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.summary-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface);
+  color: inherit;
+  text-decoration: none;
+}
+
+.summary-cell-link {
+  transition: background-color var(--duration-fast) var(--ease);
+}
+
+.summary-cell-link:hover {
+  background: var(--surface-hover);
+}
+
+.summary-cell-link:focus-visible {
+  outline-offset: -2px;
+}
+
+.summary-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-strong);
+  color: var(--text-muted);
+}
+
+.summary-label svg {
+  color: var(--text-subtle);
+}
+
+.summary-value {
+  display: flex;
+  align-items: baseline;
+  margin-top: 2px;
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-display);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+/* "%" sits right against its number. */
+.summary-unit {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-title);
+  color: var(--text-muted);
+}
+
+.summary-value-empty {
+  color: var(--text-subtle);
+}
+
+.summary-of {
+  margin-left: 6px;
+  font-size: var(--text-md);
+  font-weight: var(--weight-strong);
+  letter-spacing: 0;
+  color: var(--text-subtle);
+}
+
+.summary-note {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-strong);
+  color: var(--text-subtle);
+}
+
+/* The small picture at the bottom of each cell sits on the same line
+   across the strip. */
+.summary-cell > :last-child:not(.summary-note) {
+  margin-top: auto;
+}
+
+.summary-cell .usage {
+  display: flex;
+  margin-top: var(--space-2);
+}
+
+.summary-cell .usage-track {
+  flex: 1;
+}
+
+.node-squares {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding-top: var(--space-3);
+}
+
+.node-square {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.mini-stack {
+  display: flex;
+  gap: 2px;
+  height: 6px;
+  margin-top: var(--space-3);
+}
+
+.mini-stack > span {
+  min-width: 3px;
+}
+
+.mini-stack > span:first-child {
+  border-radius: 3px 0 0 3px;
+}
+
+.mini-stack > span:last-child {
+  border-radius: 0 3px 3px 0;
+}
+
+.mini-stack > span:only-child {
+  border-radius: 3px;
+}
+
+/* Resources and pods on the left, nodes on the right; one column when narrow. */
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.overview-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+@media (max-width: 1100px) {
+  .overview-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Resources: a row per kind */
+
+.resource-group + .resource-group {
+  margin-top: var(--space-4);
+}
+
+.resource-group-title {
+  margin-bottom: var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-strong);
+  color: var(--text-subtle);
+}
+
+.resource-rows {
+  margin: 0 calc(-1 * var(--space-2));
+  padding: 0;
+  list-style: none;
+}
+
+.resource-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) 48px minmax(80px, 1.3fr) 128px;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 38px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius);
+  color: inherit;
+  text-decoration: none;
+}
+
+.resource-row:hover {
+  background: var(--surface-hover);
+}
+
+.resource-row:focus-visible {
+  outline-offset: -2px;
+}
+
+.resource-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-weight: var(--weight-strong);
+}
+
+.resource-name svg {
+  flex-shrink: 0;
+  color: var(--text-subtle);
+}
+
+.resource-count {
+  text-align: right;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-title);
+}
+
+/* Healthy against not, as one bar; an empty track when there are none. */
+.resource-bar {
+  display: flex;
+  gap: 2px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--data-track);
+  overflow: hidden;
+}
+
+.resource-bar > span {
+  min-width: 3px;
+}
+
+.resource-state {
+  font-size: var(--text-sm);
+  color: var(--text-subtle);
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .resource-row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: var(--space-3);
+  }
+
+  .resource-bar {
+    display: none;
+  }
+}
+
+/* Nodes */
+
+.node-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.node-row {
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.node-row:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.node-row:last-child {
+  padding-bottom: 0;
+}
+
+.node-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+/* A long node name is cut off rather than wrapping. */
+.node-row-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--weight-strong);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.node-row-name:hover {
+  text-decoration: underline;
+}
+
+.node-row-meta {
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+}
+
+.node-row-usage {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 4px var(--space-3);
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-strong);
+  color: var(--text-subtle);
+}
+
+.node-row-usage .usage {
+  display: flex;
+}
+
+.node-row-usage .usage-track {
+  flex: 1;
+}

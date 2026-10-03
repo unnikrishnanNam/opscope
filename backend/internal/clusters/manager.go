@@ -1,4 +1,4 @@
-// Package clusters keeps track of the Kubernetes clusters OpScope knows
+// Package clusters keeps track of the Kubernetes clusters Opscope knows
 // about and holds one client per cluster.
 //
 // Clusters come from two places:
@@ -29,7 +29,7 @@ const (
 	SourceUI  = "ui"
 )
 
-// Cluster is one cluster OpScope can talk to. The exported fields are safe
+// Cluster is one cluster Opscope can talk to. The exported fields are safe
 // to send to the browser; credentials stay inside the client.
 type Cluster struct {
 	ID      string `json:"id"`
@@ -108,10 +108,10 @@ func (m *Manager) LoadFromFile(path, contextName, name string) (*Cluster, error)
 	return cluster, nil
 }
 
-// LoadInCluster adds the cluster OpScope is running in, using the pod's
+// LoadInCluster adds the cluster Opscope is running in, using the pod's
 // service account. Kubernetes mounts its token and CA into every pod (at
 // /var/run/secrets/kubernetes.io/serviceaccount) and sets KUBERNETES_SERVICE_HOST,
-// which is what rest.InClusterConfig reads. What OpScope may see is then
+// which is what rest.InClusterConfig reads. What Opscope may see is then
 // decided by the RBAC rules bound to that service account.
 func (m *Manager) LoadInCluster(name string) (*Cluster, error) {
 	restConfig, err := rest.InClusterConfig()
@@ -256,7 +256,7 @@ func (m *Manager) Add(name string, kubeconfig []byte, contextName string) (*Clus
 	return cluster, nil
 }
 
-// save writes one cluster file that only the OpScope user can read (0600),
+// save writes one cluster file that only the Opscope user can read (0600),
 // inside a folder only it can open (0700).
 func (m *Manager) save(saved savedCluster) error {
 	if err := os.MkdirAll(m.dir, 0o700); err != nil {
