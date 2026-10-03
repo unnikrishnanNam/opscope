@@ -158,6 +158,12 @@
   left: 8px;
 }
 
+.search-input-shortcut {
+  position: absolute;
+  right: 8px;
+  pointer-events: none;
+}
+
 .search-input-clear {
   position: absolute;
   right: 5px;

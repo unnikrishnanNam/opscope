@@ -27,6 +27,9 @@ const SKELETON_ROWS = 8;
 //   toolbar    extra things on the right of the filter (refresh, updated time)
 //   density    "comfortable" (default) or "compact"
 //   maxHeight  any CSS length: the table scrolls inside and its header stays put
+//   fill       take the rest of the page's height and scroll inside, header
+//              staying put (list pages); on phones the page scrolls instead
+//   shortcut   a key that jumps to the filter box, e.g. "/"
 //
 // The filter matches the text of every plain-text column.
 export default function DataTable({
@@ -39,6 +42,8 @@ export default function DataTable({
   toolbar,
   density = "comfortable",
   maxHeight,
+  fill = false,
+  shortcut,
 }) {
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState(null); // { key, ascending } or null for the server's order
@@ -65,7 +70,7 @@ export default function DataTable({
   }
 
   return (
-    <div className={`data-table data-table-${density}`}>
+    <div className={["data-table", `data-table-${density}`, fill && "data-table-fill"].filter(Boolean).join(" ")}>
       <div className="data-table-toolbar">
         <SearchInput
           className="data-table-filter"
@@ -73,6 +78,7 @@ export default function DataTable({
           label={`Filter ${noun}`}
           value={filter}
           onChange={setFilter}
+          shortcut={shortcut}
         />
         <span className="data-table-count">{rows ? countLabel(visible.length, rows.length, noun) : ""}</span>
         {toolbar && <div className="data-table-toolbar-end">{toolbar}</div>}

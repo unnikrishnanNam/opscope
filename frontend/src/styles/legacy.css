@@ -222,47 +222,13 @@ code,
   gap: var(--space-3);
 }
 
-.filter {
-  width: 240px;
-}
-
 /* Wide tables scroll sideways inside their box instead of stretching the page. */
-.table-scroll {
-  overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-
-.table-scroll .table {
-  border: none;
-}
 
 .table td {
   white-space: nowrap;
 }
 
 /* Header cells hold a button so sorting works with the keyboard too. */
-.th-button {
-  all: unset;
-  cursor: pointer;
-  display: inline-flex;
-  gap: 4px;
-}
-
-.th-button:hover {
-  color: var(--ink);
-}
-
-.th-button:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.sort-arrow {
-  display: inline-block;
-  width: 0.8em;
-  color: var(--accent);
-}
 
 .table tbody tr:hover td {
   background: var(--surface-hover);
@@ -290,78 +256,12 @@ code,
   margin-left: 4px;
 }
 
-.table-empty {
-  padding: var(--space-6) var(--space-3) !important;
-  text-align: center;
-  color: var(--ink-faint);
-}
-
 /* ==========================================================================
    Overview (Phase 3)
    ========================================================================== */
 
 .tag-gap {
   margin-left: var(--space-2);
-}
-
-.tiles {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
-  gap: var(--space-3);
-  margin-bottom: var(--space-6);
-}
-
-.tile {
-  display: block;
-  padding: var(--space-3) var(--space-4);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: inherit;
-  text-decoration: none;
-}
-
-.tile-link:hover {
-  border-color: var(--border-strong);
-}
-
-.tile-link:hover .tile-label {
-  color: var(--accent);
-}
-
-.tile-label {
-  font-size: var(--text-xs);
-  color: var(--ink-soft);
-}
-
-.tile-value {
-  font-size: 26px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.3;
-}
-
-.tile-note {
-  font-size: var(--text-xs);
-}
-
-.tile-note .status {
-  font-size: var(--text-xs);
-}
-
-.cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-  gap: var(--space-4);
-  margin-bottom: var(--space-4);
-}
-
-.old-card {
-  padding: var(--space-4);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  min-width: 0;
 }
 
 .old-card-title {
@@ -375,40 +275,6 @@ code,
 }
 
 /* Pods by status: one bar, a 2px gap between segments, rounded ends. */
-
-.node-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  font-size: var(--text-sm);
-}
-
-.node-list li {
-  display: grid;
-  /* minmax(0, 1fr) lets the name column shrink, so long names get "…" instead of wrapping. */
-  grid-template-columns: minmax(0, 1fr) auto auto 80px;
-  align-items: center;
-  gap: var(--space-4);
-  padding: 6px 0;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.node-list li:last-child {
-  border-bottom: none;
-}
-
-.node-name {
-  font-weight: 600;
-  color: inherit;
-  text-decoration: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-a.node-name:hover {
-  color: var(--accent);
-}
 
 .card-scroll {
   overflow-x: auto;
@@ -429,18 +295,8 @@ a.node-name:hover {
 }
 
 /* A table inside a card uses the card's border instead of its own. */
-.old-card .table {
-  border: none;
-}
-
-.old-card .table th {
-  background: none;
-}
 
 .old-card .table th:first-child,
-.old-card .table td:first-child {
-  padding-left: 0;
-}
 
 /* ==========================================================================
    Secret keys (Phase 4)
@@ -649,29 +505,4 @@ a.node-name:hover {
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-all;
-}
-
-/* ==========================================================================
-   Overview usage card (Phase 7)
-   ========================================================================== */
-
-.usage-card {
-  margin-bottom: var(--space-4);
-}
-
-.usage-row {
-  display: grid;
-  grid-template-columns: 80px auto 1fr auto;
-  align-items: center;
-  gap: var(--space-4);
-  padding: 4px 0;
-  font-size: var(--text-sm);
-}
-
-.usage-row-label {
-  font-weight: 600;
-}
-
-.usage-rows .small {
-  margin: var(--space-2) 0 0;
 }

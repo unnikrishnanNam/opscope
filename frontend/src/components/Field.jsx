@@ -1,4 +1,4 @@
-import { cloneElement, useId, useRef } from "react";
+import { cloneElement, useEffect, useId, useRef } from "react";
 import { CloseIcon, ErrorIcon, SearchIcon } from "./icons.jsx";
 import "./Field.css";
 
@@ -76,8 +76,34 @@ export function Select({ size = "md", invalid, className, children, ...props }) 
 
 // SearchInput: a text box with a search icon and a clear button. Escape also
 // clears it. `onChange` receives the new text, not an event.
-export function SearchInput({ value, onChange, size = "md", label = "Filter", className, ...props }) {
-  const inputRef = useRef(null);
+//   shortcut  a key that focuses it from anywhere on the page (e.g. "/");
+//             shown as a hint while the box is empty
+//   inputRef  optional ref to the <input>, for focusing it from outside
+export function SearchInput({
+  value,
+  onChange,
+  size = "md",
+  label = "Filter",
+  shortcut,
+  inputRef: outerRef,
+  className,
+  ...props
+}) {
+  const ownRef = useRef(null);
+  const inputRef = outerRef ?? ownRef;
+
+  // The shortcut works anywhere, except while typing in another field.
+  useEffect(() => {
+    if (!shortcut) return;
+    function onKeyDown(event) {
+      if (event.key !== shortcut || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.target.closest("input, textarea, select, [contenteditable], dialog")) return;
+      event.preventDefault();
+      inputRef.current?.focus();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [shortcut, inputRef]);
 
   function clear() {
     onChange("");
@@ -92,6 +118,7 @@ export function SearchInput({ value, onChange, size = "md", label = "Filter", cl
         type="search"
         className={controlClass("input", size)}
         aria-label={label}
+        aria-keyshortcuts={shortcut}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
@@ -102,6 +129,11 @@ export function SearchInput({ value, onChange, size = "md", label = "Filter", cl
         }}
         {...props}
       />
+      {shortcut && !value && (
+        <kbd className="kbd search-input-shortcut" aria-hidden="true">
+          {shortcut}
+        </kbd>
+      )}
       {value && (
         // Not in the tab order: Escape does the same from the keyboard.
         <button type="button" className="search-input-clear" onClick={clear} tabIndex={-1} aria-label="Clear">

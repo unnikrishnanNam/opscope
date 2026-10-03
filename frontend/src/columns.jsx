@@ -1,5 +1,5 @@
 // Table columns for each resource type, keyed by the name used in the API
-// URL (/api/clusters/{id}/pods). See ResourceTable.jsx for what each field means.
+// URL (/api/clusters/{id}/pods). See DataTable.jsx for what each field means.
 import StatusBadge, { Fraction } from "./components/StatusBadge.jsx";
 import { Tag } from "./components/Tag.jsx";
 import { age, bytes, cores, cpu, duration } from "./format.js";
@@ -221,7 +221,13 @@ export const columns = {
       key: "ready",
       label: "Ready",
       className: "num",
-      render: (row) => <Fraction have={row.ready} want={row.containers} />,
+      // A finished pod has no ready containers, and that's fine: no warning colour.
+      render: (row) =>
+        ["Completed", "Succeeded"].includes(row.status) ? (
+          `${row.ready}/${row.containers}`
+        ) : (
+          <Fraction have={row.ready} want={row.containers} />
+        ),
     },
     { key: "restarts", label: "Restarts", className: "num" },
     { key: "node", label: "Node", className: "mono" },

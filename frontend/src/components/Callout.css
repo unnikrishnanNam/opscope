@@ -56,6 +56,12 @@
   overflow-wrap: anywhere;
 }
 
+/* Inline code in a callout is short (a flag, a name): keep it on one line,
+   so "--kubelet-insecure-tls" doesn't break after its dashes. */
+.callout-text :not(pre) > code {
+  white-space: nowrap;
+}
+
 /* Paragraphs and code blocks inside a callout get room between them. */
 .callout-text > * + * {
   margin-top: var(--space-2);

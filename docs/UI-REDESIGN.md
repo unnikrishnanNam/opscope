@@ -8,7 +8,7 @@ We work the same way as before: one small phase at a time, each ending with a wo
 ticked boxes and notes at the bottom of this file. Phases are numbered **R0–R8** so they don't mix
 with the build phases 0–8.
 
-**Status (2026-10-03):** R0–R4 done; R5 next.
+**Status (2026-10-03):** R0–R5 done; R6 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -195,15 +195,15 @@ Goal: the new frame around the old pages, working on real clusters.
 
 Goal: the pages people open most.
 
-- [ ] Overview: header with version, namespace count and API server; stat tiles; cluster usage with
+- [x] Overview: header with version, namespace count and API server; stat tiles; cluster usage with
       sparklines; pods by status; nodes; recent warnings. Missing metrics-server and missing Gateway
       API look intentional, not broken
-- [ ] All 16 list pages on `DataTable` with `PageHeader`, filter, count, refresh and "updated" time
-- [ ] List pages: the table fills the rest of the window and scrolls inside, so its column headers
+- [x] All 14 list pages on `DataTable` with `PageHeader`, filter, count, refresh and "updated" time
+- [x] List pages: the table fills the rest of the window and scrolls inside, so its column headers
       stay visible (decided after R4)
-- [ ] Nodes and Pods: usage columns on the new `UsageBar` and `Sparkline`
-- [ ] "Not installed" (Gateway API) and "forbidden" (Secrets without RBAC) as `Callout`s
-- [ ] Checked on both clusters
+- [x] Nodes and Pods: usage columns on the new `UsageBar` and `Sparkline`
+- [x] "Not installed" (Gateway API) and "forbidden" (Secrets without RBAC) as `Callout`s
+- [x] Checked on both clusters
 
 ## Phase R6: Detail pages
 
@@ -436,4 +436,39 @@ Things that come up while building, decisions made, and anything that moves betw
 - Spotted for R5: the old list toolbar is cramped at 375 px; in a callout, the inline code
   `--kubelet-insecure-tls` can break after its dashes.
 - Build: JS 337 KB (106 KB gzipped), CSS 48 KB.
+
+### Phase R5
+
+- Checked against all three test clusters: every list page on multipass (each loaded, with no
+  errors), the Gateway API "not installed" note and the missing metrics-server notes on
+  `opscope-test`, the overview with and without a namespace, in light and dark, at 375 px, the
+  pane's 800 px and an emulated 1440 × 900.
+- There are 14 list pages, not 16 as the plan said (the overview is the 15th page in the sidebar).
+- List pages: `PageHeader`, then any notes, then `DataTable` with `fill`. The page is a flex column
+  as tall as the content area. The table box grows with its rows and stops at the bottom of the
+  window; from there only the rows scroll and the column headers stay in view. A short list ends
+  after its last row instead of leaving an empty box. Below 640 px the page scrolls as a whole
+  instead, since a scrolling box inside a scrolling page is awkward on a phone.
+- `/` jumps to the filter box from anywhere on a list page (not while typing in another field). The
+  box shows the key while empty, and the input announces it with `aria-keyshortcuts`.
+- The refresh button only spins for a refresh someone clicked, not for the automatic one every
+  10 seconds, which made it flicker before.
+- "Not installed" (Gateway API) and "forbidden" (RBAC, usually Secrets) are calm notes, not errors.
+  The forbidden note couldn't be seen this time: it would mean taking Secrets access away on a test
+  cluster. Its code path is the same 403 check the old page used.
+- Overview: header with version, namespace count and API server; a tile per count with its page's
+  icon (from `sections.js`), linking to the list with the namespace kept; cluster usage with large
+  percentages, full-width bars and 15-minute lines; pods by status; nodes with each node's CPU and
+  memory; recent warnings as an `EventList`. Usage and nodes sit side by side from 1100 px. Missing
+  metrics-server is a one-line note inside the usage card; without Gateway API those tiles are
+  left out.
+- `UsageBar` gained `width` and `showPercent`; `Sparkline` gained `fluid` (stretches to its box,
+  with `vector-effect: non-scaling-stroke` so the line keeps its weight).
+- Finished pods (Completed/Succeeded) show their "0/1" ready count in the normal colour.
+- Inline code in a callout no longer breaks after its dashes (`--kubelet-insecure-tls`).
+- Removed: `ResourceTable.jsx`, and from `legacy.css` the old table toolbar, the overview's tiles,
+  cards, node list and usage rows. `legacy.css` is down to about 500 lines from 1,286.
+- Known and left: 9 tiles at some widths leave one alone on the last row (e.g. 8 + 1 at 1440 px);
+  tiles narrow enough to always fit would cut off names like "Deployments".
+- Build: JS 343 KB (107 KB gzipped), CSS 54 KB.
 

@@ -1,33 +1,40 @@
-import { Link, useLocation, useOutletContext, useParams, useSearchParams } from "react-router";
+import { Link, useLocation, useOutletContext, useSearchParams } from "react-router";
 import { useApi } from "../api.js";
-import { bytes, clock, cpu } from "../format.js";
-import ErrorBox from "../components/ErrorBox.jsx";
+import { bytes, clock, cpu, percent } from "../format.js";
+import Button from "../components/Button.jsx";
+import { Callout } from "../components/Callout.jsx";
+import { Card, StatTile } from "../components/Card.jsx";
+import EventList from "../components/EventList.jsx";
+import { Skeleton } from "../components/Loading.jsx";
+import { PageHeader } from "../components/PageHeader.jsx";
 import PodStatusBar from "../components/PodStatusBar.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
-import EventsTable from "../components/EventsTable.jsx";
-import { detailPath, nsQuery } from "../sections.js";
 import { MetricsUnavailable, Sparkline, UsageBar } from "../components/Usage.jsx";
+import { allPages, detailPath, nsQuery } from "../sections.js";
+import "./Overview.css";
 
 const REFRESH_MS = 10_000;
 const WARNINGS_SHOWN = 8;
 const METRICS_REFRESH_MS = 15_000; // metrics-server's own refresh interval
 
-// What each workload count links to and how its "unhealthy" number reads.
-const WORKLOADS = {
-  deployments: { label: "Deployments", path: "workloads/deployments", problem: "not ready" },
-  statefulsets: { label: "StatefulSets", path: "workloads/statefulsets", problem: "not ready" },
-  daemonsets: { label: "DaemonSets", path: "workloads/daemonsets", problem: "not ready" },
-  jobs: { label: "Jobs", path: "workloads/jobs", problem: "failed" },
-  cronjobs: { label: "CronJobs", path: "workloads/cronjobs", problem: "" },
-  gateways: { label: "Gateways", path: "network/gateways", problem: "not programmed" },
-  httproutes: { label: "HTTPRoutes", path: "network/httproutes", problem: "not accepted" },
+// What each count's "needs attention" number is called. Pages (label, link,
+// icon) come from sections.js.
+const PROBLEMS = {
+  deployments: "not ready",
+  statefulsets: "not ready",
+  daemonsets: "not ready",
+  jobs: "failed",
+  cronjobs: "",
+  gateways: "not programmed",
+  httproutes: "not accepted",
 };
 
-// The cluster's front page: counts, pod health, nodes and recent warnings.
+// The cluster's front page: counts, usage, pod health, nodes and recent warnings.
 export default function Overview({ page }) {
   const { cluster, reachable, status } = useOutletContext();
   const [searchParams] = useSearchParams();
   const namespace = searchParams.get("ns") ?? "";
+  const search = nsQuery(useLocation().search);
 
   const query = namespace ? `?namespace=${encodeURIComponent(namespace)}` : "";
   const base = reachable ? `/clusters/${cluster.id}` : null;
@@ -40,89 +47,139 @@ export default function Overview({ page }) {
 
   const o = overview.data;
   const error = overview.error ?? nodes.error ?? warnings.error;
+  // Links to list pages keep the selected namespace.
+  const to = (path) => `/c/${cluster.id}/${path}${search}`;
 
   return (
-    <section>
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">{cluster.name}</h1>
-          <p className="page-about">
-            {status?.version ? `Kubernetes ${status.version} · ` : ""}
-            {o ? `${o.namespaces} namespaces · ` : ""}
+    <section className="overview">
+      <PageHeader
+        title={cluster.name}
+        description={
+          <>
+            {status?.version && `Kubernetes ${status.version} · `}
+            {o && `${o.namespaces} namespaces · `}
             <span className="mono">{cluster.server}</span>
-            {namespace && (
-              <>
-                <br />
-                Showing namespace <strong>{namespace}</strong>. Nodes and namespaces cover the whole cluster.
-              </>
-            )}
-          </p>
-        </div>
-        {overview.updatedAt && <span className="muted">Updated {clock(overview.updatedAt)}</span>}
-      </div>
+          </>
+        }
+        meta={overview.updatedAt && `Updated ${clock(overview.updatedAt)}`}
+      />
 
-      {error && <ErrorBox title={`Couldn't load the ${page.label.toLowerCase()}`} message={error.message} detail={error.detail} />}
+      {namespace && (
+        <Callout compact>
+          Showing namespace <strong>{namespace}</strong>. Nodes, usage and the namespace count cover the whole cluster.
+        </Callout>
+      )}
+
+      {error && (
+        <Callout tone="error" title={`Couldn't load the ${page.label.toLowerCase()}`} detail={error.detail}>
+          {error.message}
+        </Callout>
+      )}
+
+      {o ? <Tiles o={o} to={to} /> : !error && reachable && <TileSkeletons />}
 
       {o && (
-        <>
-          <div className="tiles">
-            <Tile to="nodes" label="Nodes" value={o.nodes.total}>
-              <Health bad={o.nodes.total - o.nodes.ready} problem="not ready" okText="All ready" />
-            </Tile>
-            <Tile to="workloads/pods" label="Pods" value={o.pods.total}>
-              <Health bad={unhealthyPods(o.pods.byStatus)} problem="unhealthy" okText="All healthy" />
-            </Tile>
-            {/* gatewayAPI is null when the cluster doesn't have Gateway API, so no tiles appear. */}
-            {[...o.workloads, ...(o.gatewayAPI ?? [])].map((w) => {
-              const info = WORKLOADS[w.resource];
-              return (
-                <Tile key={w.resource} to={info.path} label={info.label} value={w.total}>
-                  {info.problem ? (
-                    <Health bad={w.unhealthy} problem={info.problem} okText={w.total ? "All good" : "None"} />
-                  ) : (
-                    <span className="muted">{w.total ? "Scheduled" : "None"}</span>
-                  )}
-                </Tile>
-              );
-            })}
-          </div>
-
-          <div className="old-card usage-card">
-            <h2 className="old-card-title">Cluster usage</h2>
-            <ClusterUsage usage={usage} />
-          </div>
-
-          <div className="cards">
-            <div className="old-card">
-              <h2 className="old-card-title">Pods by status</h2>
+        <div className="overview-grid">
+          <div className="overview-main">
+            <Card title="Cluster usage" aside="of what nodes can give to pods">
+              <ClusterUsage usage={usage} />
+            </Card>
+            <Card
+              title="Pods by status"
+              aside={`${o.pods.total} pods`}
+              action={
+                <Button variant="quiet" size="sm" to={to("workloads/pods")}>
+                  View pods
+                </Button>
+              }
+            >
               <PodStatusBar byStatus={o.pods.byStatus} total={o.pods.total} />
-            </div>
-
-            <div className="old-card">
-              <h2 className="old-card-title">Nodes</h2>
-              <NodeList nodes={nodes.data} clusterId={cluster.id} />
-            </div>
+            </Card>
           </div>
-        </>
+          <Card
+            title="Nodes"
+            aside={`${o.nodes.ready} of ${o.nodes.total} ready`}
+            action={
+              <Button variant="quiet" size="sm" to={to("nodes")}>
+                View nodes
+              </Button>
+            }
+          >
+            <NodeList nodes={nodes.data} usage={usage.data} clusterId={cluster.id} />
+          </Card>
+        </div>
       )}
 
       {warnings.data && (
-        <div className="old-card">
-          <h2 className="old-card-title">
-            Recent warnings
-            {warnings.data.length > WARNINGS_SHOWN && (
-              <span className="muted"> · newest {WARNINGS_SHOWN} of {warnings.data.length}</span>
-            )}
-          </h2>
-          <EventsTable
+        <Card
+          title="Recent warnings"
+          aside={
+            warnings.data.length > WARNINGS_SHOWN
+              ? `newest ${WARNINGS_SHOWN} of ${warnings.data.length}`
+              : warnings.data.length > 0 && `${warnings.data.length}`
+          }
+        >
+          <EventList
             clusterId={cluster.id}
             events={warnings.data.slice(0, WARNINGS_SHOWN)}
             showNamespace={!namespace}
             emptyText="No warnings. Nothing has complained recently."
           />
-        </div>
+        </Card>
       )}
     </section>
+  );
+}
+
+// The counts: nodes and pods first, then workloads, then Gateway API
+// (only when the cluster has it: gatewayAPI is null otherwise).
+function Tiles({ o, to }) {
+  const pageFor = (resource) => allPages.find((p) => p.resource === resource);
+  const nodesPage = pageFor("nodes");
+  const podsPage = pageFor("pods");
+
+  return (
+    <div className="stat-grid">
+      <StatTile label="Nodes" icon={nodesPage.icon} value={o.nodes.total} to={to(nodesPage.path)}>
+        <Health bad={o.nodes.total - o.nodes.ready} problem="not ready" okText="All ready" />
+      </StatTile>
+      <StatTile label="Pods" icon={podsPage.icon} value={o.pods.total} to={to(podsPage.path)}>
+        <Health
+          bad={unhealthyPods(o.pods.byStatus)}
+          problem="unhealthy"
+          okText={o.pods.total ? "All healthy" : "None"}
+        />
+      </StatTile>
+      {[...o.workloads, ...(o.gatewayAPI ?? [])].map((w) => {
+        const p = pageFor(w.resource);
+        const problem = PROBLEMS[w.resource];
+        return (
+          <StatTile key={w.resource} label={p.label} icon={p.icon} value={w.total} to={to(p.path)}>
+            {problem ? (
+              <Health bad={w.unhealthy} problem={problem} okText={w.total ? "All good" : "None"} />
+            ) : w.total ? (
+              "Scheduled"
+            ) : (
+              "None"
+            )}
+          </StatTile>
+        );
+      })}
+    </div>
+  );
+}
+
+function TileSkeletons() {
+  return (
+    <div className="stat-grid" aria-hidden="true">
+      {Array.from({ length: 7 }, (_, i) => (
+        <div key={i} className="stat-tile">
+          <Skeleton width="60%" />
+          <Skeleton width={40} height={28} />
+          <Skeleton width="50%" />
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -131,26 +188,6 @@ function unhealthyPods(byStatus) {
   return Object.entries(byStatus)
     .filter(([status]) => !["Running", "Completed", "Succeeded"].includes(status))
     .reduce((sum, [, count]) => sum + count, 0);
-}
-
-// A count with a label; links to its page when `to` is given.
-function Tile({ to, label, value, children }) {
-  const { clusterId } = useParams();
-  const search = nsQuery(useLocation().search); // keep ?ns=... when following the link
-  const body = (
-    <>
-      <div className="tile-label">{label}</div>
-      <div className="tile-value">{value}</div>
-      <div className="tile-note">{children}</div>
-    </>
-  );
-  return to ? (
-    <Link className="tile tile-link" to={{ pathname: `/c/${clusterId}/${to}`, search }}>
-      {body}
-    </Link>
-  ) : (
-    <div className="tile">{body}</div>
-  );
 }
 
 // "2 not ready" in the warning colour, or a calm "All ready".
@@ -162,32 +199,20 @@ function Health({ bad, problem, okText }) {
       </span>
     );
   }
-  return <span className="muted">{okText}</span>;
+  return okText;
 }
 
-function NodeList({ nodes, clusterId }) {
-  if (!nodes) return <p className="muted">Loading…</p>;
-  return (
-    <ul className="node-list">
-      {nodes.map((n) => (
-        <li key={n.name}>
-          <Link className="node-name" title={n.name} to={detailPath(clusterId, "nodes", "", n.name)}>
-            {n.name}
-          </Link>
-          <span className="muted">{n.roles.join(", ") || "–"}</span>
-          <span className="mono muted">{n.version}</span>
-          <StatusBadge status={n.status} />
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-// CPU and memory for the whole cluster: all nodes added up.
+// CPU and memory for the whole cluster: all nodes added up, with the last
+// 15 minutes as a line.
 function ClusterUsage({ usage }) {
   if (usage.error?.code === "metrics_unavailable") return <MetricsUnavailable compact />;
-  if (usage.error) return <p className="muted">Usage isn't available right now: {usage.error.message}</p>;
-  if (!usage.data) return <p className="muted">Loading…</p>;
+  if (usage.error)
+    return (
+      <Callout compact tone="warning">
+        Usage isn't available right now: {usage.error.message}
+      </Callout>
+    );
+  if (!usage.data) return <Skeleton height={96} />;
 
   const { total, history } = usage.data;
   const rows = [
@@ -195,20 +220,70 @@ function ClusterUsage({ usage }) {
     { what: "Memory", field: "memory", used: total.memory, of: total.memoryAllocatable, format: bytes },
   ];
   return (
-    <div className="usage-rows">
+    <div className="cluster-usage">
       {rows.map((r) => (
-        <div key={r.field} className="usage-row">
-          <span className="usage-row-label">{r.what}</span>
-          <UsageBar used={r.used} total={r.of} label={`${r.format(r.used)} of ${r.format(r.of)} used`} />
-          <span className="muted">
+        <div key={r.field} className="cluster-usage-item">
+          <div className="cluster-usage-head">
+            <span className="cluster-usage-label">{r.what}</span>
+            <span className="cluster-usage-pct">{percent(r.used, r.of)}%</span>
+          </div>
+          <UsageBar
+            used={r.used}
+            total={r.of}
+            width="100%"
+            showPercent={false}
+            label={`${r.format(r.used)} of ${r.format(r.of)} used`}
+          />
+          <div className="cluster-usage-amount">
             {r.format(r.used)} of {r.format(r.of)}
-          </span>
-          <Sparkline points={history} field={r.field} format={r.format} what={r.what} width={220} height={28} />
+          </div>
+          <Sparkline points={history} field={r.field} format={r.format} what={r.what} width={300} height={36} fluid />
         </div>
       ))}
-      <p className="muted small">
-        Of what nodes can give to pods (allocatable). The line shows the last 15 minutes.
-      </p>
     </div>
+  );
+}
+
+// Each node: name, roles and status, and its usage when metrics-server is there.
+function NodeList({ nodes, usage, clusterId }) {
+  if (!nodes) return <Skeleton height={80} />;
+  const byName = Object.fromEntries((usage?.nodes ?? []).map((n) => [n.name, n]));
+  return (
+    <ul className="node-rows">
+      {nodes.map((n) => {
+        const u = byName[n.name];
+        return (
+          <li key={n.name} className="node-row">
+            <div className="node-row-head">
+              <Link className="node-row-name" title={n.name} to={detailPath(clusterId, "nodes", "", n.name)}>
+                {n.name}
+              </Link>
+              <StatusBadge status={n.status} />
+            </div>
+            <div className="node-row-meta">
+              {n.roles.join(", ") || "no role"} · <span className="mono">{n.version}</span>
+            </div>
+            {u && (
+              <div className="node-row-usage">
+                <span>CPU</span>
+                <UsageBar
+                  used={u.cpu}
+                  total={u.cpuAllocatable}
+                  width="100%"
+                  label={`CPU: ${cpu(u.cpu)} of ${cpu(u.cpuAllocatable)}`}
+                />
+                <span>Memory</span>
+                <UsageBar
+                  used={u.memory}
+                  total={u.memoryAllocatable}
+                  width="100%"
+                  label={`Memory: ${bytes(u.memory)} of ${bytes(u.memoryAllocatable)}`}
+                />
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }

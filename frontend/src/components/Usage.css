@@ -51,6 +51,7 @@
 }
 
 .sparkline-line {
+  vector-effect: non-scaling-stroke; /* a stretched (fluid) line keeps its weight */
   fill: none;
   stroke: var(--data);
   stroke-width: 1.5;
@@ -59,6 +60,7 @@
 }
 
 .sparkline-base {
+  vector-effect: non-scaling-stroke;
   stroke: var(--border);
   stroke-width: 1;
 }
@@ -69,7 +71,8 @@
 }
 
 .sparkline-empty {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   flex-shrink: 0;
   font-size: var(--text-xs);
   color: var(--text-subtle);
