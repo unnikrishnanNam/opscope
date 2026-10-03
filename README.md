@@ -47,7 +47,8 @@ frontend/                 React app (Vite, plain JavaScript)
   src/kit/                the component kit at /kit (development only, left out of builds)
 deploy/kubernetes/        manifests for running Opscope inside a cluster
 data/                     local data (git- and docker-ignored): kubeconfigs, saved clusters
-Dockerfile                builds the single image
+Dockerfile                builds the single image (for any platform; CI builds amd64 and arm64)
+.github/workflows/        release.yml: publishes the image to GHCR for each version tag
 Makefile                  common commands
 docs/PHASES.md            build plan, progress and notes
 docs/UI-REDESIGN.md       the interface redesign: design rules, phases and notes
@@ -117,6 +118,17 @@ make dev-backend OPSCOPE_KUBECONFIG=$PWD/data/multipass.kubeconfig
 
 ## Run with Docker
 
+Each release is published to the GitHub Container Registry for amd64 and arm64:
+
+```bash
+docker run --rm -p 127.0.0.1:8080:8080 -v opscope-data:/data ghcr.io/unnikrishnannam/opscope:latest
+```
+
+Open http://localhost:8080 and add a cluster in the UI. Use a version tag (for example `:v1.1.0`)
+instead of `:latest` to stay on one release.
+
+To build the image yourself:
+
 ```bash
 make docker-build
 ```
@@ -164,8 +176,9 @@ The manifests in `deploy/kubernetes/` run Opscope as a pod that shows the cluste
   Deployment and a ClusterIP Service
 - `secrets-access.yaml`: an optional second ClusterRole for Secrets (see below)
 
-The image has to be available to the cluster. Push `opscope:dev` to a registry your cluster can
-pull from and change `image:` in `opscope.yaml`, or, for kind, load it straight into the nodes:
+`opscope.yaml` uses the published image, `ghcr.io/unnikrishnannam/opscope:v1.1.0` (amd64 and
+arm64), so the cluster pulls it by itself. To run your own build instead, set `image:` to
+`opscope:dev` and, for kind, load it straight into the nodes:
 
 ```bash
 make docker-build
@@ -175,7 +188,7 @@ make docker-build
 kind load docker-image opscope:dev --name <cluster>
 ```
 
-Then apply the manifests and open it through a port-forward:
+Apply the manifests and open Opscope through a port-forward:
 
 ```bash
 kubectl apply -f deploy/kubernetes/
@@ -216,6 +229,23 @@ kubectl delete -f deploy/kubernetes/secrets-access.yaml
 ```
 
 The Secrets pages then say "this user isn't allowed to read this", and everything else keeps working.
+
+## Releases
+
+Pushing a version tag publishes the image. `.github/workflows/release.yml` builds it for amd64 and
+arm64 and pushes `ghcr.io/unnikrishnannam/opscope` with the tags `vX.Y.Z`, `X.Y` and `latest`
+(a pre-release such as `v1.3.0-rc.1` gets only its own tag):
+
+```bash
+git tag -a v1.2.0 -m "Release v1.2.0"
+```
+
+```bash
+git push origin v1.2.0
+```
+
+The workflow can also be run by hand from the Actions tab for a tag that already exists. Remember to
+update the image tag in `deploy/kubernetes/opscope.yaml` for each release.
 
 ## Configuration
 

@@ -1,0 +1,84 @@
+# Publishes the Opscope image to the GitHub Container Registry (GHCR) for
+# every version tag, built for amd64 and arm64 in one multi-platform image:
+#
+#   git tag -a v1.2.0 -m "Release v1.2.0" && git push origin v1.2.0
+#
+# gives ghcr.io/<owner>/opscope:v1.2.0, :1.2 and :latest. It can also be run
+# by hand from the Actions tab for a tag that already exists (e.g. v1.1.0).
+#
+# Pushing uses the workflow's own GITHUB_TOKEN, so no secrets are needed.
+# A new package starts out private on GHCR: make it public once under the
+# package's settings so anyone can pull it.
+
+name: Release image
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build and publish, e.g. v1.1.0"
+        required: true
+
+permissions:
+  contents: read
+  packages: write # push to ghcr.io
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    env:
+      # The tag being released: the pushed tag, or the one typed in by hand.
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    steps:
+      - name: Check out the tag
+        uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.TAG }}
+
+      # GHCR image names must be lowercase; GitHub owner names may not be.
+      - name: Work out the image name
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/opscope" >> "$GITHUB_ENV"
+
+      - name: Set up QEMU (to build arm64 on an amd64 runner)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # v1.2.0 -> tags v1.2.0, 1.2 and latest, plus standard OCI labels
+      # (source repo, version, revision) so GHCR links the image to the repo.
+      # A pre-release (v1.3.0-rc.1) gets only its own tag: "latest" and
+      # "1.3" stay on the last real release.
+      - name: Image tags and labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern=v{{version}},value=${{ env.TAG }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ env.TAG }}
+            type=raw,value=latest,enable=${{ !contains(env.TAG, '-') }}
+          labels: |
+            org.opencontainers.image.title=Opscope
+            org.opencontainers.image.description=A small, read-only Kubernetes dashboard
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: VERSION=${{ env.TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
