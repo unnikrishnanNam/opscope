@@ -8,7 +8,7 @@ We work the same way as before: one small phase at a time, each ending with a wo
 ticked boxes and notes at the bottom of this file. Phases are numbered **R0–R8** so they don't mix
 with the build phases 0–8.
 
-**Status (2026-10-03):** R0 done; R1 next.
+**Status (2026-10-03):** R0 and R1 done; R2 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -84,7 +84,7 @@ These rules are checked at every review:
 - No purple or indigo "default" accent; the palette is the brand's.
 - Borders separate things; shadows are only for things that float (menus, dialogs). Corner radius
   6–8 px, not pill-shaped cards.
-- One icon set, one stroke width (2 px at 16 px), used for meaning, not decoration.
+- One icon set, one line weight (1.6 px at any size), used for meaning, not decoration.
 - Text stays plain and specific, as it is now ("Can't reach multipass", not "Oops! Something went wrong").
 
 ---
@@ -126,21 +126,22 @@ Goal: new tokens, fonts, themes and brand assets are in place, and the existing 
 
 Goal: the small building blocks, each with all its states.
 
-- [ ] `icons.jsx`: the Lucide subset (nav sections, refresh, copy, search, chevrons, check, x, eye,
+- [x] `icons.jsx`: the Lucide subset (nav sections, refresh, copy, search, chevrons, check, x, eye,
       external link, alert, info, sun/moon/monitor, menu, ...)
-- [ ] `Logo`: the mark inlined with `currentColor` (follows the theme, pupil stays orange), plus the
+- [x] `Logo`: the mark inlined with `currentColor` (follows the theme, pupil stays orange), plus the
       wordmark SVG; the tile icon below 24 px, as the brand rules ask
-- [ ] `Button`: primary, secondary, quiet, danger; small and normal size; icon-only (with a label for
+- [x] `Button`: primary, secondary, quiet, danger; small and normal size; icon-only (with a label for
       screen readers); loading; disabled; works as a link too
-- [ ] `TextInput`, `SearchInput` (with clear button), `Textarea`
-- [ ] `Select` (styled native select, for short fixed lists like "last 500 lines")
-- [ ] `Checkbox` and `Switch`
-- [ ] `SegmentedControl` (used for the theme switch)
-- [ ] `Tag` and `StatusBadge` (dot + word, tones ok / warn / bad / neutral, small icon for warn and bad)
-- [ ] `Spinner` and `Skeleton` (loading placeholders shaped like the content)
-- [ ] `Tooltip` for icon buttons and cut-off text (instead of only the browser's `title`)
-- [ ] `Kbd` for keyboard hints
-- [ ] All of the above on `/kit`, hover / focus / disabled / loading shown side by side, both themes
+- [x] `TextInput`, `SearchInput` (with clear button), `Textarea`
+- [x] `Select` (styled native select, for short fixed lists like "last 500 lines")
+- [x] `Checkbox` and `Switch`
+- [x] `SegmentedControl` (used for the theme switch)
+- [x] `Tag` and `StatusBadge` (dot + word, tones ok / warn / bad / neutral, small icon for warn and bad)
+- [x] `Spinner` and `Skeleton` (loading placeholders shaped like the content)
+- [x] `Tooltip` for icon buttons and cut-off text (instead of only the browser's `title`)
+- [x] `Kbd` for keyboard hints
+- [~] All of the above on `/kit`, both themes; disabled and loading shown side by side, hover and
+      focus tried for real (see notes)
 
 ## Phase R2: Data display components
 
@@ -283,4 +284,39 @@ Things that come up while building, decisions made, and anything that moves betw
   server on another port (`OPSCOPE_API=http://localhost:8090`). The default is still `:8080`.
 - `/kit` is checked to be absent from the production bundle. Build size: JS 308 KB (96 KB gzipped),
   CSS 28 KB.
+
+### Phase R1
+
+- Checked on `/kit` in both themes and at 375 px, and in the app against multipass: pods (filter,
+  refresh, statuses), a pod's logs toolbar (selects, Previous run checkbox, Follow), Add a cluster
+  (including the error state, with the message linked to the text box for screen readers) and Manage clusters.
+- Components live next to their own CSS in `src/components/`: `Button`, `Field` (with `TextInput`,
+  `SearchInput`, `Textarea`, `Select`), `Toggle` (`Checkbox`, `Switch`, `SegmentedControl`), `Tag`
+  (with `Kbd`), `Loading` (`Spinner`, `Skeleton`, `SkeletonText`), `Tooltip`, `Logo` and `icons`.
+- The new components reuse the old class names (`.button`, `.input`, `.select`, `.field-*`, `.tag`,
+  `.status`, `.checkbox`), and the matching rules were deleted from `legacy.css`. A component's CSS
+  only ships when something imports the component. So every place that used those classes as raw
+  markup now uses the component instead: the filter box, refresh, copy, reveal and log buttons, the
+  Add a cluster form, tags and the top bar's selects. Page layouts are unchanged; that work is R5–R7.
+- `StatusBadge` was rebuilt in place with the same props, so every table picked it up. Warn and bad
+  statuses now show an icon instead of the dot, and their text is weight 600.
+- Icons are generated from Lucide's SVGs by a script, so the shapes are exact. Lucide's 2-unit line
+  is only 1.33 px at 16 px and looked thin next to Manrope 500. The icons now keep a 1.6 px line at
+  every size; the plan's "2 px" turned out heavy in the small details.
+- The logo is drawn inline from the brand kit's paths: the body uses `currentColor`, the pupil
+  `--signal`. The full logo defaults to 26 px high, which keeps the brand's 96 px minimum width.
+- Hover and focus states aren't faked side by side on `/kit`: that would mean extra state classes
+  in every component just for the demo. They're checked for real instead (hover with the mouse, Tab
+  through). Disabled and loading are shown side by side.
+- Tooltips are drawn in a layer on top (so scrolling tables can't clip them), in inverted colours.
+  They appear after 350 ms on hover, at once on keyboard focus, and close on Escape, scroll or click.
+  Screen readers skip them, so whatever they wrap must carry its own words. On `/kit` a tooltip goes
+  into the nearest themed panel, so a light panel on a dark page gets light-theme colours.
+- The `<select>` arrow is a theme token (`--chevron`, an SVG in each theme's colour), so plain
+  native selects need no wrapper element.
+- Fixed while checking: the disabled select lost its arrow, because the `background` shorthand also
+  resets the image. It now uses `background-color`.
+- The existing code isn't strictly Prettier-formatted (13 files differ), so no formatter was run;
+  new code follows the same style by hand.
+- Build: JS 315 KB (98 KB gzipped), CSS 36 KB. `/kit` is still left out of the bundle.
 

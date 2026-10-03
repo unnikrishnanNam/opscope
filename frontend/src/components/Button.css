@@ -1,0 +1,115 @@
+.button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--control-md);
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  font-size: var(--text-md);
+  font-weight: var(--weight-strong);
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color var(--duration-fast) var(--ease),
+    border-color var(--duration-fast) var(--ease),
+    color var(--duration-fast) var(--ease);
+
+  /* Secondary is the default look */
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
+
+.button-content {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.button:hover {
+  background: var(--surface-hover);
+}
+
+.button-primary {
+  color: var(--primary-text);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.button-primary:hover {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+
+.button-quiet {
+  color: var(--text-muted);
+  background: transparent;
+  border-color: transparent;
+}
+
+.button-quiet:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.button-danger {
+  color: var(--danger-text);
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.button-danger:hover {
+  background: var(--danger-hover);
+  border-color: var(--danger-hover);
+}
+
+.button-sm {
+  height: var(--control-sm);
+  padding: 0 10px;
+  font-size: var(--text-sm);
+}
+
+.button-sm .button-content {
+  gap: 6px;
+}
+
+/* Icon-only buttons are square. */
+.button-icon-only {
+  width: var(--control-md);
+  padding: 0;
+}
+
+.button-icon-only.button-sm {
+  width: var(--control-sm);
+}
+
+.button:disabled,
+.button[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* While loading, the text stays in place (invisible) so the width doesn't change. */
+.button-loading {
+  cursor: progress;
+}
+
+.button-loading:disabled {
+  opacity: 1;
+}
+
+.button-loading .button-content {
+  visibility: hidden;
+}
+
+.button-spinner {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+}

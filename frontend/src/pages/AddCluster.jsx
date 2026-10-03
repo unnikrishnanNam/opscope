@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { api } from "../api.js";
 import { useClusters } from "../clusters.jsx";
 import ErrorBox from "../components/ErrorBox.jsx";
+import Button from "../components/Button.jsx";
+import { Field, Select, Textarea, TextInput } from "../components/Field.jsx";
+import { UploadIcon } from "../components/icons.jsx";
 
 // Steps: paste or upload a kubeconfig → we list its contexts → pick one,
 // name it → the backend tests the connection and saves it.
@@ -17,6 +20,7 @@ export default function AddCluster() {
   const [readError, setReadError] = useState(null);
   const [saveError, setSaveError] = useState(null);
   const [saving, setSaving] = useState(false);
+  const fileInput = useRef(null);
 
   // Each time the kubeconfig text changes, ask the backend which contexts it
   // has. We wait 400 ms after the last keystroke so we don't call on every key.
@@ -70,68 +74,57 @@ export default function AddCluster() {
       </p>
 
       <form onSubmit={save} className="form">
-        <div className="field">
-          <div className="field-row">
-            <label htmlFor="kubeconfig" className="field-label">
-              Kubeconfig
-            </label>
-            <label className="button button-quiet">
-              Load from file
-              <input type="file" onChange={loadFile} hidden />
-            </label>
-          </div>
-          <textarea
-            id="kubeconfig"
-            className="input textarea"
+        <Field
+          label="Kubeconfig"
+          action={
+            <>
+              <Button variant="quiet" size="sm" icon={UploadIcon} onClick={() => fileInput.current.click()}>
+                Load from file
+              </Button>
+              <input ref={fileInput} type="file" onChange={loadFile} hidden />
+            </>
+          }
+          error={readError?.message}
+          hint={
+            <>
+              Credentials must be embedded in the file. Kubeconfigs that log in with a command (for example cloud CLI
+              plugins) can only be used through <code>OPSCOPE_KUBECONFIG</code>. Tip:{" "}
+              <code>kubectl config view --minify --flatten</code> prints an embedded copy of your current context.
+            </>
+          }
+        >
+          <Textarea
+            mono
             rows={12}
             spellCheck={false}
             placeholder={"apiVersion: v1\nkind: Config\nclusters:\n  ..."}
             value={kubeconfig}
             onChange={(e) => setKubeconfig(e.target.value)}
           />
-          {readError && <div className="field-error">{readError.message}</div>}
-          <div className="field-hint">
-            Credentials must be embedded in the file. Kubeconfigs that log in with a command (for example cloud CLI
-            plugins) can only be used through <code>OPSCOPE_KUBECONFIG</code>. Tip:{" "}
-            <code>kubectl config view --minify --flatten</code> prints an embedded copy of your current context.
-          </div>
-        </div>
+        </Field>
 
         {contexts.length > 0 && (
-          <div className="field">
-            <label htmlFor="context" className="field-label">
-              Context
-            </label>
-            <select id="context" className="select" value={context} onChange={(e) => setContext(e.target.value)}>
+          <Field label="Context" hint={chosen && <span className="mono">{chosen.server}</span>}>
+            <Select value={context} onChange={(e) => setContext(e.target.value)}>
               {contexts.map((c) => (
                 <option key={c.name} value={c.name}>
                   {c.name}
                 </option>
               ))}
-            </select>
-            {chosen && <div className="field-hint mono">{chosen.server}</div>}
-          </div>
+            </Select>
+          </Field>
         )}
 
-        <div className="field">
-          <label htmlFor="name" className="field-label">
-            Display name
-          </label>
-          <input
-            id="name"
-            className="input"
-            placeholder="e.g. Home lab"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </div>
+        <Field label="Display name">
+          <TextInput placeholder="e.g. Home lab" value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
 
         {saveError && <ErrorBox title="Couldn't add the cluster" message={saveError.message} detail={saveError.detail} />}
 
         <div>
-          <button type="submit" className="button button-primary" disabled={saving || !context || !name.trim()}>
-            {saving ? "Connecting…" : "Test connection and save"}
-          </button>
+          <Button type="submit" variant="primary" loading={saving} disabled={!context || !name.trim()}>
+            Test connection and save
+          </Button>
         </div>
       </form>
     </section>

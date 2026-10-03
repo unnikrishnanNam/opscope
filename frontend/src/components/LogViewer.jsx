@@ -1,4 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import Button from "./Button.jsx";
+import { Select } from "./Field.jsx";
+import { Checkbox } from "./Toggle.jsx";
+import { PauseIcon, PlayIcon, RefreshIcon } from "./icons.jsx";
 
 const LINE_CHOICES = [100, 500, 2000];
 // Keep at most this many lines in the browser while following, so a chatty
@@ -68,44 +72,44 @@ export default function LogViewer({ clusterId, namespace, pod, containers }) {
       <div className="log-toolbar">
         <label className="picker">
           <span className="picker-label">Container</span>
-          <select className="select" value={container} onChange={(e) => setContainer(e.target.value)}>
+          <Select size="sm" value={container} onChange={(e) => setContainer(e.target.value)}>
             {containers.map((c) => (
               <option key={c.name} value={c.name}>
                 {c.name}
                 {c.role ? ` (${c.role})` : ""}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <label className="picker">
           <span className="picker-label">Last</span>
-          <select className="select" value={lines} onChange={(e) => setLines(Number(e.target.value))}>
+          <Select size="sm" value={lines} onChange={(e) => setLines(Number(e.target.value))}>
             {LINE_CHOICES.map((n) => (
               <option key={n} value={n}>
                 {n} lines
               </option>
             ))}
-          </select>
+          </Select>
         </label>
-        <label className="checkbox" title="Logs from before the container's last restart">
-          <input type="checkbox" checked={previous} onChange={(e) => setPrevious(e.target.checked)} />
+        <Checkbox checked={previous} onChange={setPrevious} title="Logs from before the container's last restart">
           Previous run
-        </label>
+        </Checkbox>
         <div className="table-toolbar-right">
           {!follow && (
-            <button type="button" className="button button-quiet" onClick={() => setReloads((n) => n + 1)}>
+            <Button variant="quiet" size="sm" icon={RefreshIcon} onClick={() => setReloads((n) => n + 1)}>
               Refresh
-            </button>
+            </Button>
           )}
-          <button
-            type="button"
-            className={`button ${follow ? "button-primary" : ""}`}
+          <Button
+            variant={follow ? "primary" : "secondary"}
+            size="sm"
+            icon={follow ? PauseIcon : PlayIcon}
             onClick={() => setFollow(!follow)}
             disabled={previous}
             title={previous ? "A previous run has finished, so there's nothing to follow" : undefined}
           >
             {follow ? "Following… (stop)" : "Follow"}
-          </button>
+          </Button>
         </div>
       </div>
 

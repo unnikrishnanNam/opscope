@@ -7,6 +7,9 @@ import StatusBadge from "../components/StatusBadge.jsx";
 import EventsTable from "../components/EventsTable.jsx";
 import SecretKeys from "../components/SecretKeys.jsx";
 import LogViewer from "../components/LogViewer.jsx";
+import Button from "../components/Button.jsx";
+import { Tag } from "../components/Tag.jsx";
+import { CopyIcon } from "../components/icons.jsx";
 
 const REFRESH_MS = 10_000;
 
@@ -44,7 +47,7 @@ export default function ResourceDetail({ page }) {
   return (
     <section>
       <div className="detail-header">
-        <span className="tag">{d?.kind ?? page.label}</span>
+        <Tag>{d?.kind ?? page.label}</Tag>
         <h1 className="page-title">{name}</h1>
         {status && <StatusBadge status={status} />}
       </div>
@@ -210,7 +213,7 @@ function Containers({ containers }) {
             <tr key={c.name}>
               <td className="name">
                 {c.name}
-                {c.role && <span className="tag tag-gap">{c.role}</span>}
+                {c.role && <Tag className="tag-gap">{c.role}</Tag>}
               </td>
               <td className="mono">{c.image}</td>
               {live && (
@@ -288,9 +291,9 @@ function YamlView({ d, isSecret }) {
           Read-only. managedFields are left out{isSecret ? "; secret values are hidden" : ""}.
         </span>
         <div className="table-toolbar-right">
-          <button type="button" className="button button-quiet" onClick={copy}>
+          <Button variant="quiet" size="sm" icon={CopyIcon} onClick={copy}>
             Copy
-          </button>
+          </Button>
         </div>
       </div>
       <pre className="code-box yaml-box">{d.yaml}</pre>

@@ -31,6 +31,14 @@
   --primary-hover: #2e2921;
   --primary-text: #f6f3ee;
 
+  /* Destructive actions (removing a cluster) */
+  --danger: #ae1f3c;
+  --danger-hover: #951a33;
+  --danger-text: #ffffff;
+
+  /* The arrow on <select>s, drawn in --text-subtle */
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b645a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+
   /* Signal orange marks "you are here" and nothing else: the current page,
      the open tab, keyboard focus, live updates. Never text, never big fills. */
   --signal: #e8590c;
@@ -77,6 +85,12 @@
   --primary: #f6f3ee;
   --primary-hover: #e2ded6;
   --primary-text: #17140f;
+
+  --danger: #f47c8e;
+  --danger-hover: #f698a6;
+  --danger-text: #17140f;
+
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23959088' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 
   --signal: #e8590c;
   --signal-soft: rgba(232, 89, 12, 0.18);
@@ -134,6 +148,10 @@
   --radius-sm: 4px; /* tags, small controls */
   --radius: 6px; /* buttons, inputs */
   --radius-lg: 8px; /* cards, tables, dialogs */
+
+  /* Control heights: buttons, inputs and selects line up in a row */
+  --control-md: 34px;
+  --control-sm: 28px;
 
   /* Motion. Short and plain; switched off for people who ask for less motion. */
   --ease: cubic-bezier(0.2, 0, 0, 1);

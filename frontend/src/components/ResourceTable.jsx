@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router";
+import { SearchInput } from "./Field.jsx";
 
 // A table for any list of resources, with a text filter and sortable columns.
 //
@@ -30,13 +31,7 @@ export default function ResourceTable({ columns, rows, noun, emptyText, toolbar,
   return (
     <div>
       <div className="table-toolbar">
-        <input
-          className="input filter"
-          type="search"
-          placeholder="Filter…"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        />
+        <SearchInput className="filter" placeholder="Filter…" value={filter} onChange={setFilter} />
         <span className="muted">
           {rows ? countLabel(visible.length, rows.length, noun) : ""}
         </span>

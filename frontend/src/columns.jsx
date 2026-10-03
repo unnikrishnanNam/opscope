@@ -1,6 +1,7 @@
 // Table columns for each resource type, keyed by the name used in the API
 // URL (/api/clusters/{id}/pods). See ResourceTable.jsx for what each field means.
 import StatusBadge, { Fraction } from "./components/StatusBadge.jsx";
+import { Tag } from "./components/Tag.jsx";
 import { age, bytes, cores, cpu, duration } from "./format.js";
 import { Sparkline, UsageBar } from "./components/Usage.jsx";
 
@@ -165,9 +166,9 @@ export const columns = {
         <>
           <StatusBadge status={row.status} />
           {!row.schedulable && (
-            <span className="tag tag-gap" title="New pods won't be scheduled on this node">
+            <Tag className="tag-gap" title="New pods won't be scheduled on this node">
               Cordoned
-            </span>
+            </Tag>
           )}
         </>
       ),
@@ -355,8 +356,8 @@ function Labels({ labels }) {
   const entries = Object.entries(labels ?? {});
   if (entries.length === 0) return <span className="muted">–</span>;
   return entries.map(([k, v]) => (
-    <span key={k} className="tag mono">
+    <Tag key={k} mono>
       {k}={v}
-    </span>
+    </Tag>
   ));
 }

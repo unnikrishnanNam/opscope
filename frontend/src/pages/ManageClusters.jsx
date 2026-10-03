@@ -3,6 +3,9 @@ import { Link } from "react-router";
 import { api } from "../api.js";
 import { useClusters } from "../clusters.jsx";
 import ErrorBox from "../components/ErrorBox.jsx";
+import Button from "../components/Button.jsx";
+import { Tag } from "../components/Tag.jsx";
+import { PlusIcon } from "../components/icons.jsx";
 
 export default function ManageClusters() {
   const { data: clusters, error, reload } = useClusters();
@@ -26,9 +29,9 @@ export default function ManageClusters() {
           <h1 className="page-title">Clusters</h1>
           <p className="page-about">Clusters Opscope can read from.</p>
         </div>
-        <Link to="/clusters/add" className="button button-primary">
+        <Button to="/clusters/add" variant="primary" icon={PlusIcon}>
           Add a cluster
-        </Link>
+        </Button>
       </div>
 
       {error && <ErrorBox title="Couldn't load clusters" message={error.message} />}
@@ -59,20 +62,18 @@ export default function ManageClusters() {
                 </td>
                 <td>
                   {cluster.source === "env" ? (
-                    <span className="tag" title="Set with OPSCOPE_KUBECONFIG">
-                      Environment
-                    </span>
+                    <Tag title="Set with OPSCOPE_KUBECONFIG">Environment</Tag>
                   ) : (
-                    <span className="tag">Added in UI</span>
+                    <Tag>Added in UI</Tag>
                   )}
                 </td>
                 <td className="mono">{cluster.context}</td>
                 <td className="mono">{cluster.server}</td>
                 <td className="actions">
                   {cluster.source === "ui" && (
-                    <button className="button button-quiet" onClick={() => remove(cluster)}>
+                    <Button variant="quiet" size="sm" onClick={() => remove(cluster)}>
                       Remove
-                    </button>
+                    </Button>
                   )}
                 </td>
               </tr>

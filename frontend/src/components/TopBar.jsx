@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { useApi } from "../api.js";
 import { useClusters } from "../clusters.jsx";
 import { allPages, nsQuery } from "../sections.js";
+import { Select } from "./Field.jsx";
 
 // Crumbs for pages that don't belong to a cluster.
 const otherPages = {
@@ -63,8 +64,8 @@ function ClusterSwitcher({ cluster, pagePath }) {
   return (
     <label className="picker">
       <span className="picker-label">Cluster</span>
-      <select
-        className="select"
+      <Select
+        size="sm"
         value={cluster?.id ?? ""}
         onChange={(e) => navigate(`/c/${e.target.value}/${pagePath || "overview"}`)}
       >
@@ -74,7 +75,7 @@ function ClusterSwitcher({ cluster, pagePath }) {
             {c.name}
           </option>
         ))}
-      </select>
+      </Select>
     </label>
   );
 }
@@ -92,9 +93,9 @@ function NamespacePicker({ cluster, reachable, clusterScoped }) {
     return (
       <label className="picker" title="This page isn't limited to a namespace">
         <span className="picker-label">Namespace</span>
-        <select className="select" disabled>
+        <Select size="sm" disabled>
           <option>Cluster-wide</option>
-        </select>
+        </Select>
       </label>
     );
   }
@@ -109,7 +110,7 @@ function NamespacePicker({ cluster, reachable, clusterScoped }) {
   return (
     <label className="picker">
       <span className="picker-label">Namespace</span>
-      <select className="select" value={selected} onChange={(e) => choose(e.target.value)} disabled={!namespaces}>
+      <Select size="sm" value={selected} onChange={(e) => choose(e.target.value)} disabled={!namespaces}>
         <option value="">All namespaces</option>
         {/* Keep a namespace from the URL selectable even before the list arrives. */}
         {selected && !namespaces?.some((ns) => ns.name === selected) && <option value={selected}>{selected}</option>}
@@ -118,7 +119,7 @@ function NamespacePicker({ cluster, reachable, clusterScoped }) {
             {ns.name}
           </option>
         ))}
-      </select>
+      </Select>
     </label>
   );
 }

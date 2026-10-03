@@ -1,3 +1,6 @@
+import { ErrorIcon, WarningIcon } from "./icons.jsx";
+import "./StatusBadge.css";
+
 // One place that decides the colour of every status word, so "Failed"
 // looks the same on pods, jobs and everything else.
 //
@@ -35,10 +38,15 @@ export function statusTone(status) {
   return "neutral";
 }
 
+// StatusBadge: a status word with a mark in front. Healthy and neutral get a
+// dot; warn and bad get an icon, so a problem stands out even without colour.
 // `title` is shown on hover, e.g. the reason a gateway isn't programmed.
 export default function StatusBadge({ status, title }) {
+  const tone = statusTone(status);
+  const Icon = tone === "bad" ? ErrorIcon : tone === "warn" ? WarningIcon : null;
   return (
-    <span className={`status status-${statusTone(status)}`} title={title || undefined}>
+    <span className={`status status-${tone} ${Icon ? "status-has-icon" : ""}`} title={title || undefined}>
+      {Icon && <Icon size={14} className="status-icon" />}
       {status || "–"}
     </span>
   );

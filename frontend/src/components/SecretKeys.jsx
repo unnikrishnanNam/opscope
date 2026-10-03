@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { api } from "../api.js";
+import Button from "./Button.jsx";
+import { Tag } from "./Tag.jsx";
+import { CopyIcon, EyeIcon, EyeOffIcon } from "./icons.jsx";
 
 // The keys of one secret. Values stay hidden until "Reveal" is clicked for
 // that one key; only then is the value fetched from the backend. Nothing is
@@ -54,22 +57,22 @@ function SecretKey({ cluster, secret, name }) {
         <span className="mono secret-key-name">{name}</span>
         {value ? (
           <>
-            {value.base64 && <span className="tag">binary, shown as base64</span>}
-            <button type="button" className="button button-quiet" onClick={copy}>
+            {value.base64 && <Tag>binary, shown as base64</Tag>}
+            <Button variant="quiet" size="sm" icon={CopyIcon} onClick={copy}>
               {copied ? "Copied" : "Copy"}
-            </button>
-            <button type="button" className="button button-quiet" onClick={() => setValue(null)}>
+            </Button>
+            <Button variant="quiet" size="sm" icon={EyeOffIcon} onClick={() => setValue(null)}>
               Hide
-            </button>
+            </Button>
           </>
         ) : (
           <>
             <span className="secret-mask" aria-label="hidden value">
               ••••••••
             </span>
-            <button type="button" className="button button-quiet" onClick={reveal} disabled={loading}>
-              {loading ? "Revealing…" : "Reveal"}
-            </button>
+            <Button variant="quiet" size="sm" icon={EyeIcon} onClick={reveal} loading={loading}>
+              Reveal
+            </Button>
           </>
         )}
       </div>

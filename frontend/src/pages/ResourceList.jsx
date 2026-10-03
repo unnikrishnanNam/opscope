@@ -4,6 +4,8 @@ import { columns as allColumns } from "../columns.jsx";
 import { clock } from "../format.js";
 import ResourceTable from "../components/ResourceTable.jsx";
 import ErrorBox from "../components/ErrorBox.jsx";
+import Button from "../components/Button.jsx";
+import { RefreshIcon } from "../components/icons.jsx";
 import { detailPath, nsQuery } from "../sections.js";
 import { MetricsUnavailable } from "../components/Usage.jsx";
 
@@ -65,9 +67,9 @@ export default function ResourceList({ page }) {
           toolbar={
             <>
               {updatedAt && <span className="muted">Updated {clock(updatedAt)}</span>}
-              <button type="button" className="button button-quiet" onClick={reload} disabled={loading}>
-                {loading ? "Refreshing…" : "Refresh"}
-              </button>
+              <Button variant="quiet" size="sm" icon={RefreshIcon} onClick={reload} loading={loading}>
+                Refresh
+              </Button>
             </>
           }
         />
