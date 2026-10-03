@@ -3,13 +3,15 @@ import { useApi } from "../api.js";
 import { bytes, clock, cpu, percent } from "../format.js";
 import Button from "../components/Button.jsx";
 import { Callout } from "../components/Callout.jsx";
-import { Card, StatTile } from "../components/Card.jsx";
+import { Card } from "../components/Card.jsx";
 import EventList from "../components/EventList.jsx";
 import { Skeleton } from "../components/Loading.jsx";
 import { PageHeader } from "../components/PageHeader.jsx";
 import PodStatusBar from "../components/PodStatusBar.jsx";
-import StatusBadge from "../components/StatusBadge.jsx";
-import { MetricsUnavailable, Sparkline, UsageBar } from "../components/Usage.jsx";
+import StatusBadge, { statusTone } from "../components/StatusBadge.jsx";
+import Tooltip from "../components/Tooltip.jsx";
+import { Sparkline, UsageBar } from "../components/Usage.jsx";
+import { CpuIcon, MemoryIcon, NodesIcon, PodsIcon, SuccessIcon, WarningIcon } from "../components/icons.jsx";
 import { allPages, detailPath, nsQuery } from "../sections.js";
 import "./Overview.css";
 
@@ -17,19 +19,25 @@ const REFRESH_MS = 10_000;
 const WARNINGS_SHOWN = 8;
 const METRICS_REFRESH_MS = 15_000; // metrics-server's own refresh interval
 
-// What each count's "needs attention" number is called. Pages (label, link,
-// icon) come from sections.js.
-const PROBLEMS = {
-  deployments: "not ready",
-  statefulsets: "not ready",
-  daemonsets: "not ready",
-  jobs: "failed",
-  cronjobs: "",
-  gateways: "not programmed",
-  httproutes: "not accepted",
+// How each kind's "needs attention" count reads, and what to say when it's
+// zero. Labels, links and icons come from sections.js.
+const KINDS = {
+  deployments: { problem: "not ready", ok: "All ready" },
+  statefulsets: { problem: "not ready", ok: "All ready" },
+  daemonsets: { problem: "not ready", ok: "All ready" },
+  jobs: { problem: "failed", ok: "None failed", tone: "bad" },
+  cronjobs: { problem: null, ok: "Scheduled" }, // nothing to be unhealthy about
+  gateways: { problem: "not programmed", ok: "All programmed" },
+  httproutes: { problem: "not accepted", ok: "All accepted" },
 };
 
-// The cluster's front page: counts, usage, pod health, nodes and recent warnings.
+const pageFor = (resource) => allPages.find((p) => p.resource === resource);
+// "Deployments" -> "Deployment", for "1 Deployment not ready".
+const singular = (label) => label.replace(/s$/, "");
+
+// The cluster's front page: a health summary and the four key numbers, then
+// every resource kind with how many need attention, pod health, nodes and
+// recent warnings.
 export default function Overview({ page }) {
   const { cluster, reachable, status } = useOutletContext();
   const [searchParams] = useSearchParams();
@@ -54,6 +62,7 @@ export default function Overview({ page }) {
     <section className="overview">
       <PageHeader
         title={cluster.name}
+        after={o && <HealthChip issues={issuesOf(o)} />}
         description={
           <>
             {status?.version && `Kubernetes ${status.version} · `}
@@ -76,13 +85,19 @@ export default function Overview({ page }) {
         </Callout>
       )}
 
-      {o ? <Tiles o={o} to={to} /> : !error && reachable && <TileSkeletons />}
+      {o ? (
+        <SummaryStrip o={o} nodes={nodes.data} usage={usage} to={to} />
+      ) : (
+        !error && reachable && <Skeleton height={148} radius="var(--radius-lg)" />
+      )}
 
       {o && (
         <div className="overview-grid">
           <div className="overview-main">
-            <Card title="Cluster usage" aside="of what nodes can give to pods">
-              <ClusterUsage usage={usage} />
+            <Card title="Resources" aside={namespace ? `in ${namespace}` : "all namespaces"}>
+              <ResourceGroup title="Workloads" items={o.workloads} to={to} />
+              {/* gatewayAPI is null when the cluster doesn't have Gateway API. */}
+              {o.gatewayAPI && <ResourceGroup title="Gateway API" items={o.gatewayAPI} to={to} />}
             </Card>
             <Card
               title="Pods by status"
@@ -131,54 +146,212 @@ export default function Overview({ page }) {
   );
 }
 
-// The counts: nodes and pods first, then workloads, then Gateway API
-// (only when the cluster has it: gatewayAPI is null otherwise).
-function Tiles({ o, to }) {
-  const pageFor = (resource) => allPages.find((p) => p.resource === resource);
-  const nodesPage = pageFor("nodes");
-  const podsPage = pageFor("pods");
+// Everything that needs a look, as short phrases: ["3 Pods unhealthy", "2 Deployments not ready"].
+function issuesOf(o) {
+  const issues = [];
+  const add = (count, label, problem) => {
+    if (count > 0) issues.push({ count, text: `${count} ${count === 1 ? singular(label) : label} ${problem}` });
+  };
+  add(o.nodes.total - o.nodes.ready, "Nodes", "not ready");
+  add(unhealthyPods(o.pods.byStatus), "Pods", "unhealthy");
+  for (const w of [...o.workloads, ...(o.gatewayAPI ?? [])]) {
+    const problem = KINDS[w.resource]?.problem;
+    if (problem) add(w.unhealthy, pageFor(w.resource).label, problem);
+  }
+  return issues;
+}
 
+// Next to the cluster's name: "All healthy", or how many things need a look
+// (the list is in its hover text, and read out by screen readers).
+function HealthChip({ issues }) {
+  const total = issues.reduce((sum, i) => sum + i.count, 0);
+  if (total === 0) {
+    return (
+      <span className="health-chip health-chip-ok">
+        <SuccessIcon size={14} />
+        All healthy
+      </span>
+    );
+  }
+  const list = issues.map((i) => i.text).join(" · ");
   return (
-    <div className="stat-grid">
-      <StatTile label="Nodes" icon={nodesPage.icon} value={o.nodes.total} to={to(nodesPage.path)}>
-        <Health bad={o.nodes.total - o.nodes.ready} problem="not ready" okText="All ready" />
-      </StatTile>
-      <StatTile label="Pods" icon={podsPage.icon} value={o.pods.total} to={to(podsPage.path)}>
-        <Health
-          bad={unhealthyPods(o.pods.byStatus)}
-          problem="unhealthy"
-          okText={o.pods.total ? "All healthy" : "None"}
-        />
-      </StatTile>
-      {[...o.workloads, ...(o.gatewayAPI ?? [])].map((w) => {
-        const p = pageFor(w.resource);
-        const problem = PROBLEMS[w.resource];
-        return (
-          <StatTile key={w.resource} label={p.label} icon={p.icon} value={w.total} to={to(p.path)}>
-            {problem ? (
-              <Health bad={w.unhealthy} problem={problem} okText={w.total ? "All good" : "None"} />
-            ) : w.total ? (
-              "Scheduled"
-            ) : (
-              "None"
-            )}
-          </StatTile>
-        );
-      })}
+    <Tooltip label={list}>
+      <span className="health-chip health-chip-warn" tabIndex={0} aria-label={`${total} need attention: ${list}`}>
+        <WarningIcon size={14} />
+        {total} need attention
+      </span>
+    </Tooltip>
+  );
+}
+
+// One card, four cells: nodes, pods, CPU and memory. On narrow screens it
+// becomes two by two.
+function SummaryStrip({ o, nodes, usage, to }) {
+  const badPods = unhealthyPods(o.pods.byStatus);
+  const notReady = o.nodes.total - o.nodes.ready;
+  return (
+    <div className="summary-strip">
+      <Link className="summary-cell summary-cell-link" to={to("nodes")}>
+        <span className="summary-label">
+          <NodesIcon size={14} /> Nodes
+        </span>
+        <span className="summary-value">
+          {o.nodes.ready}
+          <span className="summary-of">/ {o.nodes.total} ready</span>
+        </span>
+        <span className="summary-note">
+          {notReady > 0 ? <span className="status status-warn">{notReady} not ready</span> : "All ready"}
+        </span>
+        {nodes && (
+          // One square per node, coloured by its status.
+          <span className="node-squares" aria-hidden="true">
+            {nodes.map((n) => (
+              <span
+                key={n.name}
+                className={`node-square tone-${statusTone(n.status)}`}
+                title={`${n.name}: ${n.status}`}
+              />
+            ))}
+          </span>
+        )}
+      </Link>
+
+      <Link className="summary-cell summary-cell-link" to={to("workloads/pods")}>
+        <span className="summary-label">
+          <PodsIcon size={14} /> Pods
+        </span>
+        <span className="summary-value">{o.pods.total}</span>
+        <span className="summary-note">
+          {badPods > 0 ? (
+            <span className="status status-warn">{badPods} unhealthy</span>
+          ) : o.pods.total ? (
+            "All healthy"
+          ) : (
+            "None"
+          )}
+        </span>
+        <MiniStack byStatus={o.pods.byStatus} />
+      </Link>
+
+      <UsageCell usage={usage} field="cpu" what="CPU" format={cpu} />
+      <UsageCell usage={usage} field="memory" what="Memory" format={bytes} />
     </div>
   );
 }
 
-function TileSkeletons() {
+// A thin bar of pods by status (the card below has the legend).
+function MiniStack({ byStatus }) {
+  const order = ["ok", "warn", "bad", "neutral"];
+  const parts = Object.entries(byStatus)
+    .map(([s, count]) => ({ count, tone: statusTone(s) }))
+    .sort((a, b) => order.indexOf(a.tone) - order.indexOf(b.tone));
+  if (parts.length === 0) return null;
   return (
-    <div className="stat-grid" aria-hidden="true">
-      {Array.from({ length: 7 }, (_, i) => (
-        <div key={i} className="stat-tile">
-          <Skeleton width="60%" />
-          <Skeleton width={40} height={28} />
-          <Skeleton width="50%" />
-        </div>
+    <span className="mini-stack" aria-hidden="true">
+      {parts.map((p, i) => (
+        <span key={i} className={`tone-${p.tone}`} style={{ flexGrow: p.count }} />
       ))}
+    </span>
+  );
+}
+
+// Cluster-wide CPU or memory: percentage, bar, amount and the last 15 minutes.
+function UsageCell({ usage, field, what, format }) {
+  const Icon = field === "cpu" ? CpuIcon : MemoryIcon;
+  const head = (
+    <span className="summary-label">
+      <Icon size={14} /> {what}
+    </span>
+  );
+  if (usage.error) {
+    return (
+      <div className="summary-cell">
+        {head}
+        <span className="summary-value summary-value-empty">–</span>
+        <span className="summary-note">
+          {usage.error.code === "metrics_unavailable" ? "Needs metrics-server" : "Not available right now"}
+        </span>
+      </div>
+    );
+  }
+  if (!usage.data) {
+    return (
+      <div className="summary-cell">
+        {head}
+        <Skeleton width={64} height={28} />
+        <Skeleton width="70%" />
+      </div>
+    );
+  }
+  const { total, history } = usage.data;
+  const used = total[field];
+  const of = total[`${field}Allocatable`];
+  return (
+    <div className="summary-cell">
+      {head}
+      <span className="summary-value">
+        {percent(used, of)}
+        <span className="summary-unit">%</span>
+      </span>
+      <span className="summary-note">
+        {format(used)} of {format(of)}
+      </span>
+      <UsageBar
+        used={used}
+        total={of}
+        width="100%"
+        showPercent={false}
+        label={`${format(used)} of ${format(of)} used`}
+      />
+      <Sparkline points={history} field={field} format={format} what={what} width={240} height={28} fluid />
+    </div>
+  );
+}
+
+// One group of resource kinds ("Workloads", "Gateway API"), a row each:
+// name, count, a bar of healthy against not, and what needs attention.
+function ResourceGroup({ title, items, to }) {
+  return (
+    <div className="resource-group">
+      <div className="resource-group-title">{title}</div>
+      <ul className="resource-rows">
+        {items.map((w) => {
+          const p = pageFor(w.resource);
+          const kind = KINDS[w.resource];
+          const bad = kind.problem ? w.unhealthy : 0;
+          const tone = kind.tone ?? "warn";
+          return (
+            <li key={w.resource}>
+              <Link className="resource-row" to={to(p.path)}>
+                <span className="resource-name">
+                  <p.icon size={16} />
+                  {p.label}
+                </span>
+                <span className="resource-count">{w.total}</span>
+                <span className="resource-bar" aria-hidden="true">
+                  {w.total > 0 && (
+                    <>
+                      <span className={kind.problem ? "tone-ok" : "tone-neutral"} style={{ flexGrow: w.total - bad }} />
+                      {bad > 0 && <span className={`tone-${tone}`} style={{ flexGrow: bad }} />}
+                    </>
+                  )}
+                </span>
+                <span className="resource-state">
+                  {bad > 0 ? (
+                    <span className={`status status-${tone}`}>
+                      {bad} {kind.problem}
+                    </span>
+                  ) : w.total > 0 ? (
+                    kind.ok
+                  ) : (
+                    "None"
+                  )}
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
@@ -188,60 +361,6 @@ function unhealthyPods(byStatus) {
   return Object.entries(byStatus)
     .filter(([status]) => !["Running", "Completed", "Succeeded"].includes(status))
     .reduce((sum, [, count]) => sum + count, 0);
-}
-
-// "2 not ready" in the warning colour, or a calm "All ready".
-function Health({ bad, problem, okText }) {
-  if (bad > 0) {
-    return (
-      <span className="status status-warn">
-        {bad} {problem}
-      </span>
-    );
-  }
-  return okText;
-}
-
-// CPU and memory for the whole cluster: all nodes added up, with the last
-// 15 minutes as a line.
-function ClusterUsage({ usage }) {
-  if (usage.error?.code === "metrics_unavailable") return <MetricsUnavailable compact />;
-  if (usage.error)
-    return (
-      <Callout compact tone="warning">
-        Usage isn't available right now: {usage.error.message}
-      </Callout>
-    );
-  if (!usage.data) return <Skeleton height={96} />;
-
-  const { total, history } = usage.data;
-  const rows = [
-    { what: "CPU", field: "cpu", used: total.cpu, of: total.cpuAllocatable, format: cpu },
-    { what: "Memory", field: "memory", used: total.memory, of: total.memoryAllocatable, format: bytes },
-  ];
-  return (
-    <div className="cluster-usage">
-      {rows.map((r) => (
-        <div key={r.field} className="cluster-usage-item">
-          <div className="cluster-usage-head">
-            <span className="cluster-usage-label">{r.what}</span>
-            <span className="cluster-usage-pct">{percent(r.used, r.of)}%</span>
-          </div>
-          <UsageBar
-            used={r.used}
-            total={r.of}
-            width="100%"
-            showPercent={false}
-            label={`${r.format(r.used)} of ${r.format(r.of)} used`}
-          />
-          <div className="cluster-usage-amount">
-            {r.format(r.used)} of {r.format(r.of)}
-          </div>
-          <Sparkline points={history} field={r.field} format={r.format} what={r.what} width={300} height={36} fluid />
-        </div>
-      ))}
-    </div>
-  );
 }
 
 // Each node: name, roles and status, and its usage when metrics-server is there.

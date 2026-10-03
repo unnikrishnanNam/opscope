@@ -468,7 +468,28 @@ Things that come up while building, decisions made, and anything that moves betw
 - Inline code in a callout no longer breaks after its dashes (`--kubelet-insecure-tls`).
 - Removed: `ResourceTable.jsx`, and from `legacy.css` the old table toolbar, the overview's tiles,
   cards, node list and usage rows. `legacy.css` is down to about 500 lines from 1,286.
-- Known and left: 9 tiles at some widths leave one alone on the last row (e.g. 8 + 1 at 1440 px);
-  tiles narrow enough to always fit would cut off names like "Deployments".
+- Superseded by the overview redesign below: the nine count tiles.
 - Build: JS 343 KB (107 KB gzipped), CSS 54 KB.
+
+### Overview redesign (after R5)
+
+- Feedback after R5: nine identical count tiles didn't look professional. They read like a grid of
+  placeholders, and at some widths one tile sat alone on the last row.
+- The overview now reads top to bottom as "how is it, the key numbers, then the detail":
+  - **Health chip** next to the cluster's name: "All healthy", or "6 need attention" with the
+    breakdown on hover and for screen readers (from the overview counts: nodes not ready, unhealthy
+    pods, workloads not ready, failed jobs, gateways not programmed, routes not accepted).
+  - **Summary strip**: one box, four cells (nodes, pods, CPU, memory), divided by 1 px lines.
+    Nodes shows a small square per node in its status colour; pods a thin bar by status; CPU and
+    memory their usage bar and 15-minute line. This replaces the separate "Cluster usage" card.
+    Without metrics-server the two usage cells show "–" and "Needs metrics-server". 2 × 2 below 1000 px.
+  - **Resources card**: one row per kind, grouped under "Workloads" and "Gateway API" (the second
+    only when installed): icon and name, count, a bar of healthy against not, and what needs
+    attention in the warning colour (failed jobs in red). Each row links to its list, with the
+    namespace kept. Below 640 px the bars are left out.
+  - Pods by status, nodes and recent warnings stay as they were.
+- Checked on all three clusters, including `opscope-test` (no metrics, no Gateway API), with a
+  namespace selected, in light and dark, at 375 px and 1440 px.
+- `StatTile` was removed (component, CSS and its `/kit` demo), since nothing uses it any more.
+- Build: JS 346 KB (108 KB gzipped), CSS 56 KB.
 

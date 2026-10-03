@@ -451,3 +451,38 @@ export const PauseIcon = (props) => (
     <rect x="5" y="3" width="5" height="18" rx="1" />
   </Icon>
 );
+
+export const CpuIcon = (props) => (
+  <Icon {...props}>
+    <path d="M12 20v2" />
+    <path d="M12 2v2" />
+    <path d="M17 20v2" />
+    <path d="M17 2v2" />
+    <path d="M2 12h2" />
+    <path d="M2 17h2" />
+    <path d="M2 7h2" />
+    <path d="M20 12h2" />
+    <path d="M20 17h2" />
+    <path d="M20 7h2" />
+    <path d="M7 20v2" />
+    <path d="M7 2v2" />
+    <rect x="4" y="4" width="16" height="16" rx="2" />
+    <rect x="8" y="8" width="8" height="8" rx="1" />
+  </Icon>
+);
+
+export const MemoryIcon = (props) => (
+  <Icon {...props}>
+    <path d="M12 12v-2" />
+    <path d="M12 18v-2" />
+    <path d="M16 12v-2" />
+    <path d="M16 18v-2" />
+    <path d="M2 11h1.5" />
+    <path d="M20 18v-2" />
+    <path d="M20.5 11H22" />
+    <path d="M4 18v-2" />
+    <path d="M8 12v-2" />
+    <path d="M8 18v-2" />
+    <rect x="2" y="6" width="20" height="10" rx="2" />
+  </Icon>
+);

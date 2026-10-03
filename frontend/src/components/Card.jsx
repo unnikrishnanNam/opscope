@@ -1,4 +1,3 @@
-import { Link } from "react-router";
 import "./Card.css";
 
 // Card: a bordered box with an optional header.
@@ -36,27 +35,5 @@ export function Section({ title, aside, action, children }) {
       </header>
       {children}
     </section>
-  );
-}
-
-// StatTile: a label, a big number and a short note underneath (usually how
-// many need attention). With `to` the whole tile links to that page.
-export function StatTile({ label, value, icon: Icon, to, children }) {
-  const body = (
-    <>
-      <span className="stat-label">
-        {Icon && <Icon size={14} />}
-        {label}
-      </span>
-      <span className="stat-value">{value}</span>
-      {children && <span className="stat-note">{children}</span>}
-    </>
-  );
-  return to ? (
-    <Link className="stat-tile stat-tile-link" to={to}>
-      {body}
-    </Link>
-  ) : (
-    <div className="stat-tile">{body}</div>
   );
 }

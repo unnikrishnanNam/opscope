@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { columns } from "../columns.jsx";
 import { bytes, cpu } from "../format.js";
 import Button from "../components/Button.jsx";
-import { Card, Section, StatTile } from "../components/Card.jsx";
+import { Card, Section } from "../components/Card.jsx";
 import { Callout, EmptyState } from "../components/Callout.jsx";
 import CodeBlock from "../components/CodeBlock.jsx";
 import DataTable from "../components/DataTable.jsx";
@@ -15,15 +15,7 @@ import StatusBadge from "../components/StatusBadge.jsx";
 import Tabs from "../components/Tabs.jsx";
 import { SegmentedControl, Switch } from "../components/Toggle.jsx";
 import { MetricsUnavailable, Sparkline, UsageBar } from "../components/Usage.jsx";
-import {
-  ClustersIcon,
-  DeploymentsIcon,
-  JobsIcon,
-  NodesIcon,
-  PlusIcon,
-  PodsIcon,
-  RefreshIcon,
-} from "../components/icons.jsx";
+import { ClustersIcon, PlusIcon, PodsIcon, RefreshIcon } from "../components/icons.jsx";
 import * as sample from "./samples.js";
 
 // Data display components on /kit (phase R2), all fed with sample data.
@@ -35,20 +27,6 @@ import * as sample from "./samples.js";
 function CardsAndTiles() {
   return (
     <div className="kit-stack">
-      <div className="stat-grid">
-        <StatTile label="Nodes" icon={NodesIcon} value={3} to="/kit#cards">
-          All ready
-        </StatTile>
-        <StatTile label="Pods" icon={PodsIcon} value={52} to="/kit#cards">
-          <span className="status status-warn">5 unhealthy</span>
-        </StatTile>
-        <StatTile label="Deployments" icon={DeploymentsIcon} value={23} to="/kit#cards">
-          <span className="status status-warn">2 not ready</span>
-        </StatTile>
-        <StatTile label="Jobs" icon={JobsIcon} value={0}>
-          None
-        </StatTile>
-      </div>
       <Card
         title="Pods by status"
         aside="52 pods"
@@ -148,9 +126,7 @@ function TabsDemo() {
         { value: "logs", label: "Logs" },
       ]}
     >
-      <p className="kit-muted">
-        The “{tab}” panel. Click a tab, or focus one and use the arrow keys, Home and End.
-      </p>
+      <p className="kit-muted">The “{tab}” panel. Click a tab, or focus one and use the arrow keys, Home and End.</p>
     </Tabs>
   );
 }
@@ -212,7 +188,11 @@ function Code() {
         title="Read-only. managedFields are left out."
         maxHeight="360px"
       />
-      <CodeBlock code={"listen 8080;\nserver_name shop.example.com;\n\nlocation / {\n  proxy_pass http://web;\n}"} lineNumbers={false} title="nginx.conf" />
+      <CodeBlock
+        code={"listen 8080;\nserver_name shop.example.com;\n\nlocation / {\n  proxy_pass http://web;\n}"}
+        lineNumbers={false}
+        title="nginx.conf"
+      />
     </div>
   );
 }
@@ -347,13 +327,60 @@ function Row({ label, children }) {
 }
 
 export const dataSections = [
-  { id: "cards", title: "Cards and tiles", about: "Boxes for the overview and section titles for detail pages.", render: () => <CardsAndTiles /> },
-  { id: "table", title: "Table", about: "The real pod columns. Click anywhere on a row to open it; the header stays put while the table scrolls.", render: () => <Table /> },
-  { id: "tabs", title: "Tabs", about: "The open tab gets the orange line: it's where you are.", render: () => <TabsDemo /> },
-  { id: "callouts", title: "Callouts and empty states", about: "Info for missing optional features, warning for something stale, error for failures (with the raw error folded away).", render: () => <Callouts /> },
-  { id: "code", title: "Code", about: "Line numbers aren't copied. YAML gets quiet colours for keys, quoted strings, literals and comments.", render: () => <Code /> },
-  { id: "logs", title: "Logs", about: "Opens at the newest line and stays there while following, unless you scroll up to read.", render: () => <Logs /> },
-  { id: "charts", title: "Usage and charts", about: "Neutral bars and lines; amber from 75%, red from 90%. Hover a sparkline for its low, high and current values.", render: () => <Charts /> },
-  { id: "facts", title: "Facts and labels", about: "Long values start folded to three lines.", render: () => <Facts /> },
-  { id: "events", title: "Events", about: "Newest first. Warnings get the icon; the count shows how often it happened.", render: () => <Events /> },
+  {
+    id: "cards",
+    title: "Cards",
+    about: "Boxes for the overview, and section titles for detail pages.",
+    render: () => <CardsAndTiles />,
+  },
+  {
+    id: "table",
+    title: "Table",
+    about: "The real pod columns. Click anywhere on a row to open it; the header stays put while the table scrolls.",
+    render: () => <Table />,
+  },
+  {
+    id: "tabs",
+    title: "Tabs",
+    about: "The open tab gets the orange line: it's where you are.",
+    render: () => <TabsDemo />,
+  },
+  {
+    id: "callouts",
+    title: "Callouts and empty states",
+    about:
+      "Info for missing optional features, warning for something stale, error for failures (with the raw error folded away).",
+    render: () => <Callouts />,
+  },
+  {
+    id: "code",
+    title: "Code",
+    about: "Line numbers aren't copied. YAML gets quiet colours for keys, quoted strings, literals and comments.",
+    render: () => <Code />,
+  },
+  {
+    id: "logs",
+    title: "Logs",
+    about: "Opens at the newest line and stays there while following, unless you scroll up to read.",
+    render: () => <Logs />,
+  },
+  {
+    id: "charts",
+    title: "Usage and charts",
+    about:
+      "Neutral bars and lines; amber from 75%, red from 90%. Hover a sparkline for its low, high and current values.",
+    render: () => <Charts />,
+  },
+  {
+    id: "facts",
+    title: "Facts and labels",
+    about: "Long values start folded to three lines.",
+    render: () => <Facts />,
+  },
+  {
+    id: "events",
+    title: "Events",
+    about: "Newest first. Warnings get the icon; the count shows how often it happened.",
+    render: () => <Events />,
+  },
 ];
