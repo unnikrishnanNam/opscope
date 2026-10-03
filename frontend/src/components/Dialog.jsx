@@ -78,6 +78,13 @@ export function Dialog({ open, onClose, title, actions, children }) {
 //   busy          shows progress on the confirm button while it runs
 //   error         an Error to show if it failed (the dialog stays open)
 export function ConfirmDialog({ open, onCancel, onConfirm, title, confirmLabel, busy = false, error, children }) {
+  const cancelRef = useRef(null);
+  // While busy the confirm button is disabled, which drops keyboard focus.
+  // If it then fails, put focus on Cancel, the safe next step.
+  useEffect(() => {
+    if (error) cancelRef.current?.focus();
+  }, [error]);
+
   return (
     <Dialog
       open={open}
@@ -85,7 +92,7 @@ export function ConfirmDialog({ open, onCancel, onConfirm, title, confirmLabel, 
       title={title}
       actions={
         <>
-          <Button onClick={onCancel} disabled={busy} data-autofocus>
+          <Button ref={cancelRef} onClick={onCancel} disabled={busy} data-autofocus>
             Cancel
           </Button>
           <Button variant="danger" onClick={onConfirm} loading={busy}>

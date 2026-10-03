@@ -20,10 +20,14 @@ export default function ClusterSwitcher({ clusters, value, onChange, manageTo = 
       options={clusters.map((c) => ({ value: c.id, label: c.name, status: c.status }))}
       onChange={onChange}
       noun="clusters"
+      // The button also says whether the current cluster answers, and its version.
       renderValue={(o) => (
         <>
           <StatusDot status={o.status} />
           {o.label}
+          <span className={`cluster-value-meta ${o.status && !o.status.reachable ? "is-bad" : ""}`}>
+            {statusText(o.status)}
+          </span>
         </>
       )}
       renderOption={(o) => (

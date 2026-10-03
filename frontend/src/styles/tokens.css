@@ -21,6 +21,10 @@
   --border: #e0d9ce;
   --border-strong: #cdc5b8; /* inputs */
 
+  /* The sidebar sits a step below the page; the current page's link is lifted */
+  --sidebar: #efebe4;
+  --nav-active: #fffdfa;
+
   /* Text */
   --text: #17140f; /* brand Ink */
   --text-muted: #4f493f; /* secondary text */
@@ -83,6 +87,9 @@
   --border-subtle: #1f252d;
   --border: #29313b;
   --border-strong: #3a4450;
+
+  --sidebar: #0c1014;
+  --nav-active: #1c222a;
 
   --text: #f6f3ee; /* brand Paper */
   --text-muted: #c2bdb4;

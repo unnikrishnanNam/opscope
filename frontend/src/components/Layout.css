@@ -1,0 +1,53 @@
+/* Sidebar on the left, the top bar and the page on the right. Only the
+   page area scrolls; the sidebar and top bar stay put. */
+
+.shell {
+  display: flex;
+  height: 100%;
+}
+
+.shell-sidebar {
+  width: var(--sidebar-width);
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+}
+
+.shell-main {
+  flex: 1;
+  min-width: 0; /* lets wide tables scroll instead of stretching the page */
+  display: flex;
+  flex-direction: column;
+}
+
+.shell-content {
+  flex: 1;
+  overflow: auto;
+  padding: var(--space-8);
+}
+
+.shell-notice {
+  margin-bottom: var(--space-6);
+}
+
+.shell-loading {
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+  color: var(--text-subtle);
+}
+
+/* Narrow screens: the sidebar moves into the drawer. */
+@media (max-width: 900px) {
+  .shell-sidebar {
+    display: none;
+  }
+
+  .shell-content {
+    padding: var(--space-6) var(--space-4);
+  }
+}
+
+/* In the drawer the sidebar fills it. */
+.drawer .sidebar {
+  min-height: 100%;
+}

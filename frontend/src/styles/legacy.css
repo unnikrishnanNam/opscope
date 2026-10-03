@@ -9,7 +9,6 @@
 /* Old token names, pointing at the new ones. */
 :root,
 [data-theme] {
-  --sidebar: var(--surface-2);
   --ink: var(--text);
   --ink-soft: var(--text-muted);
   --ink-faint: var(--text-subtle);
@@ -20,181 +19,6 @@
 .muted {
   color: var(--ink-faint);
   font-size: var(--text-sm);
-}
-
-/* ==========================================================================
-   Layout: sidebar + main column
-   ========================================================================== */
-
-.shell {
-  display: flex;
-  height: 100%;
-}
-
-.main {
-  flex: 1;
-  min-width: 0; /* lets wide tables scroll instead of stretching the page */
-  display: flex;
-  flex-direction: column;
-}
-
-.content {
-  flex: 1;
-  overflow: auto;
-  padding: var(--space-8);
-}
-
-/* ==========================================================================
-   Sidebar
-   ========================================================================== */
-
-.sidebar {
-  width: var(--sidebar-width);
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--sidebar);
-  border-right: 1px solid var(--border);
-}
-
-.sidebar-nav {
-  flex: 1;
-  overflow-y: auto;
-  padding-bottom: var(--space-4);
-}
-
-.sidebar-empty {
-  margin: var(--space-4);
-  color: var(--ink-faint);
-  font-size: var(--text-sm);
-}
-
-.sidebar-footer {
-  padding: var(--space-2);
-  border-top: 1px solid var(--border);
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  height: var(--topbar-height);
-  padding: 0 var(--space-4);
-  border-bottom: 1px solid var(--border);
-  font-weight: 700;
-  font-size: 15px;
-  letter-spacing: -0.01em;
-  color: var(--ink);
-  text-decoration: none;
-}
-
-.nav-group {
-  padding: var(--space-4) var(--space-2) 0;
-}
-
-.nav-group-title {
-  padding: 0 var(--space-2) var(--space-1);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--ink-faint);
-}
-
-.nav-link {
-  display: block;
-  padding: 5px var(--space-2);
-  border-radius: var(--radius);
-  color: var(--ink-soft);
-  text-decoration: none;
-  font-size: var(--text-sm);
-}
-
-.nav-link:hover {
-  background: var(--surface-hover);
-  color: var(--ink);
-}
-
-.nav-link.active {
-  background: var(--surface);
-  color: var(--accent);
-  font-weight: 600;
-  box-shadow: inset 2px 0 0 var(--signal);
-}
-
-/* ==========================================================================
-   Top bar
-   ========================================================================== */
-
-.topbar {
-  height: var(--topbar-height);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 var(--space-8);
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-}
-
-.crumbs {
-  font-size: var(--text-sm);
-}
-
-.crumb-group {
-  color: var(--ink-faint);
-}
-
-.crumb-sep {
-  margin: 0 var(--space-2);
-  color: var(--border-strong);
-}
-
-.crumb-page {
-  font-weight: 600;
-}
-
-.topbar-right {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-}
-
-/* ==========================================================================
-   Badge (small status pill)
-   ========================================================================== */
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px var(--space-2);
-  border-radius: var(--radius);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  border: 1px solid transparent;
-}
-
-.badge .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.badge-ok {
-  color: var(--ok);
-  background: var(--ok-soft);
-}
-
-.badge-down {
-  color: var(--bad);
-  background: var(--bad-soft);
-}
-
-.badge-checking {
-  color: var(--ink-faint);
-  border-color: var(--border);
 }
 
 /* ==========================================================================
@@ -235,37 +59,6 @@
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   white-space: nowrap;
-}
-
-/* Opscope server status, in the sidebar footer */
-
-.health {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: var(--space-2) var(--space-2) var(--space-1);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--ink-faint);
-}
-
-.health .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--ink-faint);
-}
-
-.health-ok .dot {
-  background: var(--ok-mark);
-}
-
-.health-down {
-  color: var(--bad);
-}
-
-.health-down .dot {
-  background: var(--bad-mark);
 }
 
 /* ==========================================================================
@@ -696,15 +489,6 @@ a.node-name:hover {
 /* ==========================================================================
    Detail pages (Phase 6)
    ========================================================================== */
-
-.crumb-link {
-  color: var(--ink-faint);
-  text-decoration: none;
-}
-
-.crumb-link:hover {
-  color: var(--accent);
-}
 
 .small {
   font-size: var(--text-xs);

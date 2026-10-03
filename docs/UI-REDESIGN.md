@@ -8,7 +8,7 @@ We work the same way as before: one small phase at a time, each ending with a wo
 ticked boxes and notes at the bottom of this file. Phases are numbered **R0–R8** so they don't mix
 with the build phases 0–8.
 
-**Status (2026-10-03):** R0–R3 done; R4 next.
+**Status (2026-10-03):** R0–R4 done; R5 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -182,13 +182,14 @@ Goal: the interactive pieces of the frame, fully usable with the keyboard.
 
 Goal: the new frame around the old pages, working on real clusters.
 
-- [ ] Sidebar: logo, icon + label per page, group titles in sentence case, orange marker on the
+- [x] Sidebar: logo, icon + label per page, group titles in sentence case, orange marker on the
       current page, Clusters link, server status and theme switch in the footer
-- [ ] Top bar: breadcrumbs on the left; cluster switcher, namespace picker and connection status on the right
-- [ ] Below about 900 px: sidebar becomes a drawer behind a menu button; pickers stay usable
-- [ ] Shell-level states: loading the cluster list, unknown cluster, unreachable cluster
-- [ ] Every existing page still works inside the new shell (pages themselves are restyled in R5–R7)
-- [ ] Checked on multipass and `opscope-test`, light and dark, wide and narrow
+- [~] Top bar: breadcrumbs on the left; cluster switcher, namespace picker and connection status on the right
+      (the connection status lives inside the cluster switcher; see notes)
+- [x] Below about 900 px: sidebar becomes a drawer behind a menu button; pickers stay usable
+- [x] Shell-level states: loading the cluster list, unknown cluster, unreachable cluster
+- [x] Every existing page still works inside the new shell (pages themselves are restyled in R5–R7)
+- [x] Checked on multipass and `opscope-test`, light and dark, wide and narrow
 
 ## Phase R5: Overview and list pages
 
@@ -198,6 +199,8 @@ Goal: the pages people open most.
       sparklines; pods by status; nodes; recent warnings. Missing metrics-server and missing Gateway
       API look intentional, not broken
 - [ ] All 16 list pages on `DataTable` with `PageHeader`, filter, count, refresh and "updated" time
+- [ ] List pages: the table fills the rest of the window and scrolls inside, so its column headers
+      stay visible (decided after R4)
 - [ ] Nodes and Pods: usage columns on the new `UsageBar` and `Sparkline`
 - [ ] "Not installed" (Gateway API) and "forbidden" (Secrets without RBAC) as `Callout`s
 - [ ] Checked on both clusters
@@ -402,4 +405,35 @@ Things that come up while building, decisions made, and anything that moves betw
   link. After a failed confirm, focus could move back to Cancel (today it's left on the page, and
   Tab brings it back into the dialog).
 - Build unchanged from R2 (the new components aren't used by pages yet): JS 318 KB, CSS 40 KB.
+
+### Phase R4
+
+- Checked in the browser with three clusters at once: multipass (Gateway API, metrics),
+  `opscope-test` (neither), and `old-lab`, a copy of `opscope-test` pointing at a dead port, for the
+  unreachable state. The two extra clusters lived in a throwaway `DATA_DIR` in the scratchpad, so
+  `data/` was left alone. Covered: the switcher with every cluster's status, switching clusters,
+  the unreachable callout and its Try again, the namespace picker (search, `?ns` in the URL, kept
+  across pages), "Cluster-wide" on Nodes, the metrics-server notice on `opscope-test`, an unknown
+  cluster, Add a cluster, light and dark, 375 px with the drawer.
+- Cluster status moved into the clusters context: every cluster is checked every 30 seconds, and
+  each answer is stored as it arrives (one slow or unreachable cluster doesn't hold up the others).
+  The layout, the switcher and the pages all read it from there. Before, only the current cluster
+  was checked, by the layout.
+- The separate connection badge ("v1.31.14") is gone: the cluster switcher's button already shows
+  the status dot, and now also the version, or "unreachable" in red. One control instead of two
+  saying the same thing.
+- `Sidebar` is the same component on wide screens (the left column) and on narrow ones (inside the
+  `Drawer`, below 900 px). The drawer only renders it while open, so the server check doesn't run
+  twice. It closes when the page changes, and opens with focus on the current page's link
+  (`data-autofocus`).
+- The server status (old `HealthBadge`) moved into `Sidebar.jsx`, next to the theme switch.
+- Pages get icons from `sections.js`, so the sidebar and the router still read one list.
+- Below 640 px the top bar wraps: menu button and the current page's name on the first row, the
+  two pickers sharing the second. Earlier crumbs and the version are left out there.
+- Removed from `legacy.css`: the layout, sidebar, top bar, badge and server status rules, and the
+  old `--sidebar` alias, which would have overridden the new `--sidebar` token.
+- `ConfirmDialog` now puts focus on Cancel when the action fails (from the R3 notes).
+- Spotted for R5: the old list toolbar is cramped at 375 px; in a callout, the inline code
+  `--kubelet-insecure-tls` can break after its dashes.
+- Build: JS 337 KB (106 KB gzipped), CSS 48 KB.
 

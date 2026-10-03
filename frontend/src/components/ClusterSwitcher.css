@@ -33,6 +33,19 @@
   color: var(--text-subtle);
 }
 
+.cluster-value-meta {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-body);
+  color: var(--text-subtle);
+}
+
+.cluster-value-meta.is-bad {
+  font-family: var(--font-sans);
+  font-weight: var(--weight-strong);
+  color: var(--bad);
+}
+
 .cluster-manage {
   display: flex;
   align-items: center;

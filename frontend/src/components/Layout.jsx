@@ -1,53 +1,88 @@
-import { Link, Outlet, useMatch } from "react-router";
-import { useApi } from "../api.js";
+import { useEffect, useState } from "react";
+import { Outlet, useLocation, useMatch } from "react-router";
 import { useClusters } from "../clusters.jsx";
+import Button from "./Button.jsx";
+import { Callout, EmptyState } from "./Callout.jsx";
+import { Drawer } from "./Dialog.jsx";
+import { Spinner } from "./Loading.jsx";
 import Sidebar from "./Sidebar.jsx";
 import TopBar from "./TopBar.jsx";
-import ErrorBox from "./ErrorBox.jsx";
+import { ClustersIcon, RefreshIcon } from "./icons.jsx";
+import "./Layout.css";
 
-const STATUS_REFRESH_MS = 30_000;
-
-// The frame around every page. It works out which cluster is selected
-// (from the URL) and checks that the cluster is reachable.
+// The frame around every page: sidebar, top bar and content. It works out
+// which cluster is selected (from the URL) and whether it answers.
 export default function Layout() {
   // On /c/<id>/<rest>, match.params is { clusterId, "*": rest }.
   const match = useMatch("/c/:clusterId/*");
   const clusterId = match?.params.clusterId;
   const pagePath = match?.params["*"];
+  const { pathname } = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
 
-  const { data: clusters, loading } = useClusters();
+  const { data: clusters, loading, statuses, recheck } = useClusters();
   const cluster = clusters?.find((c) => c.id === clusterId);
   // Wait for a reload to finish: a cluster that was just added isn't in the old list.
   const unknownCluster = clusterId && clusters && !cluster && !loading;
+  // GET /api/clusters/<id>: the version, or why it doesn't answer. Undefined until it has.
+  const status = cluster ? statuses[cluster.id] : undefined;
 
-  // GET /api/clusters/<id> tells us the version and whether it answers.
-  const status = useApi(cluster ? `/clusters/${cluster.id}` : null, { refreshMs: STATUS_REFRESH_MS });
+  // Picking a page in the drawer closes it.
+  useEffect(() => setMenuOpen(false), [pathname]);
+
+  const sidebarCluster = cluster?.id ?? clusters?.[0]?.id;
 
   return (
     <div className="shell">
-      <Sidebar clusterId={cluster?.id ?? clusters?.[0]?.id} />
-      <div className="main">
-        <TopBar cluster={cluster} pagePath={pagePath} status={cluster ? status : null} />
-        <main className="content">
-          {cluster && status.data && !status.data.reachable && (
-            <ErrorBox title={`Can't reach ${cluster.name}`} message={status.data.error} detail={status.data.detail} />
+      <aside className="shell-sidebar">
+        <Sidebar clusterId={sidebarCluster} />
+      </aside>
+      {/* Narrow screens: the same sidebar in a drawer, behind the top bar's menu button. */}
+      <Drawer open={menuOpen} onClose={() => setMenuOpen(false)} label="Navigation">
+        {menuOpen && <Sidebar clusterId={sidebarCluster} />}
+      </Drawer>
+
+      <div className="shell-main">
+        <TopBar cluster={cluster} status={status} pagePath={pagePath} onMenu={() => setMenuOpen(true)} />
+        <main className="shell-content">
+          {cluster && status && !status.reachable && (
+            <div className="shell-notice">
+              <Callout
+                tone="error"
+                title={`Can't reach ${cluster.name}`}
+                detail={status.detail}
+                action={
+                  <Button size="sm" icon={RefreshIcon} onClick={recheck}>
+                    Try again
+                  </Button>
+                }
+              >
+                {status.error}
+              </Callout>
+            </div>
           )}
 
           {clusterId && !cluster && !unknownCluster ? (
             // Still loading the cluster list. Waiting here means every page
             // under /c/<id>/ can rely on `cluster` being set.
-            <p className="muted">Loading…</p>
+            <div className="shell-loading">
+              <Spinner size={20} label="Loading clusters" />
+            </div>
           ) : unknownCluster ? (
-            <section>
-              <h1 className="page-title">Cluster not found</h1>
-              <p className="page-about">
-                There is no cluster called “{clusterId}”. It may have been removed.{" "}
-                <Link to="/clusters">See all clusters</Link>.
-              </p>
-            </section>
+            <EmptyState
+              icon={ClustersIcon}
+              title="Cluster not found"
+              action={
+                <Button to="/clusters" variant="primary">
+                  See all clusters
+                </Button>
+              }
+            >
+              There's no cluster called “{clusterId}”. It may have been removed.
+            </EmptyState>
           ) : (
             // Pages read these with useOutletContext().
-            <Outlet context={{ cluster, reachable: status.data?.reachable, status: status.data }} />
+            <Outlet context={{ cluster, reachable: status?.reachable, status }} />
           )}
         </main>
       </div>
