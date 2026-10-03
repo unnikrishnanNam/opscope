@@ -8,7 +8,8 @@ We build it one phase at a time. Each phase ends with a working app and a short 
 After a phase is done, we come back here, tick the boxes, and note anything that changed.
 
 **Status (2026-10-03):** all phases (0–8) are done. Ideas that were deliberately left out are
-collected under [Possible next steps](#possible-next-steps) at the end.
+collected under [Possible next steps](#possible-next-steps) at the end. A UI redesign (with a
+dark theme) is planned in [UI-REDESIGN.md](UI-REDESIGN.md).
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
