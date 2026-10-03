@@ -8,7 +8,7 @@ We work the same way as before: one small phase at a time, each ending with a wo
 ticked boxes and notes at the bottom of this file. Phases are numbered **R0–R8** so they don't mix
 with the build phases 0–8.
 
-**Status (2026-10-03):** planned, nothing started.
+**Status (2026-10-03):** R0 done; R1 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -104,23 +104,23 @@ These rules are checked at every review:
 
 Goal: new tokens, fonts, themes and brand assets are in place, and the existing app still works on top of them.
 
-- [ ] Brand assets in `frontend/public/`: `favicon.ico`, `favicon.svg`, Apple and Android icons,
+- [x] Brand assets in `frontend/public/`: `favicon.ico`, `favicon.svg`, Apple and Android icons,
       maskable icon, `site.webmanifest`
-- [ ] `index.html`: icon links and manifest from `head-snippet.html`, `theme-color` for both themes,
+- [x] `index.html`: icon links and manifest from `head-snippet.html`, `theme-color` for both themes,
       title "Opscope". The `og:` tags are left out: Opscope is self-hosted with no fixed address, and
       the GitHub social preview is uploaded by hand (see R8)
-- [ ] Check that the Go server serves the new root files (`/favicon.ico`, `/site.webmanifest`) rather
+- [x] Check that the Go server serves the new root files (`/favicon.ico`, `/site.webmanifest`) rather
       than the `index.html` fallback
-- [ ] Fonts: `@fontsource-variable/manrope` and `@fontsource-variable/jetbrains-mono` replace IBM Plex
-- [ ] `src/styles/tokens.css`: colour, type, spacing, radius, shadow and motion tokens, for light and dark
-- [ ] Theme: a `data-theme` attribute on `<html>`, set by a tiny inline script before the page draws
+- [x] Fonts: `@fontsource-variable/manrope` and `@fontsource-variable/jetbrains-mono` replace IBM Plex
+- [x] `src/styles/tokens.css`: colour, type, spacing, radius, shadow and motion tokens, for light and dark
+- [x] Theme: a `data-theme` attribute on `<html>`, set by a tiny inline script before the page draws
       (so there's no white flash in dark mode), plus a `useTheme` hook
-- [ ] `src/styles/base.css`: reset, body text, links, focus ring, selection colour, scrollbars,
+- [x] `src/styles/base.css`: reset, body text, links, focus ring, selection colour, scrollbars,
       `prefers-reduced-motion`
-- [ ] Old class names keep working on the new tokens for now, so every page still renders
+- [x] Old class names keep working on the new tokens for now, so every page still renders
       (temporary; removed in R8)
-- [ ] `/kit` route, development only, with sections for colours (with contrast ratios) and type
-- [ ] "OpScope" → "Opscope" in UI text
+- [x] `/kit` route, development only, with sections for colours (with contrast ratios) and type
+- [x] "OpScope" → "Opscope" in UI text
 
 ## Phase R1: Basic components
 
@@ -253,3 +253,34 @@ Considered and left out to keep the redesign focused:
 ## Phase notes
 
 Things that come up while building, decisions made, and anything that moves between phases.
+
+### Phase R0
+
+- Checked on `/kit` (both themes, and at 375 px) and in the app against multipass, in light and
+  dark: overview, pods, a pod's summary and logs, nodes, and Add a cluster. Every page still works
+  on the new tokens. `opscope-test` waits until R4, when the shell changes.
+- Colours were picked with a small script first (WCAG contrast and CIEDE2000 distance), then checked
+  again in the browser: `/kit` reads each token's real computed value and shows its ratios. All 52
+  checks pass in both themes.
+- Two starting values failed and were changed. Amber (warn marks) on white was 2.3:1, so it's now
+  `#AD8200` (3.5:1). Red was ΔE 17 from Signal orange in dark mode, so the reds moved towards
+  crimson: `#C42847` light, `#E8506A` dark. Both now sit at least ΔE 23 from orange and 25 from each other.
+- Status colours come in pairs: a text colour for words and a separate, slightly brighter mark
+  colour for dots and bar segments (`--ok` / `--ok-mark`, and so on).
+- `data-theme` on `<html>` is always the resolved theme, `light` or `dark`. The choice
+  (`system`, `light` or `dark`) is kept in `localStorage`, and the script in `index.html` and
+  `theme.js` both read it. Any element can carry `data-theme`, which is how `/kit` shows both themes
+  at once. A choice made in one tab is picked up by the others.
+- The fonts are variable fonts, one file per script. Browsers download only the Latin subset
+  (25 KB for Manrope, 40 KB for JetBrains Mono).
+- `styles.css` became `src/styles/legacy.css` (moved with `git mv`, so its history is kept). Its old
+  token names point at the new tokens. Its ten or so hard-coded colours became tokens so dark mode
+  works. Every font weight went up one step, since body text is now 500. The old navy accent now maps
+  to Ink (or Paper in dark), and the current sidebar item and open tab use Signal orange.
+- One backend change: Go's list of file types didn't include `.webmanifest`, so `site.webmanifest`
+  was sent as `text/plain`. It's now `application/manifest+json`, with a test.
+- `vite.config.js` takes an optional `OPSCOPE_API` variable, so the dev server can talk to a Go
+  server on another port (`OPSCOPE_API=http://localhost:8090`). The default is still `:8080`.
+- `/kit` is checked to be absent from the production bundle. Build size: JS 308 KB (96 KB gzipped),
+  CSS 28 KB.
+

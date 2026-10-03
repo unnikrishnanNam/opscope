@@ -65,7 +65,7 @@ export default function AddCluster() {
     <section className="narrow">
       <h1 className="page-title">Add a cluster</h1>
       <p className="page-about">
-        Paste a kubeconfig or load it from a file. OpScope checks that it can connect, then saves only the context
+        Paste a kubeconfig or load it from a file. Opscope checks that it can connect, then saves only the context
         you pick.
       </p>
 

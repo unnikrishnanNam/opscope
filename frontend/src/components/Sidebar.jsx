@@ -12,7 +12,7 @@ export default function Sidebar({ clusterId }) {
     <aside className="sidebar">
       <Link to="/" className="brand">
         <img src="/favicon.svg" alt="" width="22" height="22" />
-        <span>OpScope</span>
+        <span>Opscope</span>
       </Link>
 
       <nav className="sidebar-nav">

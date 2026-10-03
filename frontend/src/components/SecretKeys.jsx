@@ -10,7 +10,7 @@ export default function SecretKeys({ cluster, secret }) {
   return (
     <div className="secret-keys">
       <p className="field-hint">
-        Values are fetched one at a time when you reveal them, and aren't stored by OpScope.
+        Values are fetched one at a time when you reveal them, and aren't stored by Opscope.
       </p>
       {secret.keys.map((key) => (
         <SecretKey key={key} cluster={cluster} secret={secret} name={key} />

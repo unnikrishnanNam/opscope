@@ -3,8 +3,28 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>OpScope</title>
+    <title>Opscope</title>
+    <meta name="description" content="A small, read-only Kubernetes dashboard." />
+
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#f6f3ee" />
+
+    <script>
+      // Pick the theme before the page draws, so dark mode doesn't flash white.
+      // src/theme.js takes over once the app loads; keep the two in step.
+      (function () {
+        var choice = null;
+        try {
+          choice = localStorage.getItem("opscope-theme");
+        } catch (e) {}
+        var dark = choice === "dark" || (choice !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+        if (dark) document.querySelector('meta[name="theme-color"]').content = "#101418";
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

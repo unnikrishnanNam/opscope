@@ -1,11 +1,18 @@
 package server
 
 import (
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 )
+
+// Go's built-in list of file types doesn't know web app manifests, and would
+// send site.webmanifest as plain text.
+func init() {
+	mime.AddExtensionType(".webmanifest", "application/manifest+json")
+}
 
 // staticHandler serves the built React app from dir.
 //

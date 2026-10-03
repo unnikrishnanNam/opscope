@@ -9,7 +9,7 @@ export default function ManageClusters() {
   const [removeError, setRemoveError] = useState(null);
 
   async function remove(cluster) {
-    if (!window.confirm(`Remove “${cluster.name}”? OpScope will delete its saved kubeconfig.`)) return;
+    if (!window.confirm(`Remove “${cluster.name}”? Opscope will delete its saved kubeconfig.`)) return;
     try {
       await api(`/clusters/${cluster.id}`, { method: "DELETE" });
       setRemoveError(null);
@@ -24,7 +24,7 @@ export default function ManageClusters() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Clusters</h1>
-          <p className="page-about">Clusters OpScope can read from.</p>
+          <p className="page-about">Clusters Opscope can read from.</p>
         </div>
         <Link to="/clusters/add" className="button button-primary">
           Add a cluster
@@ -36,7 +36,7 @@ export default function ManageClusters() {
 
       {clusters?.length === 0 && (
         <div className="empty">
-          No clusters yet. <Link to="/clusters/add">Add one</Link> or start OpScope with <code>OPSCOPE_KUBECONFIG</code>.
+          No clusters yet. <Link to="/clusters/add">Add one</Link> or start Opscope with <code>OPSCOPE_KUBECONFIG</code>.
         </div>
       )}
 

@@ -1,0 +1,146 @@
+/* ==========================================================================
+   Design tokens
+   Every colour, size and duration the UI uses. Change a value here and it
+   changes everywhere. Contrast ratios for these values are shown on /kit.
+
+   Themes: the light values below are the default. `data-theme="dark"` on
+   <html> (set by index.html and theme.js) switches to the dark values. Any
+   element can carry data-theme too, which is how /kit shows both side by side.
+   ========================================================================== */
+
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* Surfaces, from the page background up */
+  --bg: #f6f3ee; /* brand Paper */
+  --surface: #fffdfa; /* cards, tables, inputs */
+  --surface-2: #f1ede6; /* table headers, code blocks, quiet fills */
+  --surface-hover: #ede8e0;
+  --border-subtle: #ebe6dd; /* lines between table rows */
+  --border: #e0d9ce;
+  --border-strong: #cdc5b8; /* inputs */
+
+  /* Text */
+  --text: #17140f; /* brand Ink */
+  --text-muted: #4f493f; /* secondary text */
+  --text-subtle: #6b645a; /* hints, timestamps; still at least 4.5:1 */
+
+  /* Primary actions: Ink buttons on light, Paper buttons on dark */
+  --primary: #17140f;
+  --primary-hover: #2e2921;
+  --primary-text: #f6f3ee;
+
+  /* Signal orange marks "you are here" and nothing else: the current page,
+     the open tab, keyboard focus, live updates. Never text, never big fills. */
+  --signal: #e8590c;
+  --signal-soft: rgba(232, 89, 12, 0.12);
+  --focus: #e8590c;
+
+  /* Status. Text colours are for words; marks are for dots and bar segments,
+     tuned to stay apart from each other and from Signal orange. */
+  --ok: #1f7343;
+  --ok-mark: #2e8a57;
+  --ok-soft: #e2f0e5;
+  --warn: #7d5a00;
+  --warn-mark: #ad8200;
+  --warn-soft: #f6eccf;
+  --bad: #ae1f3c;
+  --bad-mark: #c42847;
+  --bad-soft: #f9e1e4;
+  --neutral-mark: #8a8378;
+
+  /* Data marks (usage bars, sparklines) stay neutral, so colour means status */
+  --data: #3a352d;
+  --data-track: #e6e0d6;
+
+  /* Things that float above the page */
+  --shadow-sm: 0 1px 2px rgba(23, 20, 15, 0.06);
+  --shadow-lg: 0 2px 6px rgba(23, 20, 15, 0.06), 0 12px 32px rgba(23, 20, 15, 0.14);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #101418; /* brand Night */
+  --surface: #161b21;
+  --surface-2: #1c222a;
+  --surface-hover: #222932;
+  --border-subtle: #1f252d;
+  --border: #29313b;
+  --border-strong: #3a4450;
+
+  --text: #f6f3ee; /* brand Paper */
+  --text-muted: #c2bdb4;
+  --text-subtle: #959088;
+
+  --primary: #f6f3ee;
+  --primary-hover: #e2ded6;
+  --primary-text: #17140f;
+
+  --signal: #e8590c;
+  --signal-soft: rgba(232, 89, 12, 0.18);
+  --focus: #f0681e;
+
+  --ok: #5fc28c;
+  --ok-mark: #3dae6e;
+  --ok-soft: #16291f;
+  --warn: #e2b33c;
+  --warn-mark: #d8a824;
+  --warn-soft: #2b2414;
+  --bad: #f47c8e;
+  --bad-mark: #e8506a;
+  --bad-soft: #2e181d;
+  --neutral-mark: #79746c;
+
+  --data: #d6d0c5;
+  --data-track: #29313b;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* Values that don't change between themes */
+:root {
+  /* Type. Manrope is never used below weight 500 (thin text reads as washed out). */
+  --font-sans: "Manrope Variable", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+
+  --text-xs: 12px; /* the smallest size anywhere */
+  --text-sm: 13px;
+  --text-md: 14px; /* body */
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 28px;
+
+  --weight-body: 500;
+  --weight-strong: 600; /* labels, table headers, buttons */
+  --weight-title: 700; /* page and card titles */
+  --weight-display: 800; /* big numbers on the overview */
+
+  --leading-tight: 1.25;
+  --leading: 1.5;
+
+  /* Spacing (4px steps) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  --radius-sm: 4px; /* tags, small controls */
+  --radius: 6px; /* buttons, inputs */
+  --radius-lg: 8px; /* cards, tables, dialogs */
+
+  /* Motion. Short and plain; switched off for people who ask for less motion. */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --duration-fast: 120ms;
+  --duration: 180ms;
+
+  /* Layout */
+  --sidebar-width: 232px;
+  --topbar-height: 56px;
+}
