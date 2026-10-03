@@ -21,6 +21,11 @@
   font-weight: var(--weight-body);
 }
 
+/* A tag right after text or a status, e.g. "Ready  Cordoned". */
+.tag-gap {
+  margin-left: var(--space-2);
+}
+
 .kbd {
   display: inline-flex;
   align-items: center;

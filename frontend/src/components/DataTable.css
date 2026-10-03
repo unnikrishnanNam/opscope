@@ -213,6 +213,10 @@
   overflow-wrap: normal;
 }
 
+.simple-table .data-table-scroll:focus-visible {
+  outline-offset: -2px;
+}
+
 .simple-table th {
   position: static; /* nothing scrolls under it */
 }

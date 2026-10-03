@@ -1,4 +1,4 @@
-// OpScope is a small, read-only Kubernetes dashboard.
+// Opscope is a small, read-only Kubernetes dashboard.
 //
 // This file is the entry point: it reads configuration from environment
 // variables, loads the known clusters, starts the HTTP server, and shuts it
@@ -25,7 +25,7 @@ import (
 //	go build -ldflags "-X main.version=1.2.3"
 var version = "dev"
 
-// shutdownTimeout is how long running requests get to finish when OpScope
+// shutdownTimeout is how long running requests get to finish when Opscope
 // is asked to stop. Kubernetes waits 30 seconds by default before killing a
 // pod, so this fits well inside that.
 const shutdownTimeout = 10 * time.Second
@@ -45,7 +45,7 @@ func main() {
 	manager := clusters.NewManager(dataDir)
 
 	// 1. Clusters from the environment. A broken setting here is a mistake
-	//    by whoever started OpScope, so we stop with a clear message instead
+	//    by whoever started Opscope, so we stop with a clear message instead
 	//    of starting half-configured.
 	if os.Getenv("OPSCOPE_IN_CLUSTER") == "true" {
 		// Running as a pod: read the cluster we're in, with the pod's service account.

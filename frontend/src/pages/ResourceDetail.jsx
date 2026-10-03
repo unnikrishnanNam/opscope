@@ -185,13 +185,14 @@ function Summary({ d, cluster, resource }) {
 
       {d.tables.map((t) => (
         <Section key={t.title} title={t.title}>
-          <SimpleTable columns={t.columns.map((label) => ({ label }))} rows={t.rows} />
+          <SimpleTable label={t.title} columns={t.columns.map((label) => ({ label }))} rows={t.rows} />
         </Section>
       ))}
 
       {d.conditions.length > 0 && (
         <Section title="Conditions">
           <SimpleTable
+            label="Conditions"
             columns={[
               { label: "Type", className: "nowrap" },
               { label: "Status", className: "nowrap" },
@@ -250,7 +251,7 @@ function Containers({ containers }) {
     c.requests,
     c.limits,
   ]);
-  return <SimpleTable columns={columns} rows={rows} />;
+  return <SimpleTable label="Containers" columns={columns} rows={rows} />;
 }
 
 // A long image name may wrap only after "/", ":" or "@", so

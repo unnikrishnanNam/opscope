@@ -1,15 +1,26 @@
-# OpScope
+# Opscope
 
 A small, read-only Kubernetes dashboard. Go backend, React frontend, one Docker image.
 
 It shows nodes, workloads (Pods, Deployments, StatefulSets, DaemonSets, Jobs, CronJobs), config
 (ConfigMaps, Secrets), networking (Services, Ingresses, and Gateway API Gateways, HTTPRoutes and
-GatewayClasses), a cluster overview with recent warnings, a detail page for every object (summary,
-YAML, events, pod logs), and live CPU and memory usage from metrics-server. It never changes
-anything in a cluster.
+GatewayClasses), a cluster overview with what needs attention and recent warnings, a detail page
+for every object (summary, YAML, events, pod logs), and live CPU and memory usage from
+metrics-server. It has light and dark themes, works on a phone, and never changes anything in a
+cluster.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overview-dark.png">
+  <img src="docs/screenshots/overview-light.png" alt="The Opscope overview: a health summary, nodes, pods, CPU and memory usage, every resource kind with what needs attention, and per-node usage">
+</picture>
+
+| Pods | A pod's detail page |
+| --- | --- |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pods-dark.png"><img src="docs/screenshots/pods-light.png" alt="The pods list, with status, readiness, restarts and live usage"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pod-dark.png"><img src="docs/screenshots/pod-light.png" alt="A crash-looping pod's detail page: facts, containers and conditions"></picture> |
 
 The project was built in phases as a learning project; [docs/PHASES.md](docs/PHASES.md) has the
-plan, what each phase delivered, and the decisions made along the way.
+plan, what each phase delivered, and the decisions made along the way. The interface was then
+redesigned in its own phases, recorded in [docs/UI-REDESIGN.md](docs/UI-REDESIGN.md).
 
 ## Layout
 
@@ -26,15 +37,21 @@ frontend/                 React app (Vite, plain JavaScript)
   src/clusters.jsx        shared list of clusters (React context)
   src/columns.jsx         table columns for each resource type
   src/format.js           ages, durations, sizes, kubectl style
-  src/sections.js         list of pages; drives the sidebar and the routes
-  src/components/         shared pieces (layout, tables, status badges, logs, usage charts)
-  src/pages/              one file per page
-  src/styles.css          all styles; design tokens at the top
-deploy/kubernetes/        manifests for running OpScope inside a cluster
+  src/sections.js         list of pages (with their icons); drives the sidebar and the routes
+  src/theme.js            light, dark or follow the system; remembered in the browser
+  src/styles/tokens.css   design tokens: colours for both themes, type, spacing, radius, motion
+  src/styles/base.css     page-wide basics: fonts, links, focus ring, reduced motion
+  src/components/         shared pieces, each with its own CSS file (buttons, tables, pickers,
+                          dialogs, code blocks, logs, usage charts, the shell around every page)
+  src/pages/              one file per page (plus its CSS where it needs some)
+  src/kit/                the component kit at /kit (development only, left out of builds)
+deploy/kubernetes/        manifests for running Opscope inside a cluster
 data/                     local data (git- and docker-ignored): kubeconfigs, saved clusters
 Dockerfile                builds the single image
 Makefile                  common commands
 docs/PHASES.md            build plan, progress and notes
+docs/UI-REDESIGN.md       the interface redesign: design rules, phases and notes
+docs/screenshots/         the pictures in this README
 ```
 
 ## Requirements
@@ -46,24 +63,24 @@ docs/PHASES.md            build plan, progress and notes
 
 ## Connecting clusters
 
-OpScope has no built-in cluster and never reads `~/.kube/config` on its own. There are three ways
+Opscope has no built-in cluster and never reads `~/.kube/config` on its own. There are three ways
 to give it one:
 
 1. **From a kubeconfig file.** Set `OPSCOPE_KUBECONFIG` to the file. That cluster is loaded at
    startup and marked "Environment" in the UI. Any kubeconfig works here, including ones that log
    in through a command (cloud CLI plugins).
-2. **From inside the cluster.** Set `OPSCOPE_IN_CLUSTER=true` when OpScope runs as a pod. It then
+2. **From inside the cluster.** Set `OPSCOPE_IN_CLUSTER=true` when Opscope runs as a pod. It then
    uses its pod's service account, and sees whatever that account's RBAC rules allow. See
    [Run in a Kubernetes cluster](#run-in-a-kubernetes-cluster).
 3. **From the UI.** Open *Clusters → Add a cluster*, paste or upload a kubeconfig and pick a
-   context. OpScope tests the connection and saves only that context to `DATA_DIR/clusters/`
-   (files readable only by OpScope). For safety, kubeconfigs added this way must have their
+   context. Opscope tests the connection and saves only that context to `DATA_DIR/clusters/`
+   (files readable only by Opscope). For safety, kubeconfigs added this way must have their
    credentials embedded and can't run login commands. `kubectl config view --minify --flatten`
    prints a suitable copy of your current context.
 
 ## Security notes
 
-- **OpScope has no login.** Anyone who can open the page can read everything OpScope can read, in
+- **Opscope has no login.** Anyone who can open the page can read everything Opscope can read, in
   every cluster it knows. Keep it on `127.0.0.1` (the Makefile does), reach it with
   `kubectl port-forward` when it runs in a cluster, or put something that adds authentication in
   front of it.
@@ -86,7 +103,11 @@ make dev-frontend
 ```
 
 Open http://localhost:5173. Vite reloads the page when you edit frontend files and forwards
-`/api/*` calls to the Go server on port 8080. Restart `make dev-backend` after Go changes.
+`/api/*` calls to the Go server on port 8080 (set `OPSCOPE_API`, for example
+`OPSCOPE_API=http://localhost:8090`, to use another). Restart `make dev-backend` after Go changes.
+
+http://localhost:5173/kit shows every design token and component in both themes, with sample data
+and no cluster needed. It's the place to build or change a component before it's used on a page.
 
 To start the backend with a cluster from a file:
 
@@ -120,24 +141,24 @@ The container must be able to reach the cluster's API server. A `server:` addres
 ### Using a kind cluster with Docker
 
 kind clusters run in Docker and publish their API server on your machine's `127.0.0.1`, which a
-container can't reach. Put OpScope on kind's Docker network instead, and use the kubeconfig kind
+container can't reach. Put Opscope on kind's Docker network instead, and use the kubeconfig kind
 writes for that network (it uses the node's container name, which kind's certificate includes):
 
 ```bash
 kind get kubeconfig --internal --name <cluster> > data/kind.internal.kubeconfig
 ```
 
-Then either start OpScope with `--network kind` added to `docker run`, or connect a running one:
+Then either start Opscope with `--network kind` added to `docker run`, or connect a running one:
 
 ```bash
 docker network connect kind <opscope-container>
 ```
 
-When OpScope runs directly on your machine (`make dev-backend`), the normal kubeconfig works.
+When Opscope runs directly on your machine (`make dev-backend`), the normal kubeconfig works.
 
 ## Run in a Kubernetes cluster
 
-The manifests in `deploy/kubernetes/` run OpScope as a pod that shows the cluster it runs in:
+The manifests in `deploy/kubernetes/` run Opscope as a pod that shows the cluster it runs in:
 
 - `opscope.yaml`: a namespace, a service account, a read-only ClusterRole and its binding, the
   Deployment and a ClusterIP Service
@@ -169,12 +190,12 @@ Open http://localhost:8080. The cluster appears as "this cluster".
 The pod runs as a non-root user with a read-only root filesystem, no Linux capabilities and the
 default seccomp profile. It only writes to `/data` (an `emptyDir`, so clusters added in the UI
 are lost when the pod is replaced; use a PersistentVolumeClaim to keep them). Liveness and
-readiness probes use `/api/health`. On SIGTERM, OpScope stops taking new connections and gives
+readiness probes use `/api/health`. On SIGTERM, Opscope stops taking new connections and gives
 running requests up to 10 seconds to finish (open log streams are closed after that).
 
 ### Permissions
 
-OpScope only ever uses `get` and `list`:
+Opscope only ever uses `get` and `list`:
 
 | API group                   | Resources                                               | Why                    |
 | --------------------------- | ------------------------------------------------------- | ---------------------- |
@@ -187,8 +208,8 @@ OpScope only ever uses `get` and `list`:
 | `metrics.k8s.io`            | nodes, pods                                             | CPU and memory usage   |
 | core (`""`)                 | secrets (separate role, `secrets-access.yaml`)          | Secrets pages, Reveal  |
 
-**Reading Secrets is a conscious choice.** With `secrets-access.yaml` applied, the OpScope pod can
-read every Secret in the cluster, and so can anyone who can reach OpScope. To turn it off:
+**Reading Secrets is a conscious choice.** With `secrets-access.yaml` applied, the Opscope pod can
+read every Secret in the cluster, and so can anyone who can reach Opscope. To turn it off:
 
 ```bash
 kubectl delete -f deploy/kubernetes/secrets-access.yaml
@@ -241,5 +262,5 @@ features answer `404` with a `code` instead of failing:
 - `"code": "not_installed"`: the cluster has no Gateway API (`gateway.networking.k8s.io/v1`)
 - `"code": "metrics_unavailable"`: the cluster has no working metrics-server
 
-OpScope samples every cluster's usage every 15 seconds in the background and keeps the last
+Opscope samples every cluster's usage every 15 seconds in the background and keeps the last
 15 minutes in memory for the sparklines; that history starts empty after a restart.

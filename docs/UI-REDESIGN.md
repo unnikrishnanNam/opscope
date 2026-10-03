@@ -8,7 +8,8 @@ We work the same way as before: one small phase at a time, each ending with a wo
 ticked boxes and notes at the bottom of this file. Phases are numbered **R0–R8** so they don't mix
 with the build phases 0–8.
 
-**Status (2026-10-03):** R0–R7 done; R8 next.
+**Status (2026-10-03):** R0–R8 done. Left for you: checking Safari and Firefox, and uploading the
+GitHub social preview.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -233,14 +234,15 @@ Goal: the pages around the clusters, and a good first impression.
 
 Goal: ready to show people.
 
-- [ ] Accessibility pass: contrast in both themes, keyboard-only walk through every page, focus
+- [x] Accessibility pass: contrast in both themes, keyboard-only walk through every page, focus
       order, screen-reader labels, reduced motion
-- [ ] Safari, Firefox and Chrome; 375 px, 768 px and wide screens
-- [ ] Remove the old class names kept in R0 and any CSS no longer used
-- [ ] Bundle and font size check (only the font weights we use are shipped)
-- [ ] Screenshots in both themes for the README; README and PHASES.md updated for the new look and name
+- [~] Safari, Firefox and Chrome; 375 px, 768 px and wide screens (Chrome and the sizes done here;
+      Safari and Firefox are yours to check)
+- [x] Remove the old class names kept in R0 and any CSS no longer used
+- [x] Bundle and font size check (only the font weights we use are shipped)
+- [x] Screenshots in both themes for the README; README and PHASES.md updated for the new look and name
 - [ ] Upload `github-social-preview.png` as the repo's social preview (you, in GitHub settings)
-- [ ] Docker image built and checked, and the in-cluster deployment on `opscope-test` checked once more
+- [x] Docker image built and checked, and the in-cluster deployment on `opscope-test` checked once more
 
 ---
 
@@ -552,4 +554,46 @@ Things that come up while building, decisions made, and anything that moves betw
   (its last users were these pages). The rules left in `legacy.css` are now unused apart from
   `.muted`, `.mono` and `.tag-gap`; they move or go in R8 with the file.
 - Build: JS 353 KB (110 KB gzipped), CSS 63 KB.
+
+### Phase R8
+
+- Accessibility: axe-core 4.13 (WCAG 2.0/2.1 A and AA rules), served from the scratchpad and run
+  inside the page, on the overview, nodes, pods, a pod's summary, YAML and logs, a Secret, the
+  clusters list, Add a cluster, the Gateway API "not installed" note and an unreachable cluster,
+  in light and dark (dark with the namespace picker open too). It found two problems, both fixed;
+  every page now passes:
+  - usage bars put an `aria-label` on a plain `<span>`, which screen readers ignore. They're now
+    `role="img"` with that label (one picture: the reader hears "2.1 GiB of 2.8 GiB used").
+  - detail tables wider than the page scrolled sideways but couldn't take keyboard focus.
+    `SimpleTable`'s box is now a focusable, named region (`label`: "Containers", "Conditions", ...).
+- Keyboard walk, which found two gaps axe doesn't flag:
+  - there was no way past the 16 sidebar links. A "Skip to content" link is now the first thing
+    Tab reaches (hidden until focused); it moves focus to the page, where the next Tab is the
+    filter box.
+  - every browser tab was titled "Opscope". The title now follows the page ("Pods · multipass ·
+    Opscope", or an object's name), which helps screen readers, tab switching and history.
+- Reduced motion: `base.css` cuts animations and transitions to nothing for people who ask for
+  less motion (the spinner shows a still arc, the live dot stops pulsing).
+- `legacy.css` is gone. Its last three rules moved: `.muted` and `.mono` (small helpers) to
+  `base.css`, `.tag-gap` to `Tag.css`.
+- Found while moving them: the old `code { font-size: 0.92em }` also shrank the `<code>` inside
+  code blocks, so YAML had been showing at 11.5 px, under the 12 px minimum. `pre code` now keeps
+  the block's size (12.5 px).
+- Sizes: JS 353 KB (110 KB gzipped), CSS 61 KB (16 KB gzipped). A first visit downloads about
+  190 KB in all: those two plus the Latin subsets of the two variable fonts (25 KB Manrope, 40 KB
+  JetBrains Mono). Other scripts' font files only load if a page needs those characters. `/kit`
+  is not in the bundle.
+- Screenshots: overview, pods and a crash-looping pod's page, light and dark, taken with headless
+  Chrome at 1440 × 900 and 2× pixel density, then scaled to 1600 px wide (`docs/screenshots/`).
+  The README shows the dark ones to readers whose GitHub is in dark mode (`<picture>`). Headless
+  Chrome doesn't exit by itself on a page that keeps polling, so each shot stops it once the file
+  is written.
+- "OpScope" → "Opscope" in the remaining comments (backend, manifests, Dockerfile, Makefile) and
+  in the README and PHASES.md. Nothing user-facing in the backend had the old spelling.
+- Docker: `make docker-build` gives a 42 MB image, as before. On `opscope-test` it was loaded with
+  `kind load docker-image`, rolled out with `kubectl rollout restart`, and used through
+  `kubectl port-forward`: "this cluster" from the service account, the new overview, and Secrets
+  through the RBAC role. The page title followed the page there too.
+- Left for you: Safari and Firefox, and uploading `github-social-preview.png` from the brand kit
+  under the repository's Settings → Social preview.
 

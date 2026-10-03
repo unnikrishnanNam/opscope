@@ -23,7 +23,8 @@ export function UsageBar({ used, total, label, width, showPercent = true }) {
   // always shown, so colour is never the only signal.
   const tone = pct >= 90 ? "bad" : pct >= 75 ? "warn" : "ok";
   return (
-    <span className="usage" title={label} aria-label={label}>
+    // One picture for screen readers: they read the label, not the parts.
+    <span className="usage" title={label} role="img" aria-label={label}>
       <span className="usage-track" style={width ? { width } : undefined}>
         <span className={`usage-fill usage-${tone}`} style={{ width: `${Math.min(pct, 100)}%` }} />
       </span>

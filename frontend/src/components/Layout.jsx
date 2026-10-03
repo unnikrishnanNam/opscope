@@ -34,6 +34,10 @@ export default function Layout() {
 
   return (
     <div className="shell">
+      {/* First thing the keyboard reaches: jump past the sidebar's links. */}
+      <a className="skip-link" href="#content">
+        Skip to content
+      </a>
       <aside className="shell-sidebar">
         <Sidebar clusterId={sidebarCluster} />
       </aside>
@@ -44,7 +48,7 @@ export default function Layout() {
 
       <div className="shell-main">
         <TopBar cluster={cluster} status={status} pagePath={pagePath} onMenu={() => setMenuOpen(true)} />
-        <main className="shell-content">
+        <main className="shell-content" id="content" tabIndex={-1}>
           {cluster && status && !status.reachable && (
             <div className="shell-notice">
               <Callout

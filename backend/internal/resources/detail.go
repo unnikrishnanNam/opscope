@@ -90,7 +90,7 @@ type Detail struct {
 type Owner struct {
 	Kind     string `json:"kind"`
 	Name     string `json:"name"`
-	Resource string `json:"resource,omitempty"` // set when OpScope has a page for this kind
+	Resource string `json:"resource,omitempty"` // set when Opscope has a page for this kind
 }
 
 type Field struct {

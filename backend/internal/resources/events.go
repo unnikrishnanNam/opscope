@@ -24,7 +24,7 @@ type Event struct {
 	Message string `json:"message"`
 	Object  string `json:"object"` // what it happened to, e.g. "Pod/web-7d9f"
 	// The same object as parts, so the UI can link to it. ObjectResource is
-	// empty for kinds OpScope has no page for (like ReplicaSet).
+	// empty for kinds Opscope has no page for (like ReplicaSet).
 	ObjectName     string    `json:"objectName"`
 	ObjectResource string    `json:"objectResource,omitempty"`
 	Count          int32     `json:"count"` // how many times it happened

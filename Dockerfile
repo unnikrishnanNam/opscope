@@ -1,4 +1,4 @@
-# OpScope: one image that serves both the API and the web UI.
+# Opscope: one image that serves both the API and the web UI.
 #
 # Built in three stages. Only the last one ends up in the final image;
 # the first two are thrown away after their output is copied out.
@@ -32,7 +32,7 @@ FROM gcr.io/distroless/static-debian12:nonroot
 WORKDIR /app
 COPY --from=backend /opscope /app/opscope
 COPY --from=frontend /src/dist /app/web
-# Owned by the nonroot user (uid 65532) so OpScope can write saved clusters.
+# Owned by the nonroot user (uid 65532) so Opscope can write saved clusters.
 # Mount a volume here to keep them across restarts.
 COPY --from=backend --chown=65532:65532 /empty-data /data
 ENV PORT=8080 \

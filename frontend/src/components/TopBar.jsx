@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { useApi } from "../api.js";
 import { useClusters } from "../clusters.jsx";
@@ -42,6 +43,12 @@ export default function TopBar({ cluster, status, pagePath, onMenu }) {
       ];
     }
   }
+
+  // The browser tab's title follows the page: "api-1 · multipass · Opscope".
+  const title = [crumbs.at(-1)?.label, cluster?.name, "Opscope"].filter(Boolean).join(" · ");
+  useEffect(() => {
+    document.title = title;
+  }, [title]);
 
   return (
     <header className="topbar">

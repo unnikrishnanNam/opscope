@@ -10,7 +10,6 @@ import "@fontsource-variable/jetbrains-mono";
 
 import "./styles/tokens.css";
 import "./styles/base.css";
-import "./styles/legacy.css";
 import "./theme.js"; // keeps the theme in step with the OS and other tabs
 import App from "./App.jsx";
 import { ClustersProvider } from "./clusters.jsx";

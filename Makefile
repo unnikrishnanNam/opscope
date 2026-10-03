@@ -4,7 +4,7 @@ IMAGE   ?= opscope
 VERSION ?= dev
 
 # Docker settings shared by the run targets:
-#   - the port is published on 127.0.0.1 only, because OpScope has no login
+#   - the port is published on 127.0.0.1 only, because Opscope has no login
 #   - saved clusters live in the "opscope-data" volume, so they survive restarts
 DOCKER_RUN = docker run --rm -p 127.0.0.1:8080:8080 -v opscope-data:/data
 

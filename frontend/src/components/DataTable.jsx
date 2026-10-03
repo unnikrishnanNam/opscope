@@ -90,7 +90,11 @@ export default function DataTable({
             <tr>
               {columns.map((col) => (
                 // Headers only take the alignment; "mono" and the rest are for the cells.
-                <th key={col.key} className={col.className?.includes("num") ? "num" : undefined} aria-sort={ariaSort(sort, col.key)}>
+                <th
+                  key={col.key}
+                  className={col.className?.includes("num") ? "num" : undefined}
+                  aria-sort={ariaSort(sort, col.key)}
+                >
                   <button type="button" className="data-table-sort" onClick={() => toggleSort(col.key)}>
                     {col.label}
                     <SortIcon direction={sort?.key === col.key ? (sort.ascending ? "up" : "down") : null} />
@@ -172,10 +176,14 @@ export default function DataTable({
 //   columns  [{ label, className }]: "num" right-aligns, "mono" for code,
 //            "nowrap" keeps a short value on one line
 //   rows     [[cell, cell, ...]]; an empty cell shows a dash
-export function SimpleTable({ columns, rows }) {
+//   label    names the table for screen readers, e.g. "Containers"
+//
+// When a table is wider than the page its box scrolls sideways; the box can
+// take keyboard focus (and has a name) so it can be scrolled without a mouse.
+export function SimpleTable({ columns, rows, label }) {
   return (
     <div className="data-table data-table-compact simple-table">
-      <div className="data-table-scroll">
+      <div className="data-table-scroll" tabIndex={0} role="region" aria-label={label}>
         <table>
           <thead>
             <tr>
