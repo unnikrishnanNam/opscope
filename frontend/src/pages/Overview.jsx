@@ -79,7 +79,14 @@ export default function Overview({ page }) {
         </Callout>
       )}
 
-      {error && (
+      {/* 403: RBAC doesn't allow it. Not a failure, so a warning, as on the list pages. */}
+      {error?.status === 403 && (
+        <Callout tone="warning" title="Opscope isn't allowed to read this cluster's resources" detail={error.detail}>
+          The Kubernetes user or service account it connects with has no permission to list them. See “Permissions” in
+          the README.
+        </Callout>
+      )}
+      {error && error.status !== 403 && (
         <Callout tone="error" title={`Couldn't load the ${page.label.toLowerCase()}`} detail={error.detail}>
           {error.message}
         </Callout>

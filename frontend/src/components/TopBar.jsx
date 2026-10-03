@@ -11,6 +11,7 @@ import "./TopBar.css";
 
 // Breadcrumbs for pages that don't belong to a cluster.
 const OTHER_PAGES = {
+  "/": [{ label: "Welcome" }], // only seen before any cluster exists; otherwise "/" opens one
   "/clusters": [{ label: "Clusters" }],
   "/clusters/add": [{ label: "Clusters", to: "/clusters" }, { label: "Add a cluster" }],
 };

@@ -2,85 +2,128 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { api } from "../api.js";
 import { useClusters } from "../clusters.jsx";
-import ErrorBox from "../components/ErrorBox.jsx";
 import Button from "../components/Button.jsx";
+import { Callout, EmptyState } from "../components/Callout.jsx";
+import { ConfirmDialog } from "../components/Dialog.jsx";
+import { PageHeader } from "../components/PageHeader.jsx";
 import { Tag } from "../components/Tag.jsx";
-import { PlusIcon } from "../components/icons.jsx";
+import { ClustersIcon, PlusIcon, TrashIcon } from "../components/icons.jsx";
+import "./Clusters.css";
 
+// Every cluster Opscope knows, whether it answers, and where it came from.
+// Clusters added in the UI can be removed (after a confirmation); ones from
+// the environment are set when Opscope starts.
 export default function ManageClusters() {
-  const { data: clusters, error, reload } = useClusters();
+  const { data: clusters, error, reload, statuses } = useClusters();
+  const [removing, setRemoving] = useState(null); // the cluster being confirmed
+  const [busy, setBusy] = useState(false);
   const [removeError, setRemoveError] = useState(null);
 
-  async function remove(cluster) {
-    if (!window.confirm(`Remove “${cluster.name}”? Opscope will delete its saved kubeconfig.`)) return;
+  function close() {
+    setRemoving(null);
+    setRemoveError(null);
+  }
+
+  async function remove() {
+    setBusy(true);
+    setRemoveError(null);
     try {
-      await api(`/clusters/${cluster.id}`, { method: "DELETE" });
-      setRemoveError(null);
+      await api(`/clusters/${encodeURIComponent(removing.id)}`, { method: "DELETE" });
       reload();
+      close();
     } catch (err) {
       setRemoveError(err);
     }
+    setBusy(false);
   }
 
   return (
-    <section>
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Clusters</h1>
-          <p className="page-about">Clusters Opscope can read from.</p>
-        </div>
-        <Button to="/clusters/add" variant="primary" icon={PlusIcon}>
-          Add a cluster
-        </Button>
-      </div>
+    <section className="cluster-page">
+      <PageHeader
+        title="Clusters"
+        description="The clusters Opscope can read from. Ones added here can be removed; ones from the environment are set when Opscope starts."
+        actions={
+          <Button to="/clusters/add" variant="primary" icon={PlusIcon}>
+            Add a cluster
+          </Button>
+        }
+      />
 
-      {error && <ErrorBox title="Couldn't load clusters" message={error.message} />}
-      {removeError && <ErrorBox title="Couldn't remove the cluster" message={removeError.message} />}
+      {error && (
+        <Callout tone="error" title="Couldn't load clusters">
+          {error.message}
+        </Callout>
+      )}
 
       {clusters?.length === 0 && (
-        <div className="empty">
-          No clusters yet. <Link to="/clusters/add">Add one</Link> or start Opscope with <code>OPSCOPE_KUBECONFIG</code>.
+        <div className="cluster-list-empty">
+          <EmptyState
+            icon={ClustersIcon}
+            title="No clusters yet"
+            action={
+              <Button to="/clusters/add" variant="primary" icon={PlusIcon}>
+                Add a cluster
+              </Button>
+            }
+          >
+            Add one with a kubeconfig, or start Opscope with <code>OPSCOPE_KUBECONFIG</code>.
+          </EmptyState>
         </div>
       )}
 
       {clusters?.length > 0 && (
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Source</th>
-              <th>Context</th>
-              <th>API server</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {clusters.map((cluster) => (
-              <tr key={cluster.id}>
-                <td>
-                  <Link to={`/c/${cluster.id}/overview`}>{cluster.name}</Link>
-                </td>
-                <td>
-                  {cluster.source === "env" ? (
-                    <Tag title="Set with OPSCOPE_KUBECONFIG">Environment</Tag>
-                  ) : (
-                    <Tag>Added in UI</Tag>
-                  )}
-                </td>
-                <td className="mono">{cluster.context}</td>
-                <td className="mono">{cluster.server}</td>
-                <td className="actions">
-                  {cluster.source === "ui" && (
-                    <Button variant="quiet" size="sm" onClick={() => remove(cluster)}>
-                      Remove
-                    </Button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <ul className="cluster-list">
+          {clusters.map((c) => (
+            <ClusterRow key={c.id} cluster={c} status={statuses[c.id]} onRemove={() => setRemoving(c)} />
+          ))}
+        </ul>
       )}
+
+      <ConfirmDialog
+        open={Boolean(removing)}
+        onCancel={close}
+        onConfirm={remove}
+        busy={busy}
+        error={removeError}
+        title={`Remove ${removing?.name}?`}
+        confirmLabel="Remove cluster"
+      >
+        Opscope will delete its saved kubeconfig for this cluster. The cluster itself isn't touched, and you can add it
+        again later.
+      </ConfirmDialog>
     </section>
+  );
+}
+
+function ClusterRow({ cluster, status, onRemove }) {
+  const tone = !status ? "checking" : status.reachable ? "ok" : "bad";
+  return (
+    <li className="cluster-row">
+      <span className={`cluster-dot cluster-dot-${tone}`} aria-hidden="true" />
+      <div className="cluster-row-main">
+        <div className="cluster-row-head">
+          <Link to={`/c/${cluster.id}/overview`} className="cluster-row-name">
+            {cluster.name}
+          </Link>
+          {cluster.source === "env" ? (
+            <Tag title="Set with OPSCOPE_KUBECONFIG or OPSCOPE_IN_CLUSTER when Opscope starts">Environment</Tag>
+          ) : (
+            <Tag>Added here</Tag>
+          )}
+        </div>
+        <div className="cluster-row-meta">
+          <span className="mono">{cluster.context}</span>
+          <span className="mono">{cluster.server}</span>
+        </div>
+      </div>
+      <span className={`cluster-row-status cluster-row-status-${tone}`}>
+        {!status ? "Checking…" : status.reachable ? `Kubernetes ${status.version}` : "Unreachable"}
+      </span>
+      <div className="cluster-row-actions">
+        {cluster.source === "ui" && (
+          <Button variant="quiet" size="sm" icon={TrashIcon} label={`Remove ${cluster.name}`} onClick={onRemove} />
+        )}
+      </div>
+    </li>
   );
 }

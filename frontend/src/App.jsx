@@ -4,7 +4,6 @@ import Layout from "./components/Layout.jsx";
 import Home from "./pages/Home.jsx";
 import ManageClusters from "./pages/ManageClusters.jsx";
 import AddCluster from "./pages/AddCluster.jsx";
-import Placeholder from "./pages/Placeholder.jsx";
 import ResourceList from "./pages/ResourceList.jsx";
 import Overview from "./pages/Overview.jsx";
 import ResourceDetail from "./pages/ResourceDetail.jsx";
@@ -18,7 +17,7 @@ const Kit = import.meta.env.DEV ? lazy(() => import("./kit/Kit.jsx")) : null;
 
 // All routes. Every page renders inside <Layout> (sidebar + top bar).
 //
-//   /                         picks a cluster, or sends you to "Add a cluster"
+//   /                         opens the first cluster, or welcomes you when there are none
 //   /clusters                 list and remove clusters
 //   /clusters/add             add a cluster
 //   /c/:clusterId/<page>      a page for one cluster, e.g. /c/lab/workloads/pods
@@ -64,9 +63,7 @@ export default function App() {
   );
 }
 
-// The overview has its own page; pages with a `resource` are tables; the
-// rest are placeholders until their phase arrives.
+// The overview has its own page; every other page is a table of one resource type.
 function pageElement(page) {
-  if (page.path === "overview") return <Overview page={page} />;
-  return page.resource ? <ResourceList page={page} /> : <Placeholder page={page} />;
+  return page.path === "overview" ? <Overview page={page} /> : <ResourceList page={page} />;
 }

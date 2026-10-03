@@ -8,7 +8,7 @@ We work the same way as before: one small phase at a time, each ending with a wo
 ticked boxes and notes at the bottom of this file. Phases are numbered **R0–R8** so they don't mix
 with the build phases 0–8.
 
-**Status (2026-10-03):** R0–R6 done; R7 next.
+**Status (2026-10-03):** R0–R7 done; R8 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -221,13 +221,13 @@ Goal: one object's page, including logs and secrets.
 
 Goal: the pages around the clusters, and a good first impression.
 
-- [ ] First run (no clusters): a welcome screen with the logo, one sentence on what Opscope does,
+- [x] First run (no clusters): a welcome screen with the logo, one sentence on what Opscope does,
       and the two ways to connect
-- [ ] Add a cluster: drop a kubeconfig file or paste it, pick a context, name it, test and save; clear
+- [x] Add a cluster: drop a kubeconfig file or paste it, pick a context, name it, test and save; clear
       progress and error states
-- [ ] Manage clusters: source, context and server per cluster, remove with the new `Dialog`
-- [ ] Not found page
-- [ ] Remove `Placeholder.jsx` (every page exists since Phase 7)
+- [x] Manage clusters: source, context and server per cluster, remove with the new `Dialog`
+- [x] Not found page
+- [x] Remove `Placeholder.jsx` (every page exists since Phase 7)
 
 ## Phase R8: Polish and publish
 
@@ -521,4 +521,35 @@ Things that come up while building, decisions made, and anything that moves betw
   toolbar and old tab rules. `legacy.css` is down to about 240 lines; what's left belongs to the
   cluster pages (R7) and the "Cordoned" tag spacing.
 - Build: JS 348 KB (109 KB gzipped), CSS 59 KB.
+
+### Phase R7
+
+- Checked in the browser against a backend with no clusters (welcome), then with three (multipass
+  from the environment, `opscope-test` and the unreachable `old-lab` added in a scratchpad
+  `DATA_DIR`), in light and dark, at 1440 px and 375 px.
+- Adding a cluster was tested end to end without typing real credentials into the browser: a
+  made-up kubeconfig with no user credentials, pointed at the kind cluster. The steps ticked off as
+  each was done, the name was suggested from the context ("demo-viewer@demo-lab" → "demo-lab"),
+  saving tested the connection and opened the new cluster. Kubernetes allows `/version` without
+  credentials but not lists, so this also showed the "not allowed" notes, which R5 couldn't. The
+  same kubeconfig pointed at an unreachable address showed the progress line and then the error,
+  with the form kept. The test cluster was then removed through the new confirm dialog.
+- First run: `/` with no clusters shows a welcome screen (inside the normal layout, with a
+  "Welcome" breadcrumb) instead of jumping to the form: the logo, what Opscope is, that it never
+  changes anything, and two cards, "Add one here" and "Or start Opscope with one"
+  (`OPSCOPE_KUBECONFIG`, `OPSCOPE_IN_CLUSTER`).
+- Add a cluster: three numbered steps joined by a line (kubeconfig, context, name), each ticked when
+  done. The kubeconfig box takes a dropped file as well as paste and "Load from file"; `DropZone`
+  passes the label and hint ids from `Field` on to the text box. While saving, a line says which
+  server is being tested and that it can take up to 10 seconds; Cancel goes back.
+- Manage clusters: a list with each cluster's status dot, name (linking to its overview), source
+  ("Environment" or "Added here"), context, server, and version or "Unreachable". Only clusters
+  added here have a remove button, which opens `ConfirmDialog` (focus on Cancel, the error shown in
+  the dialog if it fails) instead of `window.confirm`.
+- The overview now treats 403 like the list pages: a calm "isn't allowed" note, not a red error.
+- Not found: an `EmptyState` with "Go to the start".
+- Removed: `Placeholder.jsx` and the `phase` fields in `sections.js` it used, and `ErrorBox.jsx`
+  (its last users were these pages). The rules left in `legacy.css` are now unused apart from
+  `.muted`, `.mono` and `.tag-gap`; they move or go in R8 with the file.
+- Build: JS 353 KB (110 KB gzipped), CSS 63 KB.
 
