@@ -166,6 +166,43 @@ export default function DataTable({
   );
 }
 
+// SimpleTable: a small fixed table in the same style, for detail pages
+// (containers, conditions, a Service's ports). No filter or sorting, and
+// long text wraps.
+//   columns  [{ label, className }]: "num" right-aligns, "mono" for code,
+//            "nowrap" keeps a short value on one line
+//   rows     [[cell, cell, ...]]; an empty cell shows a dash
+export function SimpleTable({ columns, rows }) {
+  return (
+    <div className="data-table data-table-compact simple-table">
+      <div className="data-table-scroll">
+        <table>
+          <thead>
+            <tr>
+              {columns.map((col) => (
+                <th key={col.label} className={col.className?.includes("num") ? "num" : undefined}>
+                  {col.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, r) => (
+              <tr key={r}>
+                {row.map((cell, i) => (
+                  <td key={i} className={columns[i]?.className}>
+                    {cell === "" || cell == null ? <span className="cell-empty">–</span> : cell}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // An arrow for the sorted column; a faint up-down hint on the others (on hover).
 function SortIcon({ direction }) {
   if (direction === "up") return <ArrowUpIcon size={12} className="data-table-sort-icon is-active" />;

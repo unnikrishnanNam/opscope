@@ -8,7 +8,7 @@ We work the same way as before: one small phase at a time, each ending with a wo
 ticked boxes and notes at the bottom of this file. Phases are numbered **R0–R8** so they don't mix
 with the build phases 0–8.
 
-**Status (2026-10-03):** R0–R5 done; R6 next.
+**Status (2026-10-03):** R0–R6 done; R7 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -209,13 +209,13 @@ Goal: the pages people open most.
 
 Goal: one object's page, including logs and secrets.
 
-- [ ] Header: kind tag, name, status, namespace and age, with tabs underneath
-- [ ] Summary: `FactGrid`, owner links, containers, data, tables, conditions, labels, annotations
-- [ ] YAML tab on `CodeBlock`
-- [ ] Events tab on `EventList`
-- [ ] Logs tab: container, lines, previous run and follow controls in one toolbar; `LogView`
-- [ ] Secret keys: masked values, reveal / copy / hide per key, the base64 note
-- [ ] Checked on a crash-looping pod, a node, a Gateway, an HTTPRoute, a Secret and a ConfigMap
+- [x] Header: kind tag, name, status, namespace and age, with tabs underneath
+- [x] Summary: `FactGrid`, owner links, containers, data, tables, conditions, labels, annotations
+- [x] YAML tab on `CodeBlock`
+- [x] Events tab on `EventList`
+- [x] Logs tab: container, lines, previous run and follow controls in one toolbar; `LogView`
+- [x] Secret keys: masked values, reveal / copy / hide per key, the base64 note
+- [x] Checked on a crash-looping pod, a node, a Gateway, an HTTPRoute, a Secret and a ConfigMap
 
 ## Phase R7: Clusters and first run
 
@@ -492,4 +492,33 @@ Things that come up while building, decisions made, and anything that moves betw
   namespace selected, in light and dark, at 375 px and 1440 px.
 - `StatTile` was removed (component, CSS and its `/kit` demo), since nothing uses it any more.
 - Build: JS 346 KB (108 KB gzipped), CSS 56 KB.
+
+### Phase R6
+
+- Checked on multipass at 1440 px: a crash-looping pod (summary, YAML, events, current and previous
+  logs), a running pod's logs while following (new lines arrived and stayed in view), a node, a
+  Gateway, an HTTPRoute, a Deployment (containers from its template), a Secret and a ConfigMap. On
+  `opscope-test`: the Opscope pod itself, with its logs. Also dark mode and 375 px.
+- Secrets were tested by revealing `tls.crt` of a TLS secret only (a certificate is public by
+  design); the other keys stayed masked.
+- Header: `PageHeader` with the kind tag, name and status. The namespace links to the list filtered
+  to it, and the age shows the exact time on hover. Below it, `Tabs` with the event count; the open
+  tab is still in the URL (`?tab=logs`).
+- Summary: facts in a card, then sections (containers, data, kind-specific tables, conditions,
+  labels, annotations), each with its count. Detail tables use the new `SimpleTable` (in
+  `DataTable.jsx`): the same look as the list tables, no filter or sorting, and text wraps.
+- Container images only wrap after `/`, `:` or `@` (`BreakAt`), so a tag like `v2.13.0` never
+  splits.
+- ConfigMap values and the YAML tab use `CodeBlock`; Secret YAML still says its values are hidden.
+- Logs: container (a picker only when there's more than one), lines, previous run, wrap lines,
+  follow (a switch), refresh, above a `LogView` sized to the window. Turning on "previous run" stops
+  following, since a finished run has nothing to follow.
+- Secret keys: a bordered list, a row per key with Reveal/Hide; a revealed value appears in a
+  `CodeBlock` with its own copy button.
+- Fixed while checking: at 375 px a long object name in the top bar's breadcrumb pushed the page
+  3 px wide. The breadcrumb now shrinks and cuts the name off with "…".
+- Removed: `EventsTable.jsx`, and from `legacy.css` the detail page, secret keys, log, picker, table
+  toolbar and old tab rules. `legacy.css` is down to about 240 lines; what's left belongs to the
+  cluster pages (R7) and the "Cordoned" tag spacing.
+- Build: JS 348 KB (109 KB gzipped), CSS 59 KB.
 

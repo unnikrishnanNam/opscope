@@ -75,3 +75,8 @@
   font-weight: var(--weight-title);
   letter-spacing: 0;
 }
+
+/* A card without a header has even padding all round. */
+.card:not(:has(> .card-header)) > .card-body {
+  padding-top: var(--space-4);
+}

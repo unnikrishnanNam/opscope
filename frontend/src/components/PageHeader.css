@@ -1,5 +1,10 @@
 /* Breadcrumbs */
 
+/* min-width: 0 lets it shrink in a flex row, so a long name gets "…". */
+.breadcrumbs {
+  min-width: 0;
+}
+
 .breadcrumbs ol {
   display: flex;
   align-items: center;
