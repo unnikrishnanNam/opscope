@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -9,6 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"opscope/internal/clusters"
 	"opscope/internal/metrics"
@@ -70,5 +74,24 @@ func TestUnknownResourceIs404(t *testing.T) {
 
 	if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), "unknown resource type") {
 		t.Fatalf("got %d %s, want 404 unknown resource type", rec.Code, rec.Body.String())
+	}
+}
+
+func TestClusterErrorsKeepTheirMeaning(t *testing.T) {
+	cluster := &clusters.Cluster{Server: "https://example:6443"}
+	tests := []struct {
+		err  error
+		want int
+	}{
+		{apierrors.NewForbidden(schema.GroupResource{Resource: "secrets"}, "", errors.New("RBAC")), http.StatusForbidden},
+		{apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, "web"), http.StatusNotFound},
+		{errors.New("connection refused"), http.StatusBadGateway},
+	}
+	for _, tt := range tests {
+		rec := httptest.NewRecorder()
+		writeClusterError(rec, tt.err, cluster)
+		if rec.Code != tt.want {
+			t.Errorf("%v: status %d, want %d", tt.err, rec.Code, tt.want)
+		}
 	}
 }

@@ -129,13 +129,16 @@ func findCluster(w http.ResponseWriter, r *http.Request, manager *clusters.Manag
 }
 
 // writeClusterError reports a failed call to a cluster with a readable
-// explanation and the original error as detail. "Not found" from the cluster
-// becomes a 404; anything else is a 502 (we're a gateway to the cluster,
-// and the cluster's side failed).
+// explanation and the original error as detail. "Not found" and "forbidden"
+// from the cluster keep their meaning (404, 403); anything else is a 502
+// (we're a gateway to the cluster, and the cluster's side failed).
 func writeClusterError(w http.ResponseWriter, err error, cluster *clusters.Cluster) {
 	status := http.StatusBadGateway
-	if apierrors.IsNotFound(err) {
+	switch {
+	case apierrors.IsNotFound(err):
 		status = http.StatusNotFound
+	case apierrors.IsForbidden(err):
+		status = http.StatusForbidden // e.g. RBAC doesn't allow reading Secrets
 	}
 	writeErrorDetail(w, status, clusters.Explain(err, cluster.Server), err.Error())
 }

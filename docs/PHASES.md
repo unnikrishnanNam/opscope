@@ -7,6 +7,9 @@ Docker image.
 We build it one phase at a time. Each phase ends with a working app and a short review.
 After a phase is done, we come back here, tick the boxes, and note anything that changed.
 
+**Status (2026-10-03):** all phases (0–8) are done. Ideas that were deliberately left out are
+collected under [Possible next steps](#possible-next-steps) at the end.
+
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
 ---
@@ -17,7 +20,8 @@ After a phase is done, we come back here, tick the boxes, and note anything that
 - **Keep it boring.** Use the Go standard library where possible, plain CSS, and few dependencies.
   Every file should make sense to someone learning the stack.
 - **One image.** The Go binary serves the API (`/api/*`) and the built React app (everything else).
-- **No built-in cluster.** Clusters come from the environment or are added in the UI. Every cluster endpoint lives under `/api/clusters/{id}/`.
+- **No built-in cluster.** Clusters come from the environment (a kubeconfig file, or the pod's service
+  account when running in a cluster) or are added in the UI. Every cluster endpoint lives under `/api/clusters/{id}/`.
 - **Fail clearly.** If the cluster or metrics-server can't be reached, show a plain message, not a blank screen.
 
 ---
@@ -133,7 +137,7 @@ Goal: cover the remaining common resource types.
 - [x] ConfigMaps: name, namespace, number of keys, age
 - [x] Secrets: name, namespace, type, number of keys, age
 - [x] Secret values hidden by default; revealing a value is an explicit click per key
-      (click a secret's name to open its keys; `GET /api/clusters/{id}/secrets/{namespace}/{name}/{key}`)
+      (`GET /api/clusters/{id}/secrets/{namespace}/{name}/{key}`; since Phase 6 the keys are on the Secret's detail page)
 - [x] The secrets list never contains values (tested on the JSON); the value endpoint sends `Cache-Control: no-store`
 - [x] Binary secret values are shown as base64 and labelled as such
 - [x] Services: name, namespace, type, cluster IP, external IP, ports, age
@@ -177,7 +181,7 @@ Goal: click any row to see more about it.
 - [x] `GET /api/clusters/{id}/{resource}/{namespace}/{name}` returns details for one object
       (and `/{resource}/{name}` for cluster-wide kinds like nodes)
 - [x] Every kind is fetched the same way, with the dynamic client; kind-specific sections convert to typed structs
-- [x] Detail panel: metadata, labels, annotations, owner references
+- [x] Detail page (a route, not a panel): metadata, labels, annotations, owner references
 - [x] Type-specific sections (containers for pods, replica info for deployments, keys for ConfigMaps, ...)
 - [x] YAML view (read-only, with managed fields removed)
 - [x] Secrets: YAML values replaced with a placeholder, and the `last-applied-configuration` annotation dropped
@@ -211,17 +215,22 @@ Goal: basic live CPU and memory numbers.
 
 Goal: OpScope can run inside the cluster it watches.
 
-- [ ] In-cluster mode: with `OPSCOPE_IN_CLUSTER=true`, use the pod's service account as a cluster
+- [x] In-cluster mode: with `OPSCOPE_IN_CLUSTER=true`, use the pod's service account as a cluster
       "from environment" (moved here from Phase 1, since it only matters when running inside a cluster)
-- [ ] Kubernetes manifests: Namespace, ServiceAccount, read-only ClusterRole + binding, Deployment, Service
-- [ ] The ClusterRole covers everything OpScope reads, including Gateway API (`gateway.networking.k8s.io`),
+- [x] Kubernetes manifests: Namespace, ServiceAccount, read-only ClusterRole + binding, Deployment, Service
+      (`deploy/kubernetes/opscope.yaml`)
+- [x] The ClusterRole covers everything OpScope reads, including Gateway API (`gateway.networking.k8s.io`),
       metrics (`metrics.k8s.io`) and Secrets. Reading Secrets is called out in the README so it's a
       conscious choice; it can be removed if the reveal feature isn't wanted
-- [ ] Health and readiness probes using `/api/health`
-- [ ] Image runs as a non-root user with a read-only filesystem
-- [ ] Graceful shutdown on SIGTERM
-- [ ] README: run with Docker, run in a cluster, required permissions
-- [ ] Final pass over this document
+      (Secrets get their own ClusterRole in `deploy/kubernetes/secrets-access.yaml`, so removing access
+      is one `kubectl delete -f`)
+- [x] Health and readiness probes using `/api/health`
+- [x] Image runs as a non-root user with a read-only filesystem (plus no capabilities, no privilege
+      escalation, default seccomp profile; only `/data` is writable)
+- [x] Graceful shutdown on SIGTERM (stop accepting connections, up to 10 seconds for running requests)
+- [x] RBAC refusals return 403 with "this user isn't allowed to read this" (they were 502 before)
+- [x] README: run with Docker, run in a cluster, required permissions
+- [x] Final pass over this document
 
 ---
 
@@ -403,3 +412,45 @@ Things that came up while building, decisions made, and anything that moved betw
 - The collector logs failures at Debug level only: unreachable clusters and clusters without
   metrics-server are normal and would otherwise fill the log every 15 seconds.
 - Fixed: node names on the overview (links since Phase 6) were underlined like plain browser links.
+
+### Phase 8
+
+- Deployed the real image to the `opscope-test` kind cluster (`kind load docker-image`, then
+  `kubectl apply -f deploy/kubernetes/`) and used it through `kubectl port-forward`:
+  - it started with the service account as "this cluster" and nothing configured by hand
+  - every list, the overview, a pod's detail page and logs, and a secret reveal worked through the
+    real RBAC rules; Gateway API and metrics correctly reported "not installed" / "unavailable"
+  - deleting `secrets-access.yaml` turned the Secrets pages into "isn't allowed to read this"
+    (now a 403) while everything else kept working; re-applying it brought them back
+  - a `rollout restart` showed the old pod logging "shutting down" → "stopped" and disappearing
+    within 2 seconds
+- The image was also checked with `docker run --read-only` (only `/data` writable): it runs, and
+  adding a cluster writes to `/data` without errors.
+- Shutdown was timed locally: with no open requests OpScope exits at once; with a followed log
+  stream open it waits the full 10 seconds, then closes the stream. Ending streams immediately would
+  mean cancelling every in-flight request as soon as shutdown starts, so the simpler behaviour stays;
+  10 seconds fits well within Kubernetes' default 30-second grace period.
+- Client creation was split into `newClients` (from a kubeconfig) and `clientsFor` (from any
+  connection settings), so in-cluster mode reuses the same three clients.
+- OpScope runs as a single replica: the usage history lives in memory, and two copies would each
+  keep their own.
+- The README was rewritten as one document for the finished project: what it shows, three ways to
+  connect, security notes in one place, running in a cluster, and a permissions table.
+
+---
+
+## Possible next steps
+
+Things that were considered and deliberately left out, roughly from most to least useful:
+
+- **Authentication.** OpScope has no login, which is why it stays on `127.0.0.1` or behind a
+  port-forward. An auth proxy (for example oauth2-proxy) in front of it is the usual answer.
+- **More Gateway API kinds:** GRPCRoute, TLSRoute, ReferenceGrant, BackendTLSPolicy (same pattern as
+  `gatewayapi.go`).
+- **Persistent storage in the cluster:** swap the `emptyDir` at `/data` for a PersistentVolumeClaim
+  so clusters added in the UI survive pod restarts.
+- **Faster overview on big clusters:** run its list calls in parallel instead of one after another.
+- **Dark theme:** the colours are already tokens at the top of `styles.css`.
+- **Embedding the frontend** in the Go binary with `go:embed` instead of serving a folder.
+- **Watching instead of polling,** with client-go informers and a push channel to the browser. More
+  efficient, but a lot more moving parts for a learning project.

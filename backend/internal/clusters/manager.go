@@ -19,6 +19,7 @@ import (
 
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -96,6 +97,40 @@ func (m *Manager) LoadFromFile(path, contextName, name string) (*Cluster, error)
 		Name:    name,
 		Source:  SourceEnv,
 		Context: config.CurrentContext,
+		Server:  server,
+		Client:  clients.kube,
+		Dynamic: clients.dyn,
+		Stream:  clients.stream,
+	}
+	m.mu.Lock()
+	m.clusters[cluster.ID] = cluster
+	m.mu.Unlock()
+	return cluster, nil
+}
+
+// LoadInCluster adds the cluster OpScope is running in, using the pod's
+// service account. Kubernetes mounts its token and CA into every pod (at
+// /var/run/secrets/kubernetes.io/serviceaccount) and sets KUBERNETES_SERVICE_HOST,
+// which is what rest.InClusterConfig reads. What OpScope may see is then
+// decided by the RBAC rules bound to that service account.
+func (m *Manager) LoadInCluster(name string) (*Cluster, error) {
+	restConfig, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("not running inside a Kubernetes pod (or no service account mounted): %w", err)
+	}
+	clients, server, err := clientsFor(restConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	if name == "" {
+		name = "in-cluster"
+	}
+	cluster := &Cluster{
+		ID:      slugify(name),
+		Name:    name,
+		Source:  SourceEnv,
+		Context: "(service account)",
 		Server:  server,
 		Client:  clients.kube,
 		Dynamic: clients.dyn,

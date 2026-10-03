@@ -2,31 +2,39 @@
 
 A small, read-only Kubernetes dashboard. Go backend, React frontend, one Docker image.
 
-The project is built in phases; see [docs/PHASES.md](docs/PHASES.md) for the plan and progress.
+It shows nodes, workloads (Pods, Deployments, StatefulSets, DaemonSets, Jobs, CronJobs), config
+(ConfigMaps, Secrets), networking (Services, Ingresses, and Gateway API Gateways, HTTPRoutes and
+GatewayClasses), a cluster overview with recent warnings, a detail page for every object (summary,
+YAML, events, pod logs), and live CPU and memory usage from metrics-server. It never changes
+anything in a cluster.
+
+The project was built in phases as a learning project; [docs/PHASES.md](docs/PHASES.md) has the
+plan, what each phase delivered, and the decisions made along the way.
 
 ## Layout
 
 ```
 backend/                  Go server
-  main.go                 entry point: reads env vars, loads clusters, starts the server
-  internal/clusters/      known clusters: from env or added in the UI, one client each
-  internal/resources/     one file per resource type: lists it and flattens it into table rows
-                          (gatewayapi.go reads Gateway API custom resources with the dynamic client)
+  main.go                 entry point: reads env vars, loads clusters, serves, shuts down cleanly
+  internal/clusters/      known clusters (environment, in-cluster, added in the UI), clients for each
+  internal/resources/     one file per resource type: lists it and flattens it into table rows;
+                          detail.go builds detail pages, gatewayapi.go reads Gateway API resources
   internal/metrics/       live usage from metrics-server, and the in-memory history
   internal/server/        HTTP routes, middleware, static file serving
 frontend/                 React app (Vite, plain JavaScript)
   src/api.js              fetch helper and the useApi hook
   src/clusters.jsx        shared list of clusters (React context)
   src/columns.jsx         table columns for each resource type
-  src/format.js           ages and durations, kubectl style
+  src/format.js           ages, durations, sizes, kubectl style
   src/sections.js         list of pages; drives the sidebar and the routes
-  src/components/         shared pieces (layout, sidebar, top bar, tables, status badges)
+  src/components/         shared pieces (layout, tables, status badges, logs, usage charts)
   src/pages/              one file per page
   src/styles.css          all styles; design tokens at the top
+deploy/kubernetes/        manifests for running OpScope inside a cluster
 data/                     local data (git- and docker-ignored): kubeconfigs, saved clusters
 Dockerfile                builds the single image
 Makefile                  common commands
-docs/PHASES.md            build plan and progress
+docs/PHASES.md            build plan, progress and notes
 ```
 
 ## Requirements
@@ -34,23 +42,36 @@ docs/PHASES.md            build plan and progress
 - Go 1.26+
 - Node.js 24+
 - Docker (for the image)
+- metrics-server in the cluster, for usage numbers (optional)
 
 ## Connecting clusters
 
-OpScope has no built-in cluster and never reads `~/.kube/config` on its own. There are two ways
+OpScope has no built-in cluster and never reads `~/.kube/config` on its own. There are three ways
 to give it one:
 
-1. **From the environment.** Set `OPSCOPE_KUBECONFIG` to a kubeconfig file. That cluster is
-   loaded at startup and marked "Environment" in the UI. Any kubeconfig works here, including
-   ones that log in through a command (cloud CLI plugins).
-2. **From the UI.** Open *Clusters → Add a cluster*, paste or upload a kubeconfig and pick a
+1. **From a kubeconfig file.** Set `OPSCOPE_KUBECONFIG` to the file. That cluster is loaded at
+   startup and marked "Environment" in the UI. Any kubeconfig works here, including ones that log
+   in through a command (cloud CLI plugins).
+2. **From inside the cluster.** Set `OPSCOPE_IN_CLUSTER=true` when OpScope runs as a pod. It then
+   uses its pod's service account, and sees whatever that account's RBAC rules allow. See
+   [Run in a Kubernetes cluster](#run-in-a-kubernetes-cluster).
+3. **From the UI.** Open *Clusters → Add a cluster*, paste or upload a kubeconfig and pick a
    context. OpScope tests the connection and saves only that context to `DATA_DIR/clusters/`
    (files readable only by OpScope). For safety, kubeconfigs added this way must have their
    credentials embedded and can't run login commands. `kubectl config view --minify --flatten`
    prints a suitable copy of your current context.
 
-> **OpScope has no login.** Anyone who can open the page can read every cluster it knows.
-> Keep it on `127.0.0.1` (the Makefile does) or behind something that adds authentication.
+## Security notes
+
+- **OpScope has no login.** Anyone who can open the page can read everything OpScope can read, in
+  every cluster it knows. Keep it on `127.0.0.1` (the Makefile does), reach it with
+  `kubectl port-forward` when it runs in a cluster, or put something that adds authentication in
+  front of it.
+- **Secrets** are listed by key name only. A value is fetched only when you click "Reveal" on one
+  key, and is sent with `Cache-Control: no-store`. Secret YAML has every value replaced with
+  `(hidden, about N bytes)` and leaves out kubectl's `last-applied-configuration` annotation,
+  which would otherwise contain the values.
+- **Logs** are sent with `Cache-Control: no-store`, since they can contain sensitive data.
 
 ## Run in development
 
@@ -114,55 +135,111 @@ docker network connect kind <opscope-container>
 
 When OpScope runs directly on your machine (`make dev-backend`), the normal kubeconfig works.
 
+## Run in a Kubernetes cluster
+
+The manifests in `deploy/kubernetes/` run OpScope as a pod that shows the cluster it runs in:
+
+- `opscope.yaml`: a namespace, a service account, a read-only ClusterRole and its binding, the
+  Deployment and a ClusterIP Service
+- `secrets-access.yaml`: an optional second ClusterRole for Secrets (see below)
+
+The image has to be available to the cluster. Push `opscope:dev` to a registry your cluster can
+pull from and change `image:` in `opscope.yaml`, or, for kind, load it straight into the nodes:
+
+```bash
+make docker-build
+```
+
+```bash
+kind load docker-image opscope:dev --name <cluster>
+```
+
+Then apply the manifests and open it through a port-forward:
+
+```bash
+kubectl apply -f deploy/kubernetes/
+```
+
+```bash
+kubectl -n opscope port-forward svc/opscope 8080:80
+```
+
+Open http://localhost:8080. The cluster appears as "this cluster".
+
+The pod runs as a non-root user with a read-only root filesystem, no Linux capabilities and the
+default seccomp profile. It only writes to `/data` (an `emptyDir`, so clusters added in the UI
+are lost when the pod is replaced; use a PersistentVolumeClaim to keep them). Liveness and
+readiness probes use `/api/health`. On SIGTERM, OpScope stops taking new connections and gives
+running requests up to 10 seconds to finish (open log streams are closed after that).
+
+### Permissions
+
+OpScope only ever uses `get` and `list`:
+
+| API group                   | Resources                                               | Why                    |
+| --------------------------- | ------------------------------------------------------- | ---------------------- |
+| core (`""`)                 | namespaces, nodes, pods, services, configmaps, events   | lists and details      |
+| core (`""`)                 | pods/log (`get`)                                        | the Logs tab           |
+| `apps`                      | deployments, statefulsets, daemonsets                   | workloads              |
+| `batch`                     | jobs, cronjobs                                          | workloads              |
+| `networking.k8s.io`         | ingresses                                               | networking             |
+| `gateway.networking.k8s.io` | gateways, httproutes, gatewayclasses                    | Gateway API (optional) |
+| `metrics.k8s.io`            | nodes, pods                                             | CPU and memory usage   |
+| core (`""`)                 | secrets (separate role, `secrets-access.yaml`)          | Secrets pages, Reveal  |
+
+**Reading Secrets is a conscious choice.** With `secrets-access.yaml` applied, the OpScope pod can
+read every Secret in the cluster, and so can anyone who can reach OpScope. To turn it off:
+
+```bash
+kubectl delete -f deploy/kubernetes/secrets-access.yaml
+```
+
+The Secrets pages then say "this user isn't allowed to read this", and everything else keeps working.
+
 ## Configuration
 
-| Variable                 | Default              | What it does                                                   |
-| ------------------------ | -------------------- | -------------------------------------------------------------- |
-| `PORT`                 | `8080`             | Port the server listens on                                     |
-| `STATIC_DIR`           | `../frontend/dist` | Folder with the built React app                                |
-| `DATA_DIR`             | `../data`          | Where clusters added in the UI are saved (`/data` in Docker) |
-| `OPSCOPE_KUBECONFIG`   | (none)               | Kubeconfig file for a cluster loaded at startup                |
-| `OPSCOPE_CONTEXT`      | current context      | Which context of that file to use                              |
-| `OPSCOPE_CLUSTER_NAME` | context name         | Display name for that cluster                                  |
+| Variable               | Default            | What it does                                                    |
+| ---------------------- | ------------------ | --------------------------------------------------------------- |
+| `PORT`                 | `8080`             | Port the server listens on                                      |
+| `STATIC_DIR`           | `../frontend/dist` | Folder with the built React app (`/app/web` in the image)       |
+| `DATA_DIR`             | `../data`          | Where clusters added in the UI are saved (`/data` in the image) |
+| `OPSCOPE_KUBECONFIG`   | (none)             | Kubeconfig file for a cluster loaded at startup                 |
+| `OPSCOPE_CONTEXT`      | current context    | Which context of that file to use                               |
+| `OPSCOPE_IN_CLUSTER`   | (off)              | `true`: use the pod's service account (when running in a pod)   |
+| `OPSCOPE_CLUSTER_NAME` | context name       | Display name for the environment or in-cluster cluster          |
 
 ## API
 
-| Method | Path                              | Returns                                                             |
-| ------ | --------------------------------- | ------------------------------------------------------------------- |
-| GET    | `/api/health`                   | `{"status":"ok","version":"..."}`                                 |
-| GET    | `/api/clusters`                 | All clusters (id, name, source, context, server)                    |
-| POST   | `/api/clusters/inspect`         | Contexts in a kubeconfig:`{"kubeconfig": "..."}`                  |
-| POST   | `/api/clusters`                 | Add a cluster:`{"name", "kubeconfig", "context"}`                 |
-| GET    | `/api/clusters/{id}`            | Cluster plus`reachable`, `version`, or `error` and `detail` |
-| DELETE | `/api/clusters/{id}`            | Remove a cluster added in the UI                                    |
-| GET    | `/api/clusters/{id}/{resource}` | Rows for one resource type; `?namespace=` to limit to one namespace |
-| GET    | `/api/clusters/{id}/overview`   | Counts, node health and pods by status; `?namespace=` limits the namespaced counts |
-| GET    | `/api/clusters/{id}/secrets/{namespace}/{name}/{key}` | One secret value: `{"value", "base64"}`; sent with `Cache-Control: no-store` |
-| GET    | `/api/clusters/{id}/{resource}/{namespace}/{name}` | One object: summary fields, containers, conditions, tables, events, YAML |
-| GET    | `/api/clusters/{id}/{resource}/{name}` | The same for cluster-wide kinds (nodes, namespaces, gatewayclasses) |
-| GET    | `/api/clusters/{id}/pods/{namespace}/{name}/logs` | Plain-text logs; `?container=`, `?tail=` (default 500, max 10000), `?previous=true`, `?follow=true` streams |
-| GET    | `/api/clusters/{id}/metrics/nodes` | Usage per node vs allocatable, cluster total, and 15 minutes of history |
-| GET    | `/api/clusters/{id}/metrics/pods` | Usage per pod (containers summed); `?namespace=` |
+All endpoints are `GET` unless noted.
+
+| Path                                                   | Returns                                                                         |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| `/api/health`                                          | `{"status":"ok","version":"..."}`                                               |
+| `/api/clusters`                                        | All clusters (id, name, source, context, server)                                |
+| `POST /api/clusters/inspect`                           | Contexts in a kubeconfig: `{"kubeconfig": "..."}`                               |
+| `POST /api/clusters`                                   | Add a cluster: `{"name", "kubeconfig", "context"}`                              |
+| `/api/clusters/{id}`                                   | Cluster plus `reachable`, `version`, or `error` and `detail`                    |
+| `DELETE /api/clusters/{id}`                            | Remove a cluster added in the UI                                                |
+| `/api/clusters/{id}/{resource}`                        | Rows for one resource type; `?namespace=` limits to one namespace               |
+| `/api/clusters/{id}/overview`                          | Counts, node health and pods by status; `?namespace=` limits namespaced counts  |
+| `/api/clusters/{id}/{resource}/{namespace}/{name}`     | One object: fields, containers, conditions, tables, events, YAML                |
+| `/api/clusters/{id}/{resource}/{name}`                 | The same for cluster-wide kinds (nodes, namespaces, gatewayclasses)             |
+| `/api/clusters/{id}/secrets/{namespace}/{name}/{key}`  | One secret value: `{"value", "base64"}`                                         |
+| `/api/clusters/{id}/pods/{namespace}/{name}/logs`      | Plain-text logs; `?container=`, `?tail=` (default 500, max 10000), `?previous=true`, `?follow=true` streams |
+| `/api/clusters/{id}/metrics/nodes`                     | Usage per node vs allocatable, cluster total, and 15 minutes of history         |
+| `/api/clusters/{id}/metrics/pods`                      | Usage per pod (containers summed); `?namespace=`                                |
 
 `{resource}` is one of `namespaces`, `nodes`, `events`, `pods`, `deployments`, `statefulsets`,
 `daemonsets`, `jobs`, `cronjobs`, `configmaps`, `secrets`, `services`, `ingresses`, `gateways`,
 `httproutes` or `gatewayclasses` (see `backend/internal/resources/resources.go`). Events are
 returned newest first (at most 100) and accept `?type=Warning` or `?type=Normal`.
 
-Live usage needs [metrics-server](https://github.com/kubernetes-sigs/metrics-server) in the cluster.
-Without it, the metrics endpoints answer `404` with `"code": "metrics_unavailable"` and the UI shows
-how to install it. OpScope samples every cluster every 15 seconds in the background and keeps the
-last 15 minutes in memory for the sparklines; the history starts empty after a restart.
+Errors look like `{"error": "readable message", "detail": "original error"}`. A cluster's "not
+found" and "forbidden" keep their status (404, 403); other cluster failures are 502. Two optional
+features answer `404` with a `code` instead of failing:
 
-Gateway API types are read with client-go's dynamic client (`gateway.networking.k8s.io/v1`). On a
-cluster without Gateway API they answer `404` with `"code": "not_installed"`, and the overview's
-`gatewayAPI` field is `null`.
+- `"code": "not_installed"`: the cluster has no Gateway API (`gateway.networking.k8s.io/v1`)
+- `"code": "metrics_unavailable"`: the cluster has no working metrics-server
 
-Secret detail pages show key names too; their YAML has every value replaced with
-`(hidden, about N bytes)` and leaves out kubectl's `last-applied-configuration` annotation,
-which would otherwise contain the values.
-
-The secrets list only ever contains key names. A value is sent only by the endpoint above, one key
-at a time, when someone clicks "Reveal" in the UI.
-
-Errors look like `{"error": "readable message", "detail": "original error"}`.
+OpScope samples every cluster's usage every 15 seconds in the background and keeps the last
+15 minutes in memory for the sparklines; that history starts empty after a restart.

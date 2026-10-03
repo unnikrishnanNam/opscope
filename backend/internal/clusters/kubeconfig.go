@@ -117,7 +117,12 @@ func newClients(config *clientcmdapi.Config) (clientSet, string, error) {
 	if err != nil {
 		return clientSet{}, "", fmt.Errorf("can't build a client from this kubeconfig: %w", err)
 	}
+	return clientsFor(restConfig)
+}
 
+// clientsFor builds the clients from connection settings, wherever they came
+// from: a kubeconfig, or the pod's own service account (in-cluster mode).
+func clientsFor(restConfig *rest.Config) (clientSet, string, error) {
 	// The stream client is a copy made before the timeout is set: a timeout
 	// covers the whole response, which would cut a log stream after 10 seconds.
 	// Streams end instead when the browser goes away (the request context).
@@ -125,6 +130,7 @@ func newClients(config *clientcmdapi.Config) (clientSet, string, error) {
 	restConfig.Timeout = requestTimeout
 
 	var c clientSet
+	var err error
 	if c.kube, err = kubernetes.NewForConfig(restConfig); err != nil {
 		return clientSet{}, "", err
 	}
