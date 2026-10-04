@@ -6,8 +6,9 @@ It shows nodes, workloads (Pods, Deployments, StatefulSets, DaemonSets, Jobs, Cr
 (ConfigMaps, Secrets), networking (Services, Ingresses, and Gateway API Gateways, HTTPRoutes and
 GatewayClasses), a cluster overview with what needs attention and recent warnings, a detail page
 for every object (summary, YAML, events, pod logs), and live CPU and memory usage from
-metrics-server. It has light and dark themes, works on a phone, and never changes anything in a
-cluster.
+metrics-server. A ⌘K command palette finds any page or object by name, and keyboard shortcuts get
+around without the mouse. It has light and dark themes, works on a phone, and never changes anything
+in a cluster.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overview-dark.png">
@@ -20,7 +21,8 @@ cluster.
 
 The project was built in phases as a learning project; [docs/PHASES.md](docs/PHASES.md) has the
 plan, what each phase delivered, and the decisions made along the way. The interface was then
-redesigned in its own phases, recorded in [docs/UI-REDESIGN.md](docs/UI-REDESIGN.md).
+redesigned in its own phases, recorded in [docs/UI-REDESIGN.md](docs/UI-REDESIGN.md), and the
+command palette added in [docs/COMMAND-PALETTE.md](docs/COMMAND-PALETTE.md).
 
 ## Layout
 
@@ -35,10 +37,15 @@ backend/                  Go server
 frontend/                 React app (Vite, plain JavaScript)
   src/api.js              fetch helper and the useApi hook
   src/clusters.jsx        shared list of clusters (React context)
+  src/commands/           the command registry behind the palette and the shortcuts: matching,
+                          the sources of global commands (sources/), keyboard shortcuts
   src/columns.jsx         table columns for each resource type
   src/format.js           ages, durations, sizes, kubectl style
-  src/sections.js         list of pages (with their icons); drives the sidebar and the routes
+  src/sections.js         list of pages (with their icons, short names and shortcuts); drives the
+                          sidebar, the routes and the palette's "Go to" and object search
   src/theme.js            light, dark or follow the system; remembered in the browser
+  src/toast.js            short confirmations at the bottom of the window ("Copied …")
+  src/kubectl.js          read-only kubectl lines for one object, for copying
   src/styles/tokens.css   design tokens: colours for both themes, type, spacing, radius, motion
   src/styles/base.css     page-wide basics: fonts, links, focus ring, reduced motion
   src/components/         shared pieces, each with its own CSS file (buttons, tables, pickers,
@@ -52,6 +59,7 @@ Dockerfile                builds the single image (for any platform; CI builds a
 Makefile                  common commands
 docs/PHASES.md            build plan, progress and notes
 docs/UI-REDESIGN.md       the interface redesign: design rules, phases and notes
+docs/COMMAND-PALETTE.md   the command palette and shortcuts: design, phases and notes
 docs/screenshots/         the pictures in this README
 ```
 
@@ -78,6 +86,51 @@ to give it one:
    (files readable only by Opscope). For safety, kubeconfigs added this way must have their
    credentials embedded and can't run login commands. `kubectl config view --minify --flatten`
    prints a suitable copy of your current context.
+
+## Command palette and shortcuts
+
+Press ⌘K (Ctrl+K on Windows and Linux), or the search box in the top bar, and type:
+
+- a page ("pods", or kubectl's short names: "po", "svc", "cm")
+- an object's name, of any kind ("argocd-server"); start with a kind to search only that kind
+  ("po api", "gtw main"). Objects in the selected namespace come first
+- a namespace ("kube-system"), another cluster ("switch to"), or the theme
+- what the current page can do: open a tab, copy the name, the YAML or a kubectl line (`get`,
+  `describe`, `logs`; read-only commands only), follow logs, go to the owner or the node
+
+Enter runs the highlighted command, ⌘/Ctrl+Enter opens a link in a new tab, and Escape clears the
+box, then closes. Recently used commands come first when nothing is typed.
+
+Without the palette:
+
+| Keys                         | Does                                                  |
+| ---------------------------- | ----------------------------------------------------- |
+| `g` then `o` `n` `p` `d` `s` | Overview, Nodes, Pods, Deployments, Services          |
+| `g` then `c`                 | Manage clusters                                       |
+| `1` `2` `3` `4`              | An object's Summary, YAML, Events and Logs tabs       |
+| `/`                          | The list's filter                                     |
+| `?`                          | Every shortcut that works on the current page         |
+
+Shortcuts are ignored while typing in a field.
+
+### Adding commands
+
+Every command comes from one registry (`frontend/src/commands/`), which feeds the palette, the
+shortcuts and the `?` help. A command is a plain object (`id`, `title`, `group`, `icon`, and a link
+`to`, an action `run` or a sub-list `items`, plus optional `shortcut` and search words); the shapes
+are documented at the top of `commands/registry.jsx`.
+
+| You add…                                            | You do…                                                        |
+| --------------------------------------------------- | -------------------------------------------------------------- |
+| a page in `sections.js`                             | nothing: "Go to" and its objects in search come with it; add `aliases` for short names and `shortcut` for a key |
+| a resource to the backend's `Listers`               | nothing: it's in `/names`, so its objects can be found once it has a page |
+| a command that works on any page                    | a file in `commands/sources/` and one line in `commands/index.js` |
+| a command that belongs to one page or component     | `useCommands("id", [...commands], [deps])` in that component  |
+| a key for any of these                              | `shortcut: "g x"` (or one key) on the command                  |
+
+`ctx`, what every command can read and do (the cluster, the namespace, `navigate`, …), is built in
+`commands/context.js`. Matching, ranking and the shortcut logic are plain functions with tests
+(`npm test` in `frontend/`, or `make test` for everything).
 
 ## Security notes
 
@@ -273,6 +326,7 @@ All endpoints are `GET` unless noted.
 | `DELETE /api/clusters/{id}`                            | Remove a cluster added in the UI                                                |
 | `/api/clusters/{id}/{resource}`                        | Rows for one resource type; `?namespace=` limits to one namespace               |
 | `/api/clusters/{id}/overview`                          | Counts, node health and pods by status; `?namespace=` limits namespaced counts  |
+| `/api/clusters/{id}/names`                             | Every object's kind, namespace and name (for search), and kinds `skipped`       |
 | `/api/clusters/{id}/{resource}/{namespace}/{name}`     | One object: fields, containers, conditions, tables, events, YAML                |
 | `/api/clusters/{id}/{resource}/{name}`                 | The same for cluster-wide kinds (nodes, namespaces, gatewayclasses)             |
 | `/api/clusters/{id}/secrets/{namespace}/{name}/{key}`  | One secret value: `{"value", "base64"}`                                         |

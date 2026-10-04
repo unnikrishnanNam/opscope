@@ -47,12 +47,14 @@ export default function ClusterSwitcher({ clusters, value, onChange, manageTo = 
   );
 }
 
-function StatusDot({ status }) {
+// StatusDot and statusText describe one cluster's status (also used by the
+// command palette's cluster commands).
+export function StatusDot({ status }) {
   const tone = !status ? "checking" : status.reachable ? "ok" : "bad";
   return <span className={`cluster-dot cluster-dot-${tone}`} aria-hidden="true" />;
 }
 
-function statusText(status) {
+export function statusText(status) {
   if (!status) return "checking…";
   return status.reachable ? status.version : "unreachable";
 }

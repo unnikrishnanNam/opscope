@@ -3,10 +3,12 @@ import { useTheme } from "../theme.js";
 import { AppIcon } from "../components/Logo.jsx";
 import { Checkbox } from "../components/Toggle.jsx";
 import ThemeSwitch from "../components/ThemeSwitch.jsx";
+import Toaster from "../components/Toast.jsx";
 import { tokenSections } from "./TokensDemo.jsx";
 import { basicSections } from "./BasicsDemo.jsx";
 import { dataSections } from "./DataDemo.jsx";
 import { navSections } from "./NavDemo.jsx";
+import { commandSections } from "./CommandsDemo.jsx";
 import "./kit.css";
 
 // /kit: every design token and component, in every state, in both themes.
@@ -15,7 +17,7 @@ import "./kit.css";
 //
 // Each demo file exports a list of sections: { id, title, about, render },
 // where render(theme) draws the section for one theme ("light" or "dark").
-const sections = [...tokenSections, ...basicSections, ...dataSections, ...navSections];
+const sections = [...tokenSections, ...basicSections, ...dataSections, ...navSections, ...commandSections];
 
 export default function Kit() {
   const [both, setBoth] = useState(true);
@@ -45,6 +47,7 @@ export default function Kit() {
       {sections.map((s) => (
         <KitSection key={s.id} section={s} both={both} />
       ))}
+      <Toaster />
     </div>
   );
 }

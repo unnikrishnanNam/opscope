@@ -1,5 +1,6 @@
 import { Link, useLocation, useOutletContext, useSearchParams } from "react-router";
 import { useApi } from "../api.js";
+import { useCommands } from "../commands/registry.jsx";
 import { bytes, clock, cpu, percent } from "../format.js";
 import Button from "../components/Button.jsx";
 import { Callout } from "../components/Callout.jsx";
@@ -11,12 +12,13 @@ import PodStatusBar from "../components/PodStatusBar.jsx";
 import StatusBadge, { statusTone } from "../components/StatusBadge.jsx";
 import Tooltip from "../components/Tooltip.jsx";
 import { Sparkline, UsageBar } from "../components/Usage.jsx";
-import { CpuIcon, MemoryIcon, NodesIcon, PodsIcon, SuccessIcon, WarningIcon } from "../components/icons.jsx";
+import { CpuIcon, MemoryIcon, NodesIcon, PodsIcon, RefreshIcon, SuccessIcon, WarningIcon } from "../components/icons.jsx";
 import { allPages, detailPath, nsQuery } from "../sections.js";
 import "./Overview.css";
 
 const REFRESH_MS = 10_000;
 const WARNINGS_SHOWN = 8;
+const WARNINGS_ID = "recent-warnings";
 const METRICS_REFRESH_MS = 15_000; // metrics-server's own refresh interval
 
 // How each kind's "needs attention" count reads, and what to say when it's
@@ -57,6 +59,30 @@ export default function Overview({ page }) {
   const error = overview.error ?? nodes.error ?? warnings.error;
   // Links to list pages keep the selected namespace.
   const to = (path) => `/c/${cluster.id}/${path}${search}`;
+
+  useCommands(
+    "overview",
+    base
+      ? [
+          {
+            id: "overview.refresh",
+            title: "Refresh the overview",
+            group: "This page",
+            icon: RefreshIcon,
+            run: () => [overview, nodes, usage, warnings].forEach((part) => part.reload()),
+          },
+          {
+            id: "overview.warnings",
+            title: "Go to recent warnings",
+            group: "This page",
+            icon: WarningIcon,
+            keywords: ["events"],
+            run: () => focusCard(WARNINGS_ID),
+          },
+        ]
+      : [],
+    [base],
+  );
 
   return (
     <section className="overview">
@@ -134,6 +160,7 @@ export default function Overview({ page }) {
 
       {warnings.data && (
         <Card
+          id={WARNINGS_ID}
           title="Recent warnings"
           aside={
             warnings.data.length > WARNINGS_SHOWN
@@ -412,4 +439,24 @@ function NodeList({ nodes, usage, clusterId }) {
       })}
     </ul>
   );
+}
+
+// focusCard scrolls a card to the top of the content and moves keyboard
+// focus to it, so the next Tab continues from there rather than from the
+// top of the page.
+//
+// It scrolls only the nearest box that scrolls (the content area, or the
+// whole page on phones). scrollIntoView would also move the boxes around it
+// that hide their overflow, shifting the top bar out of view.
+function focusCard(id) {
+  const card = document.getElementById(id);
+  if (!card) return;
+  card.setAttribute("tabindex", "-1");
+  card.focus({ preventScroll: true });
+
+  let box = card.parentElement;
+  while (box && !/(auto|scroll)/.test(getComputedStyle(box).overflowY)) box = box.parentElement;
+  const gap = 16;
+  if (box) box.scrollTo({ top: box.scrollTop + card.getBoundingClientRect().top - box.getBoundingClientRect().top - gap });
+  else window.scrollTo({ top: window.scrollY + card.getBoundingClientRect().top - gap });
 }

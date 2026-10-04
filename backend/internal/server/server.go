@@ -41,6 +41,9 @@ func New(cfg Config, manager *clusters.Manager, history *metrics.History, logger
 	// the one above for /api/clusters/{id}/overview.
 	mux.HandleFunc("GET /api/clusters/{id}/overview", getOverview(manager))
 
+	// Every object's name, for the command palette (also beats {resource}).
+	mux.HandleFunc("GET /api/clusters/{id}/names", listNames(manager))
+
 	// Live CPU and memory usage from metrics-server.
 	mux.HandleFunc("GET /api/clusters/{id}/metrics/nodes", getNodeMetrics(manager, history))
 	mux.HandleFunc("GET /api/clusters/{id}/metrics/pods", getPodMetrics(manager))

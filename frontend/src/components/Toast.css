@@ -1,0 +1,62 @@
+/* The toast floats above the page, near the bottom, in inverted colours
+   like tooltips (Ink on light, Paper on dark). */
+.toaster {
+  position: fixed;
+  z-index: 900; /* above the page and its menus, below tooltips */
+  left: 50%;
+  bottom: var(--space-6);
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  pointer-events: none; /* the empty region mustn't block clicks */
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  background: var(--primary);
+  color: var(--primary-text);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-strong);
+  pointer-events: auto;
+  animation: toast-in var(--duration) var(--ease);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* In the text colour: the status reds don't reach 3:1 on the inverted
+   background. The words say what happened, and the shape (a warning sign
+   instead of a tick) is the second cue. */
+.toast-icon {
+  flex-shrink: 0;
+}
+
+.toast-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.toast-close {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: var(--space-1);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  opacity: 0.7;
+  cursor: pointer;
+}
+
+.toast-close:hover {
+  opacity: 1;
+}

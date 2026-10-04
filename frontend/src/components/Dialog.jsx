@@ -11,7 +11,11 @@ import "./Dialog.css";
 // Both are controlled: the parent owns `open` and closes it in `onClose`
 // (called for Escape, the close button, and a click on the backdrop).
 
-function useModal(open, onClose) {
+// useModal is the shared behaviour, for other boxes built on <dialog> (the
+// command palette): spread what it returns onto the element.
+//   const modal = useModal(open, onClose);
+//   <dialog className="..." {...modal}>…</dialog>
+export function useModal(open, onClose) {
   const ref = useRef(null);
   const pressedBackdrop = useRef(false);
 

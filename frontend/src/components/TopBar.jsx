@@ -2,12 +2,14 @@ import { useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { useApi } from "../api.js";
 import { useClusters } from "../clusters.jsx";
-import { allPages, nsQuery } from "../sections.js";
+import { modKey } from "../platform.js";
+import { nsQuery, pageFor } from "../sections.js";
 import Button from "./Button.jsx";
 import ClusterSwitcher from "./ClusterSwitcher.jsx";
 import Combobox from "./Combobox.jsx";
 import { Breadcrumbs } from "./PageHeader.jsx";
-import { MenuIcon } from "./icons.jsx";
+import { Kbd } from "./Tag.jsx";
+import { MenuIcon, SearchIcon } from "./icons.jsx";
 import "./TopBar.css";
 
 // Breadcrumbs for pages that don't belong to a cluster.
@@ -17,19 +19,18 @@ const OTHER_PAGES = {
   "/clusters/add": [{ label: "Clusters", to: "/clusters" }, { label: "Add a cluster" }],
 };
 
-// The bar above every page: where you are on the left; which cluster and
-// namespace on the right. On narrow screens a menu button opens the
-// sidebar (`onMenu`).
+// The bar above every page: where you are on the left; the command palette's
+// search button (`onSearch`), then which cluster and namespace on the right.
+// On narrow screens a menu button opens the sidebar (`onMenu`).
 //   cluster   the cluster in the URL (undefined on pages outside a cluster,
 //             and for a moment while the cluster list loads)
 //   status    that cluster's status: { reachable, version, ... }
 //   pagePath  the rest of the URL after /c/<id>/, e.g. "workloads/pods/web/api-1"
-export default function TopBar({ cluster, status, pagePath, onMenu }) {
+export default function TopBar({ cluster, status, pagePath, onMenu, onSearch }) {
   const { pathname, search: fullSearch } = useLocation();
   const search = nsQuery(fullSearch);
-  // The page this URL belongs to: "workloads/pods" itself, or a detail page
-  // under it like "workloads/pods/web/api-1".
-  const page = allPages.find((p) => pagePath === p.path || pagePath?.startsWith(p.path + "/"));
+  // The page this URL belongs to (a list, or the list a detail page is under).
+  const page = pageFor(pagePath);
   const objectName = page && pagePath !== page.path ? decodeURIComponent(pagePath.split("/").pop()) : null;
 
   let crumbs = OTHER_PAGES[pathname] ?? [];
@@ -58,6 +59,20 @@ export default function TopBar({ cluster, status, pagePath, onMenu }) {
         </span>
         {crumbs.length > 0 && <Breadcrumbs items={crumbs} />}
       </div>
+      <button
+        type="button"
+        className="topbar-search"
+        onClick={onSearch}
+        aria-label="Search and commands"
+        aria-keyshortcuts={modKey === "⌘" ? "Meta+K" : "Control+K"}
+      >
+        <SearchIcon size={14} />
+        <span className="topbar-search-label">Search…</span>
+        <span className="topbar-search-keys" aria-hidden="true">
+          <Kbd>{modKey}</Kbd>
+          <Kbd>K</Kbd>
+        </span>
+      </button>
       <div className="topbar-end">
         {/* Switching cluster from a detail page goes to the list: the object is in the old cluster. */}
         <ClusterPicker cluster={cluster} pagePath={page?.path ?? pagePath} />

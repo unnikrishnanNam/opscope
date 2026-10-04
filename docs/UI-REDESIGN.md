@@ -250,7 +250,8 @@ Goal: ready to show people.
 
 Considered and left out to keep the redesign focused:
 
-- A ⌘K command palette to jump to any resource
+- ~~A ⌘K command palette to jump to any resource~~: done later, with keyboard shortcuts, in its own
+  phases; see [COMMAND-PALETTE.md](COMMAND-PALETTE.md)
 - Syntax colouring beyond simple YAML
 - Remembering column widths or hidden columns per table
 

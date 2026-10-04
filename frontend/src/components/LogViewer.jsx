@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
+import { copyText } from "../clipboard.js";
+import { useCommands } from "../commands/registry.jsx";
+import { kubectlLogs } from "../kubectl.js";
 import Button from "./Button.jsx";
 import { Callout } from "./Callout.jsx";
 import { Select } from "./Field.jsx";
 import LogView from "./LogView.jsx";
 import { Checkbox, Switch } from "./Toggle.jsx";
-import { RefreshIcon } from "./icons.jsx";
+import { CopyIcon, LogsIcon, PauseIcon, PlayIcon, RefreshIcon, WrapTextIcon } from "./icons.jsx";
 import "./LogViewer.css";
 
 const LINE_CHOICES = [100, 500, 2000];
@@ -27,6 +30,13 @@ export default function LogViewer({ clusterId, namespace, pod, containers }) {
   const [text, setText] = useState("");
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // The same controls in the command palette, while the logs are on screen.
+  useCommands(
+    "logs",
+    logCommands({ namespace, pod, containers, container, setContainer, previous, setPrevious, follow, setFollow, wrap, setWrap, setReloads }),
+    [namespace, pod, containers, container, previous, follow, wrap],
+  );
 
   // Fetch the logs whenever an option changes. Each run cancels the one before.
   useEffect(() => {
@@ -139,4 +149,72 @@ export default function LogViewer({ clusterId, namespace, pod, containers }) {
 function keepLastLines(text, max) {
   const lines = text.split("\n");
   return lines.length > max ? lines.slice(-max).join("\n") : text;
+}
+
+// The log viewer's commands for the palette: what its toolbar does, and a
+// kubectl line for the logs on screen.
+function logCommands(o) {
+  const group = "Logs";
+  const commands = [];
+  if (!o.previous) {
+    commands.push({
+      id: "logs.follow",
+      title: o.follow ? "Stop following logs" : "Follow logs",
+      group,
+      icon: o.follow ? PauseIcon : PlayIcon,
+      run: () => o.setFollow(!o.follow),
+    });
+  }
+  commands.push(
+    {
+      id: "logs.previous",
+      title: o.previous ? "Show the current run's logs" : "Show the previous run's logs",
+      group,
+      icon: LogsIcon,
+      keywords: ["restart", "crash"],
+      run: () => {
+        o.setPrevious(!o.previous);
+        if (!o.previous) o.setFollow(false); // a finished run has nothing to follow
+      },
+    },
+    {
+      id: "logs.wrap",
+      title: o.wrap ? "Don't wrap log lines" : "Wrap log lines",
+      group,
+      icon: WrapTextIcon,
+      run: () => o.setWrap(!o.wrap),
+    },
+  );
+  if (!o.follow) {
+    commands.push({ id: "logs.reload", title: "Reload logs", group, icon: RefreshIcon, run: () => o.setReloads((n) => n + 1) });
+  }
+  if (o.containers.length > 1) {
+    commands.push({
+      id: "logs.container",
+      title: "Show another container's logs…",
+      detail: o.container,
+      group,
+      icon: LogsIcon,
+      keywords: ["container"],
+      items: () =>
+        o.containers.map((c) => ({
+          id: `logs.container.${c.name}`,
+          title: c.name,
+          detail: c.name === o.container ? "shown" : c.role,
+          group: "Containers",
+          run: () => o.setContainer(c.name),
+        })),
+    });
+  }
+  const line = kubectlLogs(o.namespace, o.pod, { container: o.container, previous: o.previous });
+  commands.push({
+    id: "logs.kubectl",
+    title: "Copy kubectl logs",
+    detail: line,
+    group,
+    icon: CopyIcon,
+    keywords: ["command"],
+    run: () => copyText(line, "the kubectl command"),
+  });
+  return commands;
 }

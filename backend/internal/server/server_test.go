@@ -87,6 +87,15 @@ func TestUnknownResourceIs404(t *testing.T) {
 	}
 }
 
+// /names has its own handler; it isn't taken for a resource type called "names".
+func TestNamesRoute(t *testing.T) {
+	rec := get(newTestServer(t), "/api/clusters/any/names")
+
+	if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), "no cluster with id any") {
+		t.Fatalf("got %d %s, want 404 for the unknown cluster", rec.Code, rec.Body.String())
+	}
+}
+
 func TestClusterErrorsKeepTheirMeaning(t *testing.T) {
 	cluster := &clusters.Cluster{Server: "https://example:6443"}
 	tests := []struct {

@@ -24,10 +24,53 @@
   flex-shrink: 0;
 }
 
+/* Opens the command palette. It looks like a search box, since that's what
+   it opens; the key hint teaches the shortcut. */
+.topbar-search {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  width: 220px;
+  height: var(--control-sm);
+  margin-left: auto;
+  padding: 0 var(--space-1) 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-body);
+  color: var(--text-subtle);
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease);
+}
+
+.topbar-search:hover {
+  border-color: var(--text-subtle);
+}
+
+.topbar-search-keys {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
 /* The menu button only shows when the sidebar is hidden (see Layout.css). */
 .topbar-menu {
   display: none;
   margin-left: calc(-1 * var(--space-2));
+}
+
+/* Less room: the hint goes, then (on phones) the words. */
+@media (max-width: 1100px) {
+  .topbar-search {
+    width: auto;
+    padding-right: 10px;
+  }
+
+  .topbar-search-keys {
+    display: none;
+  }
 }
 
 @media (max-width: 900px) {
@@ -53,6 +96,21 @@
 
   .topbar .breadcrumbs-sep,
   .topbar .cluster-value-meta {
+    display: none;
+  }
+
+  /* An icon button at the end of the first row. */
+  .topbar-start {
+    flex: 1;
+  }
+
+  .topbar-search {
+    justify-content: center;
+    width: var(--control-sm);
+    padding: 0;
+  }
+
+  .topbar-search-label {
     display: none;
   }
 

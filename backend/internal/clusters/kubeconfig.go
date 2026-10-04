@@ -16,6 +16,14 @@ import (
 // requestTimeout stops a call to an unreachable cluster from hanging forever.
 const requestTimeout = 10 * time.Second
 
+// How many requests a second Opscope may send one cluster, and how many at
+// once above that (see clientsFor). Still modest: the API server has its own
+// limits per client (API Priority and Fairness) on top.
+const (
+	clientQPS   = 50
+	clientBurst = 100
+)
+
 // ContextInfo describes one context found in a kubeconfig.
 type ContextInfo struct {
 	Name   string `json:"name"`
@@ -128,6 +136,13 @@ func clientsFor(restConfig *rest.Config) (clientSet, string, error) {
 	// Streams end instead when the browser goes away (the request context).
 	streamConfig := rest.CopyConfig(restConfig)
 	restConfig.Timeout = requestTimeout
+	// client-go's own limit (5 requests a second, bursts of 10) is made for
+	// controllers that run unattended. One page here can take a dozen calls
+	// at once (the command palette's /names lists every kind in parallel),
+	// and the limit is shared by everything Opscope does with this cluster,
+	// so a few of those in a row would slow every page down.
+	restConfig.QPS = clientQPS
+	restConfig.Burst = clientBurst
 
 	var c clientSet
 	var err error

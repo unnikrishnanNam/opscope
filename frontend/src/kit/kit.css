@@ -405,3 +405,47 @@
     gap: var(--space-2);
   }
 }
+
+/* Command matching */
+
+.kit-matches {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.kit-match {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  color: var(--text-muted);
+}
+
+.kit-match + .kit-match {
+  border-top: 1px solid var(--border);
+}
+
+.kit-match-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.kit-match-detail {
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+  color: var(--text-subtle);
+}
+
+.kit-match-score {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+}

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { useCommands } from "../commands/registry.jsx";
 import Button from "./Button.jsx";
 import { EmptyState } from "./Callout.jsx";
 import { SearchInput } from "./Field.jsx";
@@ -46,6 +47,26 @@ export default function DataTable({
   shortcut,
 }) {
   const [filter, setFilter] = useState("");
+  const filterRef = useRef(null);
+
+  // The page's main table (the one with a shortcut) offers its filter in
+  // the command palette too.
+  useCommands(
+    "table",
+    shortcut
+      ? [
+          {
+            id: "table.filter",
+            title: `Filter ${noun}`,
+            group: "This page",
+            icon: SearchIcon,
+            shortcut,
+            run: () => filterRef.current?.focus(),
+          },
+        ]
+      : [],
+    [noun, shortcut],
+  );
   const [sort, setSort] = useState(null); // { key, ascending } or null for the server's order
   const navigate = useNavigate();
 
@@ -79,6 +100,7 @@ export default function DataTable({
           value={filter}
           onChange={setFilter}
           shortcut={shortcut}
+          inputRef={filterRef}
         />
         <span className="data-table-count">{rows ? countLabel(visible.length, rows.length, noun) : ""}</span>
         {toolbar && <div className="data-table-toolbar-end">{toolbar}</div>}
