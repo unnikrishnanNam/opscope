@@ -12,7 +12,7 @@ We work the same way as before: one small phase at a time, each ending with a wo
 ticked boxes and notes at the bottom of this file. Phases are numbered **P0–P6** so they don't mix
 with the build phases 0–8 or the redesign phases R0–R8.
 
-**Status (2026-10-04):** P0–P3 done.
+**Status (2026-10-04):** P0–P4 done.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -183,9 +183,13 @@ src/components/
   Highlight.jsx               text with matched letters in bold
   useListNavigation.js        the highlighted row and its keys, shared with Combobox
   CommandPalette.jsx / .css   the dialog: search box, list, footer
-  Toast.jsx / .css            short confirmations like "Copied" (P4)
+  Toast.jsx / .css            where toasts appear (Toaster), and one toast's look (ToastView)
   ShortcutsHelp.jsx           the "?" dialog, generated from the registry (P5)
+src/pages/detailCommands.js   the detail page's commands (a plain function, tested)
 src/platform.js               ⌘ or Ctrl: which modifier this computer uses, and its label
+src/toast.js                  toast("Copied …"): one short message at a time
+src/clipboard.js              copyText(text, what): copy, then say so in a toast
+src/kubectl.js                read-only kubectl lines for one object (get, describe, logs)
 ```
 
 ---
@@ -260,15 +264,16 @@ Goal: type a name, open that object.
 Goal: the palette knows what the current page can do. This is where `useCommands` proves itself on
 real features.
 
-- [ ] Detail page: open Summary / YAML / Events / Logs, copy the name, copy the YAML, go to the
+- [x] Detail page: open Summary / YAML / Events / Logs, copy the name, copy the YAML, go to the
       namespace's list, go to the owner (and for a pod, its node)
-- [ ] Copy a kubectl command for the object (`kubectl -n web get pod api-1 -o yaml`,
-      `kubectl -n web describe pod api-1`, `kubectl -n web logs api-1`); read-only commands only
-- [ ] Logs: follow on/off, previous run on/off, wrap lines, pick a container (sub-list)
-- [ ] List page: focus the filter, refresh
-- [ ] Overview: refresh, go to recent warnings
-- [ ] `Toast`: a short confirmation at the bottom of the window ("Copied kubectl command", or "Couldn't
-      copy" when the browser blocks it), announced politely to screen readers; on `/kit` first
+- [x] Copy a kubectl command for the object (`kubectl -n web get pods api-1 -o yaml`,
+      `kubectl -n web describe pods api-1`, `kubectl -n web logs api-1`); read-only commands only
+- [x] Logs: follow on/off, previous run on/off, wrap lines, reload, pick a container (sub-list), and
+      `kubectl logs` for the container and run on screen
+- [x] List page: focus the filter, refresh
+- [x] Overview: refresh, go to recent warnings
+- [x] `Toast`: a short confirmation at the bottom of the window ("Copied the kubectl command", or
+      "Couldn't copy" when the browser blocks it), announced politely to screen readers; on `/kit` first
 
 ## Phase P5: Keyboard shortcuts
 
@@ -476,3 +481,47 @@ Things that come up while building, decisions made, and anything that moves betw
 - Object ids include the cluster (`object:multipass/gateways/topology-test/main-gateway`), so a recent
   object from one cluster never stands in for a same-named one in another.
 - 55 frontend tests, all Go tests pass. Build: JS 368 KB (115 KB gzipped), CSS 65 KB, about as after P2.
+
+### Phase P4
+
+- Checked against multipass on a crash-looping Argo CD pod: the "This page" commands (other tabs,
+  copy name and YAML, `kubectl get`/`describe`/`logs`, "Pods in argocd", "Go to node kubeworker02");
+  "Show logs" opening the Logs tab, where the "Logs" group took over (follow, previous run, wrap,
+  reload, `kubectl logs … -c server`, which gained `--previous` once the previous run was shown);
+  "Filter pods" on the Pods list leaving focus in the filter (typing "crash" then gave "2 of 50
+  pods"); "Go to recent warnings" on the overview. Toasts on `/kit` in both themes.
+- **Commands now run after the palette has closed.** Closing a `<dialog>` puts focus back where it
+  was before it opened, which undid "Filter pods" (the filter got focus, then lost it again). The
+  palette now remembers the chosen command and runs it from an effect after its `<dialog>` has
+  closed.
+- **The built-in browser doesn't allow clipboard writes** (`clipboard-write` is "denied" for every
+  page there, so the code blocks' own copy buttons fail the same way). That showed the failure toast
+  for real: "Couldn't copy the kubectl command: the browser didn't allow it". The success path was
+  checked with `navigator.clipboard` replaced by a stand-in that records the text: the exact
+  `kubectl -n argocd describe pods …` line, and "Copied the kubectl command". Worth one real copy in
+  your own browser.
+- kubectl lines use the API name (`pods`, `deployments`); the three Gateway API kinds use their full
+  name (`gateways.gateway.networking.k8s.io`), from a new optional `kubectl` field in `sections.js`,
+  since other projects (Istio) have a kind called Gateway too. Anything unusual in a name would be
+  quoted for the shell, though Kubernetes names never need it. The lines use kubectl's current
+  context; Opscope can't know what the cluster is called in your kubeconfig.
+- Only read-only verbs exist (`kubectlGet`, `kubectlDescribe`, `kubectlLogs`); there's nothing to
+  build a changing command from.
+- The detail page's commands are a plain function in `pages/detailCommands.js`, tested on its own
+  (other tabs, kubectl lines, owners with and without a page, the node, a cluster-wide object).
+- On the Logs tab, the detail page leaves out its `kubectl logs` and the log viewer offers one for
+  the container and run on screen.
+- `DataTable` registers "Filter pods" itself, but only for a page's main table (the one with a
+  shortcut), so every list page gets it with no code of its own.
+- **Recent is capped at 5 rows in the empty palette.** With 8 recent commands, a pod's own commands
+  started below the fold. All 10 are still kept, for the ranking.
+- **"Go to recent warnings" first scrolled the whole frame.** `scrollIntoView` also scrolled the
+  boxes around the content that hide their overflow, moving the top bar out of view. It now scrolls
+  only the nearest box that scrolls (the content area, or the page on phones).
+- Toasts: one at a time, 3 seconds, a new one replacing the last; inverted colours like tooltips;
+  the region is always in the page (`role="status"`), so screen readers announce each message. The
+  icon stays in the text colour, since the status reds don't reach 3:1 on the inverted background;
+  the words and the shape (tick or warning sign) carry the meaning. `ToastView` is the look alone,
+  used by `/kit` to show both themes side by side.
+- New icon: `EventsIcon` (Lucide's "history"). `Card` takes an `id`.
+- 64 frontend tests, all Go tests pass. Build: JS 375 KB (117 KB gzipped), CSS 66 KB (16 KB gzipped).

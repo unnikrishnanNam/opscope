@@ -23,15 +23,33 @@ import "./CommandPalette.css";
 // an empty box leaves a sub-list too.
 export default function CommandPalette({ open, onClose, ctx }) {
   const modal = useModal(open, onClose);
+
+  // A chosen command runs once the palette has closed. Closing puts focus
+  // back where it was before the palette opened, which would undo a
+  // command that moves focus itself ("Filter pods"). This effect comes after
+  // useModal's, so the <dialog> is already closed when it runs.
+  const chosen = useRef(null);
+  useEffect(() => {
+    if (open || !chosen.current) return;
+    const { command, newTab } = chosen.current;
+    chosen.current = null;
+    perform(command, ctx, { newTab });
+  }, [open, ctx]);
+
+  function run(command, newTab) {
+    chosen.current = { command, newTab };
+    onClose();
+  }
+
   return (
     <dialog className="palette" aria-label="Command palette" {...modal}>
       {/* Only while open, so each opening starts empty and loads fresh data. */}
-      {open && <PaletteBody ctx={ctx} onClose={onClose} />}
+      {open && <PaletteBody ctx={ctx} onRun={run} />}
     </dialog>
   );
 }
 
-function PaletteBody({ ctx, onClose }) {
+function PaletteBody({ ctx, onRun }) {
   const id = useId();
   const inputRef = useRef(null);
   const listRef = useRef(null);
@@ -58,8 +76,7 @@ function PaletteBody({ ctx, onClose }) {
       inputRef.current?.focus();
       return;
     }
-    onClose();
-    perform(command, ctx, { newTab: metaKey || ctrlKey });
+    onRun(command, metaKey || ctrlKey);
   }
 
   function back() {

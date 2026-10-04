@@ -1,5 +1,6 @@
 import { Link, useLocation, useOutletContext, useParams, useSearchParams } from "react-router";
 import { useApi } from "../api.js";
+import { useCommands } from "../commands/registry.jsx";
 import { age } from "../format.js";
 import { detailPath, nsQuery } from "../sections.js";
 import { Callout } from "../components/Callout.jsx";
@@ -15,6 +16,7 @@ import SecretKeys from "../components/SecretKeys.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
 import { Tag } from "../components/Tag.jsx";
 import Tabs from "../components/Tabs.jsx";
+import { detailCommands } from "./detailCommands.js";
 import "./ResourceDetail.css";
 
 const REFRESH_MS = 10_000;
@@ -47,6 +49,14 @@ export default function ResourceDetail({ page }) {
   if (page.resource === "pods") tabs.push({ value: "logs", label: "Logs" });
 
   const status = d?.fields.find((f) => f.label === "Status")?.value;
+
+  // The palette's "This page" commands: other tabs, copies, related pages.
+  const search = nsQuery(useLocation().search);
+  useCommands(
+    "detail",
+    d ? detailCommands({ d, page, clusterId: cluster.id, tab, tabs, openTab, search }) : [],
+    [d, page, cluster.id, tab, search],
+  );
 
   return (
     <section className="detail-page">

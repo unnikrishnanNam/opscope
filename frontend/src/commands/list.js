@@ -7,6 +7,10 @@ import { matchCommand, queryWords } from "./match.js";
 // stays quick to type in.
 export const LIMIT = 50;
 
+// With nothing typed, at most this many recent commands come first, so the
+// page's own commands stay in view below them.
+const RECENT_SHOWN = 5;
+
 // Small lifts on top of the match score, enough to break near-ties.
 const RECENT_BONUS = 6; // the most recent command; older ones get less
 const PAGE_BONUS = 4; // commands from the page on screen
@@ -99,10 +103,10 @@ function browse(entries, recent, limit) {
   const recentRows = recent
     .map((id) => byId.get(id))
     .filter(Boolean)
+    .slice(0, RECENT_SHOWN)
     .map((e) => ({ ...e, group: "Recent" }));
-  const rest = entries.filter(
-    (e) => !e.source.searchOnly && !e.command.searchOnly && !recent.includes(e.command.id),
-  );
+  const shown = new Set(recentRows.map((e) => e.command.id));
+  const rest = entries.filter((e) => !e.source.searchOnly && !e.command.searchOnly && !shown.has(e.command.id));
   const rows = [...recentRows, ...rest];
   return grouped(rows.slice(0, limit), rows.length);
 }

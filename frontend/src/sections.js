@@ -9,6 +9,9 @@
 // `icon` is the page's icon in the sidebar.
 // `aliases` are other names that find the page in the command palette:
 // kubectl's short names and the singular ("po", "pod" for Pods).
+// `kubectl` is the name kubectl knows the resource by, when it isn't
+// `resource`: Gateway API kinds need their group, since other projects have
+// a kind called Gateway too.
 
 import * as icons from "./components/icons.jsx";
 
@@ -43,9 +46,9 @@ export const sections = [
     items: [
       { path: "network/services", icon: icons.ServicesIcon, resource: "services", aliases: ["svc", "service"], label: "Services", about: "Stable addresses in front of a set of pods." },
       { path: "network/ingresses", icon: icons.IngressesIcon, resource: "ingresses", aliases: ["ing", "ingress"], label: "Ingresses", about: "HTTP routes from outside the cluster to services." },
-      { path: "network/gateways", icon: icons.GatewaysIcon, resource: "gateways", aliases: ["gtw", "gateway"], label: "Gateways", about: "Gateway API entry points: where traffic comes in, on which ports." },
-      { path: "network/httproutes", icon: icons.HTTPRoutesIcon, resource: "httproutes", aliases: ["httproute", "route"], label: "HTTPRoutes", about: "Gateway API rules that send HTTP traffic from a gateway to services." },
-      { path: "network/gatewayclasses", icon: icons.GatewayClassesIcon, resource: "gatewayclasses", aliases: ["gc", "gatewayclass"], clusterScoped: true, label: "GatewayClasses", about: "The controllers that run gateways, such as nginx or Envoy." },
+      { path: "network/gateways", icon: icons.GatewaysIcon, resource: "gateways", kubectl: "gateways.gateway.networking.k8s.io", aliases: ["gtw", "gateway"], label: "Gateways", about: "Gateway API entry points: where traffic comes in, on which ports." },
+      { path: "network/httproutes", icon: icons.HTTPRoutesIcon, resource: "httproutes", kubectl: "httproutes.gateway.networking.k8s.io", aliases: ["httproute", "route"], label: "HTTPRoutes", about: "Gateway API rules that send HTTP traffic from a gateway to services." },
+      { path: "network/gatewayclasses", icon: icons.GatewayClassesIcon, resource: "gatewayclasses", kubectl: "gatewayclasses.gateway.networking.k8s.io", aliases: ["gc", "gatewayclass"], clusterScoped: true, label: "GatewayClasses", about: "The controllers that run gateways, such as nginx or Envoy." },
     ],
   },
 ];

@@ -5,9 +5,10 @@ import "./Card.css";
 //   aside   quiet text after the title, e.g. "newest 8 of 20"
 //   action  something on the right of the header, e.g. a button or link
 //   flush   no padding around the body, for a table that runs edge to edge
-export function Card({ title, aside, action, flush = false, className, children }) {
+//   id      for jumping to it (the palette's "Go to recent warnings")
+export function Card({ title, aside, action, flush = false, className, id, children }) {
   return (
-    <section className={["card", flush && "card-flush", className].filter(Boolean).join(" ")}>
+    <section id={id} className={["card", flush && "card-flush", className].filter(Boolean).join(" ")}>
       {(title || action) && (
         <header className="card-header">
           <h2 className="card-title">

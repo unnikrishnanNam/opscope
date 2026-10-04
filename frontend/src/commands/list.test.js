@@ -73,6 +73,14 @@ describe("buildList with an empty query", () => {
     expect(list.items[0].match).toBeNull();
   });
 
+  test("at most 5 recent commands, so the rest stays in view", () => {
+    const many = collect([{ id: "x", commands: Array.from({ length: 8 }, (_, i) => ({ id: `c${i}`, title: `c${i}`, group: "G" })) }], ctx);
+    const list = buildList({ entries: many, recent: ["c7", "c6", "c5", "c4", "c3", "c2"] });
+    expect(list.groups[0].items.map((i) => i.command.id)).toEqual(["c7", "c6", "c5", "c4", "c3"]);
+    // The sixth recent one is back in its own group.
+    expect(list.groups[1].items.map((i) => i.command.id)).toEqual(["c0", "c1", "c2"]);
+  });
+
   test("a single command can be search-only too", () => {
     const ns = {
       id: "namespaces",

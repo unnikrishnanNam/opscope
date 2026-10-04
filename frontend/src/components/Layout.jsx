@@ -10,6 +10,7 @@ import { Drawer } from "./Dialog.jsx";
 import { Spinner } from "./Loading.jsx";
 import Sidebar from "./Sidebar.jsx";
 import TopBar from "./TopBar.jsx";
+import Toaster from "./Toast.jsx";
 import { ClustersIcon, RefreshIcon } from "./icons.jsx";
 import "./Layout.css";
 
@@ -119,6 +120,7 @@ export default function Layout() {
         </main>
       </div>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} ctx={commandContext} />
+      <Toaster />
     </div>
   );
 }

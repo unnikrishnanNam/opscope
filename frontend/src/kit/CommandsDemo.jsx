@@ -6,7 +6,9 @@ import Button from "../components/Button.jsx";
 import CommandPalette from "../components/CommandPalette.jsx";
 import { SearchInput } from "../components/Field.jsx";
 import Highlight from "../components/Highlight.jsx";
+import { ToastView } from "../components/Toast.jsx";
 import { Checkbox } from "../components/Toggle.jsx";
+import { toast } from "../toast.js";
 import {
   FileTextIcon,
   LogsIcon,
@@ -242,6 +244,29 @@ function PaletteDemoBody({ failRef }) {
   );
 }
 
+/* --------------------------------------------------------------------------
+   Toasts
+   -------------------------------------------------------------------------- */
+
+function Toasts() {
+  return (
+    <div className="kit-stack">
+      <div className="kit-row-items">
+        <ToastView message="Copied the kubectl command" />
+        <ToastView tone="error" message="Couldn't copy the name: the browser didn't allow it" />
+      </div>
+      <div className="kit-row-items">
+        <Button size="sm" onClick={() => toast("Copied the kubectl command")}>
+          Show a toast
+        </Button>
+        <Button size="sm" onClick={() => toast("Couldn't copy the name: the browser didn't allow it", { tone: "error" })}>
+          Show a failure
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export const commandSections = [
   {
     id: "matching",
@@ -256,5 +281,12 @@ export const commandSections = [
     about:
       "Try it with the keyboard: type to search (pods appear after a moment, as they load), arrows to move, Enter to run, Cmd/Ctrl+Enter for a new tab, Escape to clear, go back and close. “Switch namespace…” opens a sub-list; Backspace in the empty box leaves it. The “This page” commands are registered with useCommands.",
     render: () => <PaletteDemo />,
+  },
+  {
+    id: "toasts",
+    title: "Toasts",
+    about:
+      "Short confirmations for things that happen out of sight, like a copy from the palette. One at a time at the bottom of the window, for 3 seconds; a new one replaces the last. The buttons show the real one, in the page's theme.",
+    render: () => <Toasts />,
   },
 ];

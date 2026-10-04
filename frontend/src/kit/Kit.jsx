@@ -3,6 +3,7 @@ import { useTheme } from "../theme.js";
 import { AppIcon } from "../components/Logo.jsx";
 import { Checkbox } from "../components/Toggle.jsx";
 import ThemeSwitch from "../components/ThemeSwitch.jsx";
+import Toaster from "../components/Toast.jsx";
 import { tokenSections } from "./TokensDemo.jsx";
 import { basicSections } from "./BasicsDemo.jsx";
 import { dataSections } from "./DataDemo.jsx";
@@ -46,6 +47,7 @@ export default function Kit() {
       {sections.map((s) => (
         <KitSection key={s.id} section={s} both={both} />
       ))}
+      <Toaster />
     </div>
   );
 }

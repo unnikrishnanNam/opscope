@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useOutletContext, useSearchParams } from "react-router";
 import { useApi } from "../api.js";
+import { useCommands } from "../commands/registry.jsx";
 import { columns as allColumns } from "../columns.jsx";
 import { clock } from "../format.js";
 import Button from "../components/Button.jsx";
@@ -45,6 +46,11 @@ export default function ResourceList({ page }) {
   useEffect(() => {
     if (!loading) setRefreshing(false);
   }, [loading]);
+  function refresh() {
+    setRefreshing(true);
+    reload();
+    usage.reload();
+  }
 
   // With one namespace selected, a namespace column would say the same thing on every row.
   const columns = allColumns[page.resource].filter((col) => !(namespace && col.key === "namespace"));
@@ -53,6 +59,12 @@ export default function ResourceList({ page }) {
   // and RBAC that doesn't allow this kind (often on purpose, for Secrets).
   const notInstalled = error?.code === "not_installed";
   const forbidden = error?.status === 403;
+
+  useCommands(
+    "list",
+    path ? [{ id: "list.refresh", title: `Refresh ${noun}`, group: "This page", icon: RefreshIcon, run: refresh }] : [],
+    [path, noun],
+  );
 
   return (
     <section className="list-page">
@@ -101,10 +113,7 @@ export default function ResourceList({ page }) {
                 size="sm"
                 icon={RefreshIcon}
                 loading={refreshing}
-                onClick={() => {
-                  setRefreshing(true);
-                  reload();
-                }}
+                onClick={refresh}
               >
                 Refresh
               </Button>
