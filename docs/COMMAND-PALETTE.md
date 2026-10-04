@@ -12,7 +12,7 @@ We work the same way as before: one small phase at a time, each ending with a wo
 ticked boxes and notes at the bottom of this file. Phases are numbered **P0–P6** so they don't mix
 with the build phases 0–8 or the redesign phases R0–R8.
 
-**Status (2026-10-04):** P0–P4 done.
+**Status (2026-10-04):** P0–P5 done.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -175,16 +175,16 @@ src/commands/
   list.js           collect sources and rank and group the rows (plain functions)
   match.js          fuzzy matching (plain functions)
   recent.js         recently used command ids (localStorage, per browser)
-  keys.js           global shortcuts, including sequences like "g p" (P5)
+  keys.js           keyboard shortcuts, including sequences like "g p": matching and the listener
   index.js          the list of global sources
-  sources/          pages.js, namespaces.js, clusters.jsx, theme.js, objects.js
+  sources/          pages.js, namespaces.js, clusters.jsx, theme.js, help.js, objects.js
   *.test.js         Vitest tests next to the code they test
 src/components/
   Highlight.jsx               text with matched letters in bold
   useListNavigation.js        the highlighted row and its keys, shared with Combobox
   CommandPalette.jsx / .css   the dialog: search box, list, footer
   Toast.jsx / .css            where toasts appear (Toaster), and one toast's look (ToastView)
-  ShortcutsHelp.jsx           the "?" dialog, generated from the registry (P5)
+  ShortcutsHelp.jsx / .css    the "?" dialog, generated from the registry
 src/pages/detailCommands.js   the detail page's commands (a plain function, tested)
 src/platform.js               ⌘ or Ctrl: which modifier this computer uses, and its label
 src/toast.js                  toast("Copied …"): one short message at a time
@@ -279,14 +279,14 @@ real features.
 
 Goal: the most used commands work without opening the palette.
 
-- [ ] `keys.js`: binds every command's `shortcut`, single keys and sequences ("g p"), ignored while
+- [x] `keys.js`: binds every command's `shortcut`, single keys and sequences ("g p"), ignored while
       typing in a field or while a dialog is open, as the `/` filter shortcut already is
-- [ ] Shortcuts: `g o` overview, `g n` nodes, `g p` pods, `g d` deployments, `g s` services,
+- [x] Shortcuts: `g o` overview, `g n` nodes, `g p` pods, `g d` deployments, `g s` services,
       `g c` clusters; on a detail page `1`–`4` for its tabs; `?` for the help
-- [ ] `ShortcutsHelp`: a dialog listing every command that has a shortcut, generated from the registry
-- [ ] Shortcuts shown as `Kbd` in palette rows, and announced with `aria-keyshortcuts` where there's
-      a button for the same thing
-- [ ] Move the list filter's `/` onto the registry, so it's in the help too
+- [x] `ShortcutsHelp`: a dialog listing every command that has a shortcut, generated from the registry
+- [~] Shortcuts shown as `Kbd` in palette rows, and announced with `aria-keyshortcuts` where there's
+      a button for the same thing (single keys only: see notes)
+- [x] Move the list filter's `/` onto the registry, so it's in the help too
 
 ## Phase P6: Polish and docs
 
@@ -525,3 +525,40 @@ Things that come up while building, decisions made, and anything that moves betw
   used by `/kit` to show both themes side by side.
 - New icon: `EventsIcon` (Lucide's "history"). `Card` takes an `id`.
 - 64 frontend tests, all Go tests pass. Build: JS 375 KB (117 KB gzipped), CSS 66 KB (16 KB gzipped).
+
+### Phase P5
+
+- Checked against multipass: `g` then `p` from the overview opening Pods; `/` focusing the filter,
+  and typing "g p" into it staying in the box (no navigation); `2`, `4` and `1` on a pod's page
+  opening YAML, Logs and Summary; `?` opening the help, and the palette's "Keyboard shortcuts" too
+  (after the palette had closed); `g p` ignored while the help was open; Escape closing it.
+- The test tool can't send `/` or `?` as key presses (it sends an empty key, or inserts the text
+  without a keydown), so those two were checked with real `keydown` events sent from the page.
+  Worth pressing them once yourself.
+- Shortcuts are a field on commands, so the palette's hint, the help and the binding all come from
+  one place. Pages get theirs from `sections.js` (`shortcut: "g p"`), "Manage clusters" has `g c`,
+  the detail tabs `1`–`4`, the list filter `/`, the help `?` (a small `help` source).
+- `useShortcutCommands` collects the commands with a shortcut from every source but the search-only
+  ones (building every object on each page change would be wasted work), one per shortcut; the
+  layout binds them with `useShortcuts` and passes the same list to the help. When two commands
+  share a key, the first wins, so a page's command can take a key from a global one.
+- `matchShortcut` (the decision for each key press) is a plain function with tests: single keys,
+  sequences, unknown keys, a broken sequence still letting a single-key shortcut through ("g" then
+  "/"), exact case, first wins. A sequence waits 1 second for its next key.
+- Plain keys are ignored while typing in a field and while any dialog is open (the palette, the
+  help, a confirm). Keys with ⌘, Ctrl or Alt are left alone; ⌘K stays the layout's.
+- `SearchInput` no longer listens for its own `/`: the table's "Filter pods" command does, through
+  the registry, so the key is in the help. The box still shows the hint and `aria-keyshortcuts`.
+  On `/kit`, which has no layout, `/` no longer focuses a table's filter there.
+- The detail page now lists every tab in the palette, the open one too (marked "open"), so the
+  help always shows all four number keys.
+- Running a command from a shortcut doesn't add it to Recent: it's already at hand.
+- `aria-keyshortcuts` is only used for single keys (the tabs, the filter). It has no way to say "g,
+  then p" (a space there separates alternatives), so the sidebar links don't claim their
+  sequences; the help lists them instead.
+- The help: "Anywhere" (⌘K) first, then each group in registry order, "then" between the keys of a
+  sequence. 460 px wide, scrolling inside; a screenshot wasn't possible (the browser pane was
+  hidden), so it was checked from its measurements: one line per row, no sideways overflow. A visual
+  check is in P6.
+- New icon: `KeyboardIcon` (Lucide's "keyboard").
+- 70 frontend tests, all Go tests pass. Build: JS 378 KB (118 KB gzipped), CSS 67 KB (17 KB gzipped).

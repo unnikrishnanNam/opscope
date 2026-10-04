@@ -41,12 +41,13 @@ export default function ResourceDetail({ page }) {
     setSearchParams(params);
   }
 
+  // Number keys open the tabs (see the shortcuts help).
   const tabs = [
-    { value: "summary", label: "Summary" },
-    { value: "yaml", label: "YAML" },
-    { value: "events", label: "Events", count: d?.events.length },
+    { value: "summary", label: "Summary", shortcut: "1" },
+    { value: "yaml", label: "YAML", shortcut: "2" },
+    { value: "events", label: "Events", count: d?.events.length, shortcut: "3" },
   ];
-  if (page.resource === "pods") tabs.push({ value: "logs", label: "Logs" });
+  if (page.resource === "pods") tabs.push({ value: "logs", label: "Logs", shortcut: "4" });
 
   const status = d?.fields.find((f) => f.label === "Status")?.value;
 

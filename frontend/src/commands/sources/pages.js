@@ -14,6 +14,7 @@ export const pages = {
           group: "Go to",
           icon: page.icon,
           keywords: page.aliases,
+          shortcut: page.shortcut,
           to: `/c/${encodeURIComponent(ctx.cluster.id)}/${page.path}${ctx.nsSearch}`,
         }))
       : [],

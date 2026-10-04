@@ -5,6 +5,9 @@ import "./Tabs.css";
 //
 //   <Tabs label="Pod details" value={tab} onChange={setTab}
 //     tabs={[{ value: "summary", label: "Summary" }, { value: "events", label: "Events", count: 3 }]}>
+//
+// A tab's `shortcut` (a key bound elsewhere, by the command registry) is
+// announced to screen readers with aria-keyshortcuts.
 //     {content for the open tab}
 //   </Tabs>
 //
@@ -41,6 +44,7 @@ export default function Tabs({ label, value, onChange, tabs, children }) {
               id={`${id}-tab-${tab.value}`}
               aria-selected={selected}
               aria-controls={`${id}-panel`}
+              aria-keyshortcuts={tab.shortcut}
               tabIndex={selected ? 0 : -1}
               className="tabs-tab"
               onClick={() => onChange(tab.value)}

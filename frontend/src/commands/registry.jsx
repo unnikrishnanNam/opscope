@@ -114,11 +114,29 @@ export function useCommandList(ctx, query, within = null) {
   }, [store, version, ctx, query, within]);
 }
 
+// useShortcutCommands returns every command with a `shortcut`, one per
+// shortcut (the first wins, as in keys.js), for the key bindings and the
+// shortcuts help. Search-only sources are left out: their commands are
+// found by typing, and building them (every object) on each page change
+// would be wasted work.
+export function useShortcutCommands(ctx) {
+  const store = useContext(CommandsContext);
+  const version = useSyncExternalStore(store.subscribe, store.version);
+  return useMemo(() => {
+    const sources = store.sources().filter((s) => !s.searchOnly);
+    const seen = new Set();
+    return collect(sources, ctx, (source) => store.data(source, ctx))
+      .map((e) => e.command)
+      .filter((c) => c.shortcut && !seen.has(c.shortcut) && seen.add(c.shortcut));
+  }, [store, version, ctx]);
+}
+
 // perform runs a command that has `to` or `run` (one with `items` opens
-// its sub-list instead; that's up to the palette) and remembers it as recent.
+// its sub-list instead; that's up to the palette) and remembers it as
+// recent, unless `remember` is false (a shortcut: it's already at hand).
 // `newTab` opens a link in a new browser tab.
-export function perform(command, ctx, { newTab = false } = {}) {
-  remember(command.id);
+export function perform(command, ctx, { newTab = false, remember: keep = true } = {}) {
+  if (keep) remember(command.id);
   if (command.to) {
     if (newTab) window.open(command.to, "_blank", "noopener");
     else ctx.navigate(command.to);

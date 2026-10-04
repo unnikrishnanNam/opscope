@@ -13,20 +13,23 @@ const TAB_ICONS = { summary: InfoIcon, yaml: FileTextIcon, events: EventsIcon, l
 //
 //   d        the object, from the detail endpoint
 //   page     its page in sections.js
-//   tab      the open tab; `tabs` all of them, and openTab(value) opens one
+//   tab      the open tab; `tabs` all of them (with their `shortcut` keys),
+//            and openTab(value) opens one
 //   search   "?ns=..." to keep on links
 export function detailCommands({ d, page, clusterId, tab, tabs, openTab, search }) {
   const { namespace, name } = d;
   const commands = [];
 
+  // Every tab, the open one too, so its number key is always listed.
   for (const t of tabs) {
-    if (t.value === tab) continue;
     commands.push({
       id: `detail.tab.${t.value}`,
       title: `Show ${t.value === "yaml" ? "YAML" : t.label.toLowerCase()}`,
+      detail: t.value === tab ? "open" : undefined,
       group: GROUP,
       icon: TAB_ICONS[t.value],
       keywords: ["tab"],
+      shortcut: t.shortcut,
       run: () => openTab(t.value),
     });
   }

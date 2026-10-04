@@ -9,6 +9,8 @@
 // `icon` is the page's icon in the sidebar.
 // `aliases` are other names that find the page in the command palette:
 // kubectl's short names and the singular ("po", "pod" for Pods).
+// `shortcut` jumps to the page from anywhere ("g p": g, then p), and shows
+// in the command palette and the shortcuts help (press ?).
 // `kubectl` is the name kubectl knows the resource by, when it isn't
 // `resource`: Gateway API kinds need their group, since other projects have
 // a kind called Gateway too.
@@ -19,15 +21,15 @@ export const sections = [
   {
     group: "Cluster",
     items: [
-      { path: "overview", icon: icons.OverviewIcon, label: "Overview", about: "Counts, node health and recent warnings at a glance." },
-      { path: "nodes", icon: icons.NodesIcon, resource: "nodes", aliases: ["no", "node"], clusterScoped: true, metrics: "nodes", label: "Nodes", about: "Machines in the cluster, their status, capacity and usage." },
+      { path: "overview", shortcut: "g o", icon: icons.OverviewIcon, label: "Overview", about: "Counts, node health and recent warnings at a glance." },
+      { path: "nodes", shortcut: "g n", icon: icons.NodesIcon, resource: "nodes", aliases: ["no", "node"], clusterScoped: true, metrics: "nodes", label: "Nodes", about: "Machines in the cluster, their status, capacity and usage." },
     ],
   },
   {
     group: "Workloads",
     items: [
-      { path: "workloads/pods", icon: icons.PodsIcon, resource: "pods", aliases: ["po", "pod"], metrics: "pods", label: "Pods", about: "Running containers, their status, restarts and the node they run on." },
-      { path: "workloads/deployments", icon: icons.DeploymentsIcon, resource: "deployments", aliases: ["deploy", "deployment"], label: "Deployments", about: "Stateless apps and how many of their replicas are ready." },
+      { path: "workloads/pods", shortcut: "g p", icon: icons.PodsIcon, resource: "pods", aliases: ["po", "pod"], metrics: "pods", label: "Pods", about: "Running containers, their status, restarts and the node they run on." },
+      { path: "workloads/deployments", shortcut: "g d", icon: icons.DeploymentsIcon, resource: "deployments", aliases: ["deploy", "deployment"], label: "Deployments", about: "Stateless apps and how many of their replicas are ready." },
       { path: "workloads/statefulsets", icon: icons.StatefulSetsIcon, resource: "statefulsets", aliases: ["sts", "statefulset"], label: "StatefulSets", about: "Apps with stable names and storage, such as databases." },
       { path: "workloads/daemonsets", icon: icons.DaemonSetsIcon, resource: "daemonsets", aliases: ["ds", "daemonset"], label: "DaemonSets", about: "Pods that run on every node (or a chosen set of nodes)." },
       { path: "workloads/jobs", icon: icons.JobsIcon, resource: "jobs", aliases: ["job"], label: "Jobs", about: "One-off tasks that run until they finish." },
@@ -44,7 +46,7 @@ export const sections = [
   {
     group: "Network",
     items: [
-      { path: "network/services", icon: icons.ServicesIcon, resource: "services", aliases: ["svc", "service"], label: "Services", about: "Stable addresses in front of a set of pods." },
+      { path: "network/services", shortcut: "g s", icon: icons.ServicesIcon, resource: "services", aliases: ["svc", "service"], label: "Services", about: "Stable addresses in front of a set of pods." },
       { path: "network/ingresses", icon: icons.IngressesIcon, resource: "ingresses", aliases: ["ing", "ingress"], label: "Ingresses", about: "HTTP routes from outside the cluster to services." },
       { path: "network/gateways", icon: icons.GatewaysIcon, resource: "gateways", kubectl: "gateways.gateway.networking.k8s.io", aliases: ["gtw", "gateway"], label: "Gateways", about: "Gateway API entry points: where traffic comes in, on which ports." },
       { path: "network/httproutes", icon: icons.HTTPRoutesIcon, resource: "httproutes", kubectl: "httproutes.gateway.networking.k8s.io", aliases: ["httproute", "route"], label: "HTTPRoutes", about: "Gateway API rules that send HTTP traffic from a gateway to services." },

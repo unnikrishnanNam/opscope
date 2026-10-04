@@ -22,7 +22,7 @@ export const clusters = {
           to: `/c/${encodeURIComponent(c.id)}/${ctx.page?.path ?? "overview"}`,
         };
       }),
-    { id: "clusters.manage", title: "Manage clusters", group: "Clusters", icon: ClustersIcon, to: "/clusters" },
+    { id: "clusters.manage", title: "Manage clusters", group: "Clusters", icon: ClustersIcon, shortcut: "g c", to: "/clusters" },
     { id: "clusters.add", title: "Add a cluster", group: "Clusters", icon: PlusIcon, keywords: ["kubeconfig"], to: "/clusters/add" },
   ],
 };

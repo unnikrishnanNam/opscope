@@ -2,10 +2,13 @@ import { useEffect, useState } from "react";
 import { Outlet, useLocation, useMatch } from "react-router";
 import { useClusters } from "../clusters.jsx";
 import { useCommandContext } from "../commands/context.js";
+import { useShortcuts } from "../commands/keys.js";
+import { perform, useShortcutCommands } from "../commands/registry.jsx";
 import { hasModKey } from "../platform.js";
 import Button from "./Button.jsx";
 import { Callout, EmptyState } from "./Callout.jsx";
 import CommandPalette from "./CommandPalette.jsx";
+import ShortcutsHelp from "./ShortcutsHelp.jsx";
 import { Drawer } from "./Dialog.jsx";
 import { Spinner } from "./Loading.jsx";
 import Sidebar from "./Sidebar.jsx";
@@ -25,6 +28,7 @@ export default function Layout() {
   const { pathname } = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   const { data: clusters, loading, statuses, recheck } = useClusters();
   const cluster = clusters?.find((c) => c.id === clusterId);
@@ -51,7 +55,11 @@ export default function Layout() {
   }, []);
 
   // What the palette's commands know: cluster, page, namespace, ...
-  const commandContext = useCommandContext({ cluster, status, pagePath });
+  const commandContext = useCommandContext({ cluster, status, pagePath, showShortcuts: setShortcutsOpen });
+
+  // Every command's keyboard shortcut ("g p", "/", "?"), bound here once.
+  const shortcutCommands = useShortcutCommands(commandContext);
+  useShortcuts(shortcutCommands, (command) => perform(command, commandContext, { remember: false }));
 
   const sidebarCluster = cluster?.id ?? clusters?.[0]?.id;
 
@@ -120,6 +128,7 @@ export default function Layout() {
         </main>
       </div>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} ctx={commandContext} />
+      <ShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} commands={shortcutCommands} />
       <Toaster />
     </div>
   );

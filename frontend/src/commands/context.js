@@ -19,7 +19,10 @@ import { nsQuery, pageFor } from "../sections.js";
 //   location     the router's location
 //   navigate     the router's navigate
 //   setNamespace(name)  selects a namespace ("" for all), on the same page
-export function useCommandContext({ cluster, status, pagePath }) {
+//   openShortcuts()     shows the keyboard shortcuts help
+//
+// `showShortcuts` is the layout's setter for the help dialog.
+export function useCommandContext({ cluster, status, pagePath, showShortcuts }) {
   const { data: clusters, statuses } = useClusters();
   const location = useLocation();
   const navigate = useNavigate();
@@ -46,6 +49,7 @@ export function useCommandContext({ cluster, status, pagePath }) {
         const search = next.toString();
         navigate({ pathname: location.pathname, search: search ? `?${search}` : "" });
       },
+      openShortcuts: () => showShortcuts(true),
     };
-  }, [cluster, reachable, clusters, statuses, pagePath, location, navigate]);
+  }, [cluster, reachable, clusters, statuses, pagePath, location, navigate, showShortcuts]);
 }

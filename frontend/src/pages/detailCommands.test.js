@@ -24,11 +24,12 @@ const base = { d: pod, page: pods, clusterId: "lab", tab: "summary", tabs, openT
 const byId = (commands) => Object.fromEntries(commands.map((c) => [c.id, c]));
 
 describe("detail page commands", () => {
-  test("the other tabs, not the open one", () => {
+  test("every tab, with its key; the open one says so", () => {
     const openTab = vi.fn();
-    const c = byId(detailCommands({ ...base, tab: "yaml", openTab }));
-    expect(c["detail.tab.yaml"]).toBeUndefined();
-    expect(c["detail.tab.summary"].title).toBe("Show summary");
+    const numbered = tabs.map((t, i) => ({ ...t, shortcut: String(i + 1) }));
+    const c = byId(detailCommands({ ...base, tabs: numbered, tab: "yaml", openTab }));
+    expect(c["detail.tab.yaml"]).toMatchObject({ detail: "open", shortcut: "2" });
+    expect(c["detail.tab.summary"]).toMatchObject({ title: "Show summary", detail: undefined, shortcut: "1" });
     c["detail.tab.logs"].run();
     expect(openTab).toHaveBeenCalledWith("logs");
   });

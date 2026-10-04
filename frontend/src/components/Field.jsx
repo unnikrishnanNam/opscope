@@ -1,4 +1,4 @@
-import { cloneElement, useEffect, useId, useRef } from "react";
+import { cloneElement, useId, useRef } from "react";
 import { CloseIcon, ErrorIcon, SearchIcon } from "./icons.jsx";
 import "./Field.css";
 
@@ -76,8 +76,10 @@ export function Select({ size = "md", invalid, className, children, ...props }) 
 
 // SearchInput: a text box with a search icon and a clear button. Escape also
 // clears it. `onChange` receives the new text, not an event.
-//   shortcut  a key that focuses it from anywhere on the page (e.g. "/");
-//             shown as a hint while the box is empty
+//   shortcut  the key that focuses it (e.g. "/"), shown as a hint while the
+//             box is empty and announced with aria-keyshortcuts. The key
+//             itself is bound by whoever owns the shortcut (DataTable
+//             registers it as a command, see commands/keys.js).
 //   inputRef  optional ref to the <input>, for focusing it from outside
 export function SearchInput({
   value,
@@ -91,19 +93,6 @@ export function SearchInput({
 }) {
   const ownRef = useRef(null);
   const inputRef = outerRef ?? ownRef;
-
-  // The shortcut works anywhere, except while typing in another field.
-  useEffect(() => {
-    if (!shortcut) return;
-    function onKeyDown(event) {
-      if (event.key !== shortcut || event.metaKey || event.ctrlKey || event.altKey) return;
-      if (event.target.closest("input, textarea, select, [contenteditable], dialog")) return;
-      event.preventDefault();
-      inputRef.current?.focus();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [shortcut, inputRef]);
 
   function clear() {
     onChange("");
