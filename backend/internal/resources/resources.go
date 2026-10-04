@@ -87,6 +87,13 @@ func (m Meta) sortKey() string {
 	return m.Namespace + "/" + m.Name
 }
 
+// meta returns the Meta itself. Every row type gets it through the embedded
+// Meta, so code that only has rows as `any` can still read their names
+// (see ListNames).
+func (m Meta) meta() Meta {
+	return m
+}
+
 // sortRows orders rows by namespace, then name, so the API always returns
 // the same order. The [T ...] part makes it work for any row type that has
 // a sortKey method (all of ours do, via Meta).

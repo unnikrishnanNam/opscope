@@ -17,6 +17,10 @@ import { createStore } from "./store.js";
 //     icon: PodsIcon,         optional, from icons.jsx
 //     detail: "Workloads",    optional, quieter text after the title
 //     keywords: ["po"],       optional, more words that find it ("po" finds Pods)
+//     scope: ["pods", "po"],  optional, words that narrow a search to it but don't
+//                             find it alone ("po api" finds pods called api)
+//     boost: 3,               optional, a small lift in the ranking (an object in
+//                             the selected namespace)
 //     shortcut: "g p",        optional, a key or a sequence of keys
 //     searchOnly: true,       optional, only shown once something is typed
 //
@@ -42,6 +46,9 @@ import { createStore } from "./store.js";
 //                                    null means there's nothing to load
 //     maxAge: 30_000,                how long loaded data is used (milliseconds)
 //     label: "objects",              names it in "Loading objects…"
+//     notes: (ctx, data) => [...],   lines to show under the results about what was
+//                                    loaded ("Secrets aren't searched: ..."); for a
+//                                    searchOnly source, only once something is typed
 //   }
 //
 // `ctx` is what commands may need to know and do, built by whoever shows

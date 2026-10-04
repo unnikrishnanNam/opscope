@@ -85,14 +85,32 @@ export function createStore(globalSources) {
     },
 
     // status lists the sources that load, for "Loading objects…" and
-    // "Couldn't load objects" lines: [{ id, label, loading, error }].
+    // "Couldn't load objects" lines, and each one's notes about what it
+    // loaded ("Secrets aren't searched: ..."):
+    // [{ id, label, searchOnly, loading, error, notes }].
     status(ctx) {
       return sources()
         .filter((s) => s.load && keyOf(s, ctx) !== null)
         .map((s) => {
           const e = entry(s, ctx);
-          return { id: s.id, label: s.label ?? s.id, loading: e?.loading ?? false, error: e?.error ?? null };
+          return {
+            id: s.id,
+            label: s.label ?? s.id,
+            searchOnly: Boolean(s.searchOnly),
+            loading: e?.loading ?? false,
+            error: e?.error ?? null,
+            notes: e?.data != null && s.notes ? notesOf(s, ctx, e.data) : [],
+          };
         });
     },
   };
+}
+
+function notesOf(source, ctx, data) {
+  try {
+    return source.notes(ctx, data);
+  } catch (error) {
+    console.error(`Notes from "${source.id}" failed:`, error);
+    return [];
+  }
 }

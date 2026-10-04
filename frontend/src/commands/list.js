@@ -62,11 +62,20 @@ function commandsOf(source, list) {
 // positions to make bold ({ title, detail }), or is null for an empty query.
 //
 // With an empty query: recent commands first (under "Recent"), then every
-// other command that isn't `searchOnly` (itself or its source), by group. With a query: the best
+// other command that isn't `searchOnly` (itself or its source), by group.
+//
+// Kind scoping, as in `kubectl get po`: when the first of several words is
+// exactly one of the commands' scope words ("po api"), only commands with
+// that scope word are searched. Otherwise "gtw main" would also find every
+// deployment whose name happens to contain g, t and w. With a query: the best
 // matches first; groups are ordered by their best row.
 export function buildList({ entries, query = "", recent = [], limit = LIMIT }) {
   const words = queryWords(query);
   if (!words.length) return browse(entries, recent, limit);
+
+  if (words.length > 1 && entries.some((e) => e.command.scope?.includes(words[0]))) {
+    entries = entries.filter((e) => e.command.scope?.includes(words[0]));
+  }
 
   const scored = [];
   entries.forEach((entry, order) => {
@@ -76,7 +85,8 @@ export function buildList({ entries, query = "", recent = [], limit = LIMIT }) {
     const score =
       match.score +
       (r === -1 ? 0 : RECENT_BONUS * (1 - r / recent.length)) +
-      (entry.source.page ? PAGE_BONUS : 0);
+      (entry.source.page ? PAGE_BONUS : 0) +
+      (entry.command.boost ?? 0);
     scored.push({ ...entry, match, score, order });
   });
   scored.sort((a, b) => b.score - a.score || a.order - b.order);

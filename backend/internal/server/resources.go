@@ -61,6 +61,28 @@ func getOverview(manager *clusters.Manager) http.HandlerFunc {
 	}
 }
 
+// GET /api/clusters/{id}/names
+//
+// Every object's kind, namespace and name, for the command palette's
+// search: {"objects": [...], "skipped": [...]}. Kinds the cluster doesn't
+// have or this user can't list are named in "skipped" instead of failing
+// the whole answer.
+func listNames(manager *clusters.Manager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cluster, ok := findCluster(w, r, manager)
+		if !ok {
+			return
+		}
+
+		index, err := resources.ListNames(r.Context(), clientsOf(cluster))
+		if err != nil {
+			writeClusterError(w, err, cluster)
+			return
+		}
+		writeJSON(w, http.StatusOK, index)
+	}
+}
+
 // GET /api/clusters/{id}/secrets/{namespace}/{name}/{key}
 //
 // Returns {"value": "...", "base64": false} for one key of one secret. The

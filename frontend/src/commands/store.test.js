@@ -55,7 +55,9 @@ describe("loading", () => {
     const store = createStore([source]);
 
     store.refresh({ cluster: "lab" });
-    expect(store.status({ cluster: "lab" })).toEqual([{ id: "objects", label: "objects", loading: true, error: null }]);
+    expect(store.status({ cluster: "lab" })).toEqual([
+      { id: "objects", label: "objects", searchOnly: false, loading: true, error: null, notes: [] },
+    ]);
     store.refresh({ cluster: "lab" }); // already loading
     await settle();
     store.refresh({ cluster: "lab" }); // still fresh
@@ -108,6 +110,37 @@ describe("loading", () => {
     await settle();
     expect(store.data(source, ctx)).toEqual(["api-1"]);
     expect(store.status(ctx)[0].error.message).toBe("unreachable");
+  });
+
+  test("notes describe what was loaded, once it has", async () => {
+    const source = {
+      ...objectsSource(async () => ({ skipped: ["secrets"] })),
+      searchOnly: true,
+      notes: (ctx, data) => data.skipped.map((kind) => `${kind} aren't searched`),
+    };
+    const store = createStore([source]);
+    const ctx = { cluster: "lab" };
+
+    expect(store.status(ctx)[0]).toMatchObject({ searchOnly: true, notes: [] });
+    store.refresh(ctx);
+    await settle();
+    expect(store.status(ctx)[0].notes).toEqual(["secrets aren't searched"]);
+  });
+
+  test("notes that throw are left out", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const source = {
+      ...objectsSource(async () => []),
+      notes: () => {
+        throw new Error("boom");
+      },
+    };
+    const store = createStore([source]);
+    store.refresh({ cluster: "lab" });
+    await settle();
+    expect(store.status({ cluster: "lab" })[0].notes).toEqual([]);
+    expect(error).toHaveBeenCalledOnce();
+    error.mockRestore();
   });
 
   test("a source without a key loads once for every ctx", async () => {

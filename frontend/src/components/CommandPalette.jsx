@@ -87,6 +87,8 @@ function PaletteBody({ ctx, onClose }) {
   const chip = within && within.title.replace(/…$/, "");
   const loading = list.status.filter((s) => s.loading);
   const failed = list.status.filter((s) => s.error && !s.loading);
+  // A search-only source's notes are about its results, so they wait for a query.
+  const notes = list.status.filter((s) => query.trim() || !s.searchOnly).flatMap((s) => s.notes);
   let index = 0; // rows are numbered across groups, for the keyboard
 
   return (
@@ -149,7 +151,7 @@ function PaletteBody({ ctx, onClose }) {
         )}
       </div>
 
-      {(list.total > list.items.length || loading.length > 0 || failed.length > 0) && (
+      {(list.total > list.items.length || loading.length > 0 || failed.length > 0 || notes.length > 0) && (
         <div className="palette-status">
           {list.total > list.items.length && (
             <p>
@@ -165,6 +167,9 @@ function PaletteBody({ ctx, onClose }) {
             <p key={s.id} title={s.error.detail ?? s.error.message}>
               <WarningIcon size={14} className="palette-status-warn" /> Couldn't load {s.label}: {s.error.message}
             </p>
+          ))}
+          {notes.map((note) => (
+            <p key={note}>{note}</p>
           ))}
         </div>
       )}

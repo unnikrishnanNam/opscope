@@ -25,7 +25,7 @@ const LETTERS = 20;
 const LETTERS_MAX = 35;
 
 // Where a word was found counts for less outside the title.
-const WEIGHTS = { title: 1, keywords: 0.9, detail: 0.7 };
+const WEIGHTS = { title: 1, keywords: 0.9, scope: 0.9, detail: 0.7 };
 
 const alnum = /[a-z0-9]/i;
 const lower = /[a-z]/;
@@ -103,15 +103,22 @@ function matchLetters(word, text, haystack) {
 }
 
 // matchCommand(["po", "api"], command) -> { score, title: [...], detail: [...] }
-// Every word must match the title, a keyword or the detail; each counts
-// where it matched best. `title` and `detail` are the matched letter
-// positions in those texts, for bold. Returns null if a word doesn't match.
+// Every word must match the title, a keyword, a scope word or the detail;
+// each counts where it matched best. `title` and `detail` are the matched
+// letter positions in those texts, for bold. Returns null if a word doesn't
+// match.
+//
+// Scope words narrow a search but don't find anything by themselves: a pod
+// has the scope ["pods", "pod", "po"], so "po api" finds pods called api,
+// while "pod" alone finds the Pods page, not every pod.
 export function matchCommand(words, command) {
   const fields = [["title", command.title]];
   for (const keyword of command.keywords ?? []) fields.push(["keywords", keyword]);
+  for (const word of command.scope ?? []) fields.push(["scope", word]);
   if (command.detail) fields.push(["detail", command.detail]);
 
   let score = 0;
+  let onlyScope = true;
   const found = { title: new Set(), detail: new Set() };
   for (const word of words) {
     let best = null;
@@ -123,9 +130,11 @@ export function matchCommand(words, command) {
     }
     if (!best) return null;
     score += best.score;
-    // Keywords aren't shown, so there's nothing to make bold.
-    if (best.field !== "keywords") best.positions.forEach((p) => found[best.field].add(p));
+    if (best.field !== "scope") onlyScope = false;
+    // Keywords and scope words aren't shown, so there's nothing to make bold.
+    if (found[best.field]) best.positions.forEach((p) => found[best.field].add(p));
   }
+  if (onlyScope) return null;
 
   const sorted = (set) => [...set].sort((a, b) => a - b);
   return { score, title: sorted(found.title), detail: sorted(found.detail) };

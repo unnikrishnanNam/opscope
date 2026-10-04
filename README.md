@@ -273,6 +273,7 @@ All endpoints are `GET` unless noted.
 | `DELETE /api/clusters/{id}`                            | Remove a cluster added in the UI                                                |
 | `/api/clusters/{id}/{resource}`                        | Rows for one resource type; `?namespace=` limits to one namespace               |
 | `/api/clusters/{id}/overview`                          | Counts, node health and pods by status; `?namespace=` limits namespaced counts  |
+| `/api/clusters/{id}/names`                             | Every object's kind, namespace and name (for search), and kinds `skipped`       |
 | `/api/clusters/{id}/{resource}/{namespace}/{name}`     | One object: fields, containers, conditions, tables, events, YAML                |
 | `/api/clusters/{id}/{resource}/{name}`                 | The same for cluster-wide kinds (nodes, namespaces, gatewayclasses)             |
 | `/api/clusters/{id}/secrets/{namespace}/{name}/{key}`  | One secret value: `{"value", "base64"}`                                         |

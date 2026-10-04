@@ -12,7 +12,7 @@ We work the same way as before: one small phase at a time, each ending with a wo
 ticked boxes and notes at the bottom of this file. Phases are numbered **P0–P6** so they don't mix
 with the build phases 0–8 or the redesign phases R0–R8.
 
-**Status (2026-10-04):** P0–P2 done.
+**Status (2026-10-04):** P0–P3 done.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -145,8 +145,9 @@ GET /api/clusters/{id}/names
   "skipped": [{ "resource": "gateways", "code": "not_installed" }] }
 ```
 
-- Every lister except events runs, in parallel. A kind that's not installed or forbidden is skipped
-  and named in `skipped`, instead of failing the whole answer.
+- Every lister except events runs, in parallel. A kind that's not installed, forbidden or failing is
+  skipped and named in `skipped` (with `code` `not_installed`, `forbidden` or `failed`), instead of
+  failing the whole answer. Only when no kind at all can be read is it an error.
 - Names only. Secrets are listed by name, as their list page already does; no values ever.
 - The palette loads it when it opens (and at most every 30 seconds), filters in the browser, and
   ranks objects in the selected namespace a little higher. Picking one opens its detail page.
@@ -176,7 +177,7 @@ src/commands/
   recent.js         recently used command ids (localStorage, per browser)
   keys.js           global shortcuts, including sequences like "g p" (P5)
   index.js          the list of global sources
-  sources/          pages.js, namespaces.js, clusters.jsx, theme.js; objects.js in P3
+  sources/          pages.js, namespaces.js, clusters.jsx, theme.js, objects.js
   *.test.js         Vitest tests next to the code they test
 src/components/
   Highlight.jsx               text with matched letters in bold
@@ -241,15 +242,17 @@ Goal: ⌘K works everywhere and can take you anywhere that isn't a single object
 
 Goal: type a name, open that object.
 
-- [ ] Backend: `GET /api/clusters/{id}/names`, built from `Listers` (all but events), in parallel,
-      skipping `not_installed` and forbidden kinds and naming them in `skipped`
-- [ ] Go tests with the fake clients: rows from several kinds, a missing Gateway API, a forbidden kind
-- [ ] README API table: the new endpoint
-- [ ] `objects` source: loads on open, cached per cluster for 30 seconds, rows with the kind's icon,
+- [x] Backend: `GET /api/clusters/{id}/names`, built from `Listers` (all but events), in parallel,
+      skipping `not_installed`, forbidden and failing kinds and naming them in `skipped`
+- [x] Go tests with the fake clients: rows from several kinds, events left out, a missing Gateway
+      API, a forbidden kind, another failure, nothing readable at all, and every lister's rows
+      carrying `Meta`
+- [x] README API table: the new endpoint
+- [x] `objects` source: loads on open, cached per cluster for 30 seconds, rows with the kind's icon,
       name and namespace; only kinds with a detail page
-- [ ] Kind scoping (`po api`) and the selected namespace ranked first
-- [ ] Loading and failure lines inside the palette
-- [ ] Checked on multipass (Gateway API objects found) and `opscope-test` (Gateways skipped quietly);
+- [x] Kind scoping (`po api`) and the selected namespace ranked first
+- [x] Loading and failure lines inside the palette, and notes for kinds that couldn't be searched
+- [x] Checked on multipass (Gateway API objects found) and `opscope-test` (Gateways skipped quietly);
       timing of `/names` noted for both
 
 ## Phase P4: Commands from pages
@@ -429,3 +432,47 @@ Things that come up while building, decisions made, and anything that moves betw
   directly each time.
 - Build: JS 367 KB (115 KB gzipped), CSS 65 KB (16 KB gzipped); up 13 KB and 4 KB now that the
   palette ships.
+
+### Phase P3
+
+- Checked against multipass (191 objects in 13 kinds, Gateway API included) and `opscope-test` (39
+  objects; gateways, routes and classes skipped as `not_installed`, with no note in the palette):
+  `argocd-server` finding the deployment, service and pod, grouped by kind with exact names first;
+  `gtw main` finding only the gateway and opening its page; `po argo` the 7 Argo CD pods; `core` on
+  `opscope-test` finding CoreDNS's ConfigMap, Deployment and pods; an opened object showing up under
+  Recent.
+- `ListNames` (`internal/resources/names.go`) runs every lister in `Listers` but events, in
+  parallel, and keeps only kind, namespace and name. A kind added to `Listers` is in the index with
+  no other change. Listers return typed slices as `any`, so the names are read with a little
+  reflection through a `meta()` method every row gets from its embedded `Meta`; a test fails if a
+  future lister's rows don't embed `Meta`, since they'd silently be missing from search.
+- One kind failing doesn't fail the index: it's named in `skipped`. Only when nothing at all can be
+  read (an unreachable cluster, rejected credentials) is it an error, reported like any other
+  cluster error.
+- **Found while timing `/names`:** three calls in a row took 28 ms, 0.37 s and 1.19 s. client-go's
+  default client-side limit (5 requests a second, bursts of 10) was throttling the 15 parallel
+  lists, and the limit is shared by everything Opscope does with that cluster, so opening the
+  palette a few times would slow the list pages too. The limit is now 50 a second with bursts of
+  100 (`clientQPS`, `clientBurst` in `internal/clusters/kubeconfig.go`); the API server still applies
+  its own fairness limits. Afterwards: 15–60 ms per call on multipass, 3–56 ms on `opscope-test`,
+  however often it's called. Log streams keep client-go's defaults (one request each).
+- Answer size: 14.6 KB for multipass's 191 objects, 3 KB for `opscope-test`.
+- Kinds come from `sections.js` on the frontend too: an object is offered when its kind has a page,
+  grouped and labelled by that page. Namespaces are in the index but have no page, so the palette
+  leaves them to the namespace commands.
+- Two additions to matching, both general:
+  - `scope` words on a command narrow a search but never find anything alone. A pod has
+    `["pods", "pod", "po"]`, so `po api` finds pods called api while `pod` alone still finds the
+    Pods page first (as an ordinary keyword, "pod" put 50 pods above the page).
+  - Strict kind scoping, as with `kubectl get po`: when the first of several words is exactly a scope
+    word, only commands with that scope are searched. Without it, `gtw main` also found every
+    deployment, service and pod whose name has g, t and w in order.
+  - `boost` lifts a command a little; objects in the selected namespace get 3.
+- Sources can add `notes` about what they loaded, shown under the results (for a search-only source,
+  once something is typed). The objects source uses it for kinds that couldn't be searched: "Secrets
+  aren't searched: this user isn't allowed to list them." A missing kind (no Gateway API) gets no
+  note. Covered by tests; not seen on a real cluster, since that needs taking RBAC access away.
+- Object links keep the selected namespace (`?ns`), like the rest of the app's links.
+- Object ids include the cluster (`object:multipass/gateways/topology-test/main-gateway`), so a recent
+  object from one cluster never stands in for a same-named one in another.
+- 55 frontend tests, all Go tests pass. Build: JS 368 KB (115 KB gzipped), CSS 65 KB, about as after P2.

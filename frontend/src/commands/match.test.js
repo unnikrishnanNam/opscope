@@ -87,6 +87,14 @@ describe("matchCommand", () => {
     expect(matchCommand(["svc"], services)).toMatchObject({ title: [], detail: [] });
   });
 
+  test("scope words narrow but don't find on their own", () => {
+    const scoped = { id: "pod.api", title: "api-1", detail: "web", scope: ["pods", "pod", "po"] };
+    expect(matchCommand(["po", "api"], scoped)).not.toBeNull();
+    expect(matchCommand(["pod"], scoped)).toBeNull();
+    expect(matchCommand(["po", "pods"], scoped)).toBeNull();
+    expect(matchCommand(["po", "api"], scoped).title).toEqual([0, 1, 2]);
+  });
+
   test("two words in the same text both show", () => {
     expect(matchCommand(["api", "1"], pod).title).toEqual([0, 1, 2, 4]);
   });

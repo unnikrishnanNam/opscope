@@ -134,6 +134,32 @@ describe("buildList with a query", () => {
     expect(ids(buildList({ entries: withPage, query: "web" }))).toEqual(["c", "a"]);
   });
 
+  test("a scope word first searches only that kind", () => {
+    const mixed = collect(
+      [
+        {
+          id: "x",
+          commands: [
+            { id: "gateway", title: "main", scope: ["gateways", "gtw"] },
+            { id: "deployment", title: "main-gateway-nginx", scope: ["deployments", "deploy"] },
+            { id: "page", title: "Gateways", keywords: ["gtw"] },
+          ],
+        },
+      ],
+      ctx,
+    );
+    expect(ids(buildList({ entries: mixed, query: "gtw main" }))).toEqual(["gateway"]);
+    // Alone, the word is an ordinary search (and finds the page).
+    expect(ids(buildList({ entries: mixed, query: "gtw" }))).toEqual(["page", "deployment"]);
+    // Not a scope word: everything is searched.
+    expect(ids(buildList({ entries: mixed, query: "main" }))).toEqual(["gateway", "deployment"]);
+  });
+
+  test("a boost lifts a command over an equal match", () => {
+    const twins = collect([{ id: "x", commands: [{ id: "a", title: "web" }, { id: "b", title: "web", boost: 3 }] }], ctx);
+    expect(ids(buildList({ entries: twins, query: "web" }))).toEqual(["b", "a"]);
+  });
+
   test("a recent command doesn't beat a clearly better match", () => {
     expect(ids(buildList({ entries, query: "pods", recent: ["go.deployments"] }))[0]).toBe("go.pods");
   });

@@ -50,7 +50,7 @@ const sources = [
       detail: pod.namespace,
       group: "Pods",
       icon: PodsIcon,
-      keywords: ["pods", "pod", "po"],
+      scope: ["pods", "pod", "po"],
     })),
   },
 ];
@@ -176,7 +176,7 @@ function paletteSources(failRef) {
           detail: pod.namespace,
           group: "Pods",
           icon: PodsIcon,
-          keywords: ["pods", "pod", "po"],
+          scope: ["pods", "pod", "po"],
           to: `/c/demo/workloads/pods/${pod.namespace}/${pod.name}`,
         })),
     },
