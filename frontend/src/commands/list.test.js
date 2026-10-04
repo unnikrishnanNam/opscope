@@ -73,6 +73,19 @@ describe("buildList with an empty query", () => {
     expect(list.items[0].match).toBeNull();
   });
 
+  test("a single command can be search-only too", () => {
+    const ns = {
+      id: "namespaces",
+      commands: [
+        { id: "namespace.switch", title: "Switch namespace…", group: "Namespace" },
+        { id: "namespace.web", title: "web", group: "Namespaces", searchOnly: true },
+      ],
+    };
+    const list = collect([ns], ctx);
+    expect(ids(buildList({ entries: list }))).toEqual(["namespace.switch"]);
+    expect(ids(buildList({ entries: list, query: "web" }))).toEqual(["namespace.web"]);
+  });
+
   test("recent commands come first, search-only ones included", () => {
     const list = buildList({ entries, recent: ["pod.web-2", "theme.dark", "gone"] });
     expect(list.groups[0]).toMatchObject({ title: "Recent" });

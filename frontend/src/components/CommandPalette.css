@@ -124,6 +124,7 @@
 
 .palette-option-icon {
   display: inline-flex;
+  justify-content: center; /* smaller marks, like a cluster's status dot */
   flex-shrink: 0;
   width: 16px;
   color: var(--text-subtle);

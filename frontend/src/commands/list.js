@@ -62,7 +62,7 @@ function commandsOf(source, list) {
 // positions to make bold ({ title, detail }), or is null for an empty query.
 //
 // With an empty query: recent commands first (under "Recent"), then every
-// other command that isn't `searchOnly`, by group. With a query: the best
+// other command that isn't `searchOnly` (itself or its source), by group. With a query: the best
 // matches first; groups are ordered by their best row.
 export function buildList({ entries, query = "", recent = [], limit = LIMIT }) {
   const words = queryWords(query);
@@ -90,7 +90,9 @@ function browse(entries, recent, limit) {
     .map((id) => byId.get(id))
     .filter(Boolean)
     .map((e) => ({ ...e, group: "Recent" }));
-  const rest = entries.filter((e) => !e.source.searchOnly && !recent.includes(e.command.id));
+  const rest = entries.filter(
+    (e) => !e.source.searchOnly && !e.command.searchOnly && !recent.includes(e.command.id),
+  );
   const rows = [...recentRows, ...rest];
   return grouped(rows.slice(0, limit), rows.length);
 }

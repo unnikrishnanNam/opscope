@@ -12,7 +12,7 @@ We work the same way as before: one small phase at a time, each ending with a wo
 ticked boxes and notes at the bottom of this file. Phases are numbered **P0–P6** so they don't mix
 with the build phases 0–8 or the redesign phases R0–R8.
 
-**Status (2026-10-04):** P0 and P1 done.
+**Status (2026-10-04):** P0–P2 done.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -84,6 +84,7 @@ returns them (possibly after loading something, like the object index):
 {
   id: "objects",
   searchOnly: true,                             // too many to list; shown once something is typed
+                                                // (a single command can be searchOnly too)
   key: (ctx) => ctx.cluster?.id,                // which data; a new key loads again, null loads nothing
   load: (ctx) => api(`/clusters/${ctx.cluster.id}/names`),
   maxAge: 30_000,                               // how long loaded data is used
@@ -168,13 +169,14 @@ GET /api/clusters/{id}/names
 ```
 src/commands/
   registry.jsx      CommandsProvider, useCommands, useCommandList, perform; documents the shapes
+  context.js        useCommandContext: the `ctx` every command gets, built once by the layout
   store.js          page sources and loaded data, outside React (so only the palette re-renders)
   list.js           collect sources and rank and group the rows (plain functions)
   match.js          fuzzy matching (plain functions)
   recent.js         recently used command ids (localStorage, per browser)
   keys.js           global shortcuts, including sequences like "g p" (P5)
   index.js          the list of global sources
-  sources/          pages.js, clusters.js, namespaces.js, theme.js, objects.js, ... (P2, P3)
+  sources/          pages.js, namespaces.js, clusters.jsx, theme.js; objects.js in P3
   *.test.js         Vitest tests next to the code they test
 src/components/
   Highlight.jsx               text with matched letters in bold
@@ -182,6 +184,7 @@ src/components/
   CommandPalette.jsx / .css   the dialog: search box, list, footer
   Toast.jsx / .css            short confirmations like "Copied" (P4)
   ShortcutsHelp.jsx           the "?" dialog, generated from the registry (P5)
+src/platform.js               ⌘ or Ctrl: which modifier this computer uses, and its label
 ```
 
 ---
@@ -222,14 +225,17 @@ Goal: a finished palette on `/kit`, with sample commands, before it touches the 
 
 Goal: ⌘K works everywhere and can take you anywhere that isn't a single object.
 
-- [ ] ⌘K / Ctrl+K opens it from anywhere (also while typing in a field; it's a modifier shortcut)
-- [ ] Top bar: a search button ("Search…" and the ⌘K hint; icon only below 640 px)
-- [ ] Sources: pages (from `sections.js`, keeping `?ns`), clusters ("Switch to multipass", with
+- [x] ⌘K (Ctrl+K off Apple devices) opens it from anywhere, also while typing in a field
+- [x] Top bar: a search button ("Search…" and the ⌘K hint; the hint goes below 1100 px, the words
+      below 640 px)
+- [x] Sources: pages (from `sections.js`, keeping `?ns`), clusters ("Switch to multipass", with
       status dots; switching keeps the page, like the cluster switcher), namespaces (sub-list from the
-      namespaces API, plus "All namespaces"), Clusters and Add a cluster, theme (System/Light/Dark)
-- [ ] `aliases` in `sections.js` (`po`, `deploy`, `sts`, `ds`, `cj`, `cm`, `svc`, `ing`, `gtw`, ...)
-- [ ] Commands that need a cluster hide on the welcome and clusters pages
-- [ ] Checked on both test clusters, light and dark, 375 px
+      namespaces API, plus "All namespaces", and each namespace found by typing its name), Clusters
+      and Add a cluster, theme (System/Light/Dark)
+- [x] `aliases` in `sections.js` (`no`, `po`, `deploy`, `sts`, `ds`, `cj`, `cm`, `svc`, `ing`, `gtw`,
+      `gc`, and the singulars)
+- [x] Commands that need a cluster hide on the welcome and clusters pages
+- [x] Checked on both test clusters, light and dark, 375 px and 1440 px
 
 ## Phase P3: Object search
 
@@ -385,3 +391,41 @@ Things that come up while building, decisions made, and anything that moves betw
 - The built-in browser again ran the opening animation slowly while the pane wasn't focused, so the
   first screenshot caught the palette half faded in; the finished state was checked from the page.
 - Build unchanged from P0 (JS 354 KB, CSS 61 KB): the palette isn't used by the app until P2.
+
+### Phase P2
+
+- Checked in the browser against a backend on port 8090 with multipass from the environment and
+  `opscope-test` added through the API into a scratchpad `DATA_DIR` (so `data/` was left alone):
+  ⌘K from a list and a detail page, `kube-sys` + Enter selecting that namespace (the picker followed),
+  `svc` going to Services with `?ns` kept, the namespace sub-list, "Switch to opscope-test" keeping
+  the Pods page and dropping the namespace, `local-path` finding opscope-test's own namespace, `no`
+  going to Nodes (where the namespace commands are gone, as the picker is disabled there), "Dark
+  theme", the clusters page (only cluster and theme commands), ⌘K ignored while the remove-cluster
+  confirmation is open (cancelled; both clusters still there), the search button at 375 px (an icon
+  at the end of the first row), 800 px (no key hint) and 1440 px ("Search… ⌘ K").
+- `ctx` is built in one place, `commands/context.js`, used by the layout. A field added there is
+  available to every command, so sources never reach for React state or the router themselves.
+- The four sources are each a short file in `commands/sources/`, and `commands/index.js` lists them.
+  Pages come straight from `sections.js`, so a new page needs no palette code.
+- Namespaces: "Switch namespace…" opens them all, and each one can also be found by typing its
+  name at the top level (`searchOnly` on the command, so the empty palette isn't flooded on a
+  cluster with many). `searchOnly` now works on single commands as well as whole sources. Their ids
+  are `namespace:<name>`, which can't clash with `namespace.switch`, whatever a namespace is called.
+- Sub-lists have no "Recent" group: it broke the A to Z order of the namespaces. And there a row's
+  detail only says "selected"; "Namespace" is only added at the top level, where the row needs to
+  say what it is.
+- Ctrl+K on a Mac is left alone: it's "delete to the end of the line" in text fields. `platform.js`
+  says which modifier this computer uses (`hasModKey`), and `modKey` moved there from `Tag.jsx`.
+- ⌘K doesn't open the palette over another dialog (a confirm, the drawer); that one has to be dealt
+  with first. Pressed while the palette is open, it closes it.
+- Cluster rows use the cluster switcher's status dot as their icon (`StatusDot` and `statusText`
+  are now exported from `ClusterSwitcher.jsx`).
+- A new `NamespaceIcon` (Lucide's "folder"), since namespaces have no page to borrow an icon from.
+- `pageFor(pagePath)` in `sections.js` finds the page a URL belongs to; the top bar and the palette
+  both use it.
+- `/kit` and the app share recent commands (same browser storage, and the demo's page ids match the
+  real ones). Harmless: a recent id only shows while some source offers it.
+- The built-in browser's screenshots lagged a step behind twice again; the page state was read
+  directly each time.
+- Build: JS 367 KB (115 KB gzipped), CSS 65 KB (16 KB gzipped); up 13 KB and 4 KB now that the
+  palette ships.

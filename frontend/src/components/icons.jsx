@@ -175,6 +175,14 @@ export const GatewayClassesIcon = (props) => (
   </Icon>
 );
 
+// Lucide "folder", for namespaces (there's no page for them, so the
+// sidebar has no icon to borrow).
+export const NamespaceIcon = (props) => (
+  <Icon {...props}>
+    <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
+  </Icon>
+);
+
 export const ClustersIcon = (props) => (
   <Icon {...props}>
     <path d="M2.97 12.92A2 2 0 0 0 2 14.63v3.24a2 2 0 0 0 .97 1.71l3 1.8a2 2 0 0 0 2.06 0L12 19v-5.5l-5-3-4.03 2.42Z" />

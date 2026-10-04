@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import { Outlet, useLocation, useMatch } from "react-router";
 import { useClusters } from "../clusters.jsx";
+import { useCommandContext } from "../commands/context.js";
+import { hasModKey } from "../platform.js";
 import Button from "./Button.jsx";
 import { Callout, EmptyState } from "./Callout.jsx";
+import CommandPalette from "./CommandPalette.jsx";
 import { Drawer } from "./Dialog.jsx";
 import { Spinner } from "./Loading.jsx";
 import Sidebar from "./Sidebar.jsx";
@@ -10,8 +13,9 @@ import TopBar from "./TopBar.jsx";
 import { ClustersIcon, RefreshIcon } from "./icons.jsx";
 import "./Layout.css";
 
-// The frame around every page: sidebar, top bar and content. It works out
-// which cluster is selected (from the URL) and whether it answers.
+// The frame around every page: sidebar, top bar, content and the command
+// palette. It works out which cluster is selected (from the URL) and
+// whether it answers.
 export default function Layout() {
   // On /c/<id>/<rest>, match.params is { clusterId, "*": rest }.
   const match = useMatch("/c/:clusterId/*");
@@ -19,6 +23,7 @@ export default function Layout() {
   const pagePath = match?.params["*"];
   const { pathname } = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   const { data: clusters, loading, statuses, recheck } = useClusters();
   const cluster = clusters?.find((c) => c.id === clusterId);
@@ -29,6 +34,23 @@ export default function Layout() {
 
   // Picking a page in the drawer closes it.
   useEffect(() => setMenuOpen(false), [pathname]);
+
+  // ⌘K (Ctrl+K elsewhere) opens the palette from anywhere, even while
+  // typing in a field, and closes it again. Not on top of another dialog
+  // (a confirm, the drawer): that one has to be dealt with first.
+  useEffect(() => {
+    function onKeyDown(event) {
+      if (event.key.toLowerCase() !== "k" || !hasModKey(event) || event.altKey || event.shiftKey) return;
+      if (document.querySelector("dialog[open]:not(.palette)")) return;
+      event.preventDefault();
+      setPaletteOpen((open) => !open);
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  // What the palette's commands know: cluster, page, namespace, ...
+  const commandContext = useCommandContext({ cluster, status, pagePath });
 
   const sidebarCluster = cluster?.id ?? clusters?.[0]?.id;
 
@@ -47,7 +69,13 @@ export default function Layout() {
       </Drawer>
 
       <div className="shell-main">
-        <TopBar cluster={cluster} status={status} pagePath={pagePath} onMenu={() => setMenuOpen(true)} />
+        <TopBar
+          cluster={cluster}
+          status={status}
+          pagePath={pagePath}
+          onMenu={() => setMenuOpen(true)}
+          onSearch={() => setPaletteOpen(true)}
+        />
         <main className="shell-content" id="content" tabIndex={-1}>
           {cluster && status && !status.reachable && (
             <div className="shell-notice">
@@ -90,6 +118,7 @@ export default function Layout() {
           )}
         </main>
       </div>
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} ctx={commandContext} />
     </div>
   );
 }

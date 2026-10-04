@@ -18,6 +18,7 @@ import { createStore } from "./store.js";
 //     detail: "Workloads",    optional, quieter text after the title
 //     keywords: ["po"],       optional, more words that find it ("po" finds Pods)
 //     shortcut: "g p",        optional, a key or a sequence of keys
+//     searchOnly: true,       optional, only shown once something is typed
 //
 //     and one of:
 //     to: "/c/lab/workloads/pods",   a link (Cmd/Ctrl+Enter opens it in a new tab)
@@ -100,7 +101,8 @@ export function useCommandList(ctx, query, within = null) {
     const entries = within
       ? collectItems(within, ctx)
       : collect(store.sources(), ctx, (source) => store.data(source, ctx));
-    const list = buildList({ entries, query, recent: getRecent() });
+    // A sub-list keeps its own order (namespaces A to Z); "Recent" is for the top.
+    const list = buildList({ entries, query, recent: within ? [] : getRecent() });
     return { ...list, status: within ? [] : store.status(ctx) };
   }, [store, version, ctx, query, within]);
 }
