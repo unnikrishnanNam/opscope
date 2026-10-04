@@ -107,6 +107,9 @@ function PaletteBody({ ctx, onRun }) {
   // A search-only source's notes are about its results, so they wait for a query.
   const notes = list.status.filter((s) => query.trim() || !s.searchOnly).flatMap((s) => s.notes);
   let index = 0; // rows are numbered across groups, for the keyboard
+  // Without rows there's no list to point at: a listbox must hold options,
+  // so the box is just a message then.
+  const hasRows = list.items.length > 0;
 
   return (
     <div className="palette-content">
@@ -117,8 +120,8 @@ function PaletteBody({ ctx, onRun }) {
           ref={inputRef}
           type="text"
           role="combobox"
-          aria-expanded="true"
-          aria-controls={`${id}-list`}
+          aria-expanded={hasRows}
+          aria-controls={hasRows ? `${id}-list` : undefined}
           aria-activedescendant={nav.active >= 0 ? optionId(nav.active) : undefined}
           aria-autocomplete="list"
           aria-label={chip ? `Search in ${chip}` : "Search commands"}
@@ -135,8 +138,8 @@ function PaletteBody({ ctx, onRun }) {
       <div
         ref={listRef}
         id={`${id}-list`}
-        role="listbox"
-        aria-label={chip ?? "Commands"}
+        role={hasRows ? "listbox" : undefined}
+        aria-label={hasRows ? (chip ?? "Commands") : undefined}
         className="palette-list"
         // Clicking a row mustn't take focus away from the search box.
         onMouseDown={(e) => e.preventDefault()}
@@ -163,7 +166,7 @@ function PaletteBody({ ctx, onRun }) {
           </div>
         ))}
 
-        {list.items.length === 0 && !loading.length && (
+        {!hasRows && !loading.length && (
           <p className="palette-empty">{query ? `Nothing matches “${query.trim()}”.` : "Nothing here yet."}</p>
         )}
       </div>

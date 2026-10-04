@@ -10,7 +10,8 @@ After a phase is done, we come back here, tick the boxes, and note anything that
 **Status (2026-10-03):** all phases (0–8) are done. Ideas that were deliberately left out are
 collected under [Possible next steps](#possible-next-steps) at the end. The interface was then
 redesigned, with light and dark themes and the "Opscope" name, in phases R0–R8; see
-[UI-REDESIGN.md](UI-REDESIGN.md).
+[UI-REDESIGN.md](UI-REDESIGN.md). A ⌘K command palette and keyboard shortcuts followed in phases
+P0–P6; see [COMMAND-PALETTE.md](COMMAND-PALETTE.md).
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 

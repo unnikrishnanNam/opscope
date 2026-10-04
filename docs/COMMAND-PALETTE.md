@@ -12,7 +12,8 @@ We work the same way as before: one small phase at a time, each ending with a wo
 ticked boxes and notes at the bottom of this file. Phases are numbered **P0–P6** so they don't mix
 with the build phases 0–8 or the redesign phases R0–R8.
 
-**Status (2026-10-04):** P0–P5 done.
+**Status (2026-10-04):** P0–P6 done. Left for you: Safari and Firefox; one real copy to the
+clipboard, pressing `/` and `?` yourself, and a look at the shortcuts help (see the P6 notes for why).
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -292,15 +293,16 @@ Goal: the most used commands work without opening the palette.
 
 Goal: ready to merge.
 
-- [ ] axe-core run with the palette open (empty, results, sub-list, no match), light and dark
-- [ ] Keyboard-only walk; screen reader labels; reduced motion (no open animation)
-- [ ] 375 px, 768 px and wide; Chrome here, Safari and Firefox for you
-- [ ] Large-list check: a few thousand objects stay responsive while typing
-- [ ] Bundle size noted against R8 (JS 353 KB, CSS 61 KB)
-- [ ] README: the palette in "what it shows", the `/names` endpoint, and "Adding commands" (the table
-      above); screenshot if it earns a place
-- [ ] UI-REDESIGN.md: move the ⌘K item out of "Possible later" with a link here
-- [ ] Docker image built and checked
+- [x] axe-core run with the palette open (empty, results, sub-list, no match), light and dark; and
+      the shortcuts help
+- [x] Keyboard-only walk; screen reader labels; reduced motion (no open animation)
+- [~] 375 px, 768 px and wide; Chrome here, Safari and Firefox for you
+- [x] Large-list check: a few thousand objects stay responsive while typing
+- [x] Bundle size noted against R8 (JS 353 KB, CSS 61 KB)
+- [~] README: the palette in "what it shows", the `/names` endpoint, and "Adding commands" (the table
+      above); no screenshot (see notes)
+- [x] UI-REDESIGN.md: move the ⌘K item out of "Possible later" with a link here
+- [x] Docker image built and checked
 
 ---
 
@@ -562,3 +564,44 @@ Things that come up while building, decisions made, and anything that moves betw
   check is in P6.
 - New icon: `KeyboardIcon` (Lucide's "keyboard").
 - 70 frontend tests, all Go tests pass. Build: JS 378 KB (118 KB gzipped), CSS 67 KB (17 KB gzipped).
+
+### Phase P6
+
+- **Accessibility:** axe-core 4.13 (WCAG 2.0/2.1 A and AA), served from the scratchpad and run inside
+  the page as in R8, on the palette empty, with results, with no match and in a sub-list, and on the
+  shortcuts help, in light and dark, on both clusters. One problem, fixed: with no match the
+  `listbox` held only the "Nothing matches" text, and a listbox has to contain options. Without rows
+  the box is now just a message, and the search box says `aria-expanded="false"` and points at no
+  list. Everything then passed.
+- **Reduced motion:** the rule in `base.css` covered `*`, `::before` and `::after`, but not a
+  dialog's `::backdrop`, so every dialog's backdrop (the palette's, the confirms', the drawer's) still
+  faded in. It's covered now.
+- **Keyboard:** the walk was done phase by phase (P1 on `/kit`, P2–P5 in the app): ⌘K, typing, the
+  arrows, Enter, Cmd/Ctrl+Enter, Escape in its steps, Backspace out of a sub-list, focus back where it
+  was on closing (or where a command put it), the shortcuts and the help.
+- **Sizes:** 375 px (P2), 768 px (here: the top bar on one 56 px row with "Search…", the palette 634
+  px wide, the help 451 px; nothing wider than the window), 800 px and 1440 px (P2).
+- **Large clusters:** ranking timed in Node with the real code on generated indexes. 1,000 objects:
+  under 3 ms a keystroke; 5,000: under 9 ms; 20,000: 3–9 ms for typical queries, 19 ms for a single
+  letter. Building the commands from the index (only when the palette opens or the page changes)
+  takes 1, 4 and 19 ms. The palette draws at most 50 rows whatever matches.
+- **Sizes of the build:** JS 378 KB (118 KB gzipped) against R8's 353 KB (110 KB), CSS 67 KB (17 KB)
+  against 61 KB (16 KB): about 25 KB of JS and 6 KB of CSS for the palette, the shortcuts, the toast
+  and their sources. The Docker image is 42.5 MB, as before.
+- **Docker:** built as `opscope:palette-check` (so `opscope:dev` was left alone), run with the
+  multipass kubeconfig mounted read-only: `/api/health`, `/names` in 25–30 ms, and in the browser
+  `po argocd-server` opening the pod and `2` its YAML tab. The container and the test image were
+  removed afterwards.
+- **README:** the palette in the opening paragraph, a "Command palette and shortcuts" section (what to
+  type, the keys), "Adding commands" for developers (the table from this plan), the new files in the
+  layout. `/names` went into the API table in P3. No screenshot: the palette is a box over a page,
+  and it explains itself better in words than in a fourth picture.
+- `PHASES.md` and `UI-REDESIGN.md` link here; the ⌘K item in "Possible later" is ticked off.
+- **Not checked here:**
+  - Safari and Firefox (Chrome only, as in R8).
+  - A real copy to the clipboard: the built-in browser refuses clipboard writes (P4), so only the
+    failure toast was seen for real; the success path was checked with a stand-in clipboard.
+  - Pressing `/` and `?`: the test tool can't send those keys (P5); real key events sent from the
+    page did the same thing.
+  - A visual look at the shortcuts help: the browser pane was hidden whenever it was open, so it was
+    checked from its measurements and axe only.
