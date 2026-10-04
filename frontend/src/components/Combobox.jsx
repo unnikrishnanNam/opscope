@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { usePopover } from "./Popover.jsx";
 import { CheckIcon, ChevronDownIcon, SearchIcon } from "./icons.jsx";
+import { useListNavigation } from "./useListNavigation.js";
 import "./Combobox.css";
 
 // Lists longer than this get a search box.
@@ -43,7 +44,6 @@ export default function Combobox({
   const searchRef = useRef(null);
   const listRef = useRef(null);
   const [query, setQuery] = useState("");
-  const [active, setActive] = useState(0);
   const popover = usePopover({
     onClose: ({ returnFocus }) => {
       setQuery("");
@@ -54,6 +54,15 @@ export default function Combobox({
   const needle = query.trim().toLowerCase();
   const visible = needle ? options.filter((o) => o.label.toLowerCase().includes(needle)) : options;
   const selected = options.find((o) => o.value === value);
+
+  // Up/Down, Home/End (without a search box) and Enter; see useListNavigation.
+  const { active, setActive, onKeyDown: onListKeyDown } = useListNavigation({
+    count: visible.length,
+    listRef,
+    homeEnd: !searchable,
+    open: popover.open,
+    onEnter: (i) => pick(visible[i]),
+  });
 
   // On opening: start on the current choice, and focus the search box (or the list).
   useEffect(() => {
@@ -67,25 +76,9 @@ export default function Combobox({
     (searchRef.current ?? listRef.current)?.focus();
   }, [popover.open]);
 
-  // Keep the highlighted row in view while moving with the keyboard.
-  useEffect(() => {
-    listRef.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView({ block: "nearest" });
-  }, [active, popover.open]);
-
   function pick(option) {
     onChange(option.value);
     popover.close({ returnFocus: true });
-  }
-
-  function onListKeyDown(event) {
-    const last = visible.length - 1;
-    if (event.key === "ArrowDown") setActive((i) => (i >= last ? 0 : i + 1));
-    else if (event.key === "ArrowUp") setActive((i) => (i <= 0 ? last : i - 1));
-    else if (event.key === "Home" && !searchable) setActive(0);
-    else if (event.key === "End" && !searchable) setActive(last);
-    else if (event.key === "Enter" && visible[active]) pick(visible[active]);
-    else return;
-    event.preventDefault();
   }
 
   const activeId = visible[active] ? `${id}-option-${active}` : undefined;

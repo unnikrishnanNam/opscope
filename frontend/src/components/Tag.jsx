@@ -14,3 +14,7 @@ export function Tag({ mono = false, title, className, children }) {
 export function Kbd({ children }) {
   return <kbd className="kbd">{children}</kbd>;
 }
+
+// The modifier key for shortcuts like ⌘K, as this computer's keyboard
+// labels it: "⌘" on Apple devices, "Ctrl" elsewhere.
+export const modKey = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl";

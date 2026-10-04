@@ -12,7 +12,7 @@ We work the same way as before: one small phase at a time, each ending with a wo
 ticked boxes and notes at the bottom of this file. Phases are numbered **P0–P6** so they don't mix
 with the build phases 0–8 or the redesign phases R0–R8.
 
-**Status (2026-10-04):** P0 done.
+**Status (2026-10-04):** P0 and P1 done.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -160,8 +160,8 @@ GET /api/clusters/{id}/names
   goes back up.
 - Loading the object index shows a quiet line under the list, not a spinner over everything; a
   failure there is a quiet line too ("Couldn't load objects from multipass"), and the rest keeps working.
-- The usual rules from UI-REDESIGN.md: Signal orange only for the focus ring and the active row's
-  marker, shadow because it floats, no decoration.
+- The usual rules from UI-REDESIGN.md: the highlighted row looks like the pickers' (a quiet fill,
+  no Signal orange), shadow because it floats, no decoration.
 
 ### Files
 
@@ -178,7 +178,8 @@ src/commands/
   *.test.js         Vitest tests next to the code they test
 src/components/
   Highlight.jsx               text with matched letters in bold
-  CommandPalette.jsx / .css   the dialog: search box, list, footer (P1)
+  useListNavigation.js        the highlighted row and its keys, shared with Combobox
+  CommandPalette.jsx / .css   the dialog: search box, list, footer
   Toast.jsx / .css            short confirmations like "Copied" (P4)
   ShortcutsHelp.jsx           the "?" dialog, generated from the registry (P5)
 ```
@@ -203,17 +204,19 @@ Goal: commands can be registered and listed; nothing on screen yet.
 
 Goal: a finished palette on `/kit`, with sample commands, before it touches the app.
 
-- [ ] `CommandPalette` on `<dialog>`: search box, grouped list, footer with key hints
-- [ ] Keyboard: ↑↓ (wrapping), Home/End, Enter, Cmd/Ctrl+Enter for links in a new tab, Escape
-      (clears the box first, then closes), Backspace out of a sub-list
-- [ ] Mouse: hover moves the active row, click runs it, Cmd/Ctrl-click opens links in a new tab
-- [ ] Sub-lists (`items`) with the chip in the search box
-- [ ] Empty box (recent, then the rest), no matches, and loading states
-- [ ] ARIA: combobox input with `aria-activedescendant`, `listbox` with groups, results count read
+- [x] `CommandPalette` on `<dialog>`: search box, grouped list, footer with key hints
+- [~] Keyboard: ↑↓ (wrapping), Enter, Cmd/Ctrl+Enter for links in a new tab, Escape (clears the
+      box, then leaves a sub-list, then closes), Backspace out of a sub-list. No Home/End: in the
+      search box they move the text cursor (see notes)
+- [x] Mouse: hover moves the active row, click runs it, Cmd/Ctrl-click opens links in a new tab
+- [x] Sub-lists (`items`) with the chip in the search box
+- [x] Empty box (recent, then the rest), no matches, loading, couldn't load, and "showing the best
+      50 of 247"
+- [x] ARIA: combobox input with `aria-activedescendant`, `listbox` with groups, results count read
       out with a polite live region
-- [ ] Shared list navigation with `Combobox` where it fits (a small `useListNavigation` hook), rather
-      than a second copy of the same key handling
-- [ ] On `/kit` in both themes, keyboard only, and at 375 px
+- [x] Shared list navigation with `Combobox` (`useListNavigation`), rather than a second copy of
+      the same key handling
+- [x] On `/kit` in both themes, keyboard only, and at 375 px
 
 ## Phase P2: In the app, with navigation commands
 
@@ -340,6 +343,45 @@ Things that come up while building, decisions made, and anything that moves betw
   namespace, and the empty box shows Recent first. Matched letters use weight 700 against the 500
   of the row, through a new `Highlight` component.
 - The app shell itself is unchanged: `CommandsProvider` is in place, with no global sources yet.
-- `.claude/launch.json` was added, so the dev server can be started from the desktop app's preview.
+- A local `.claude/launch.json` starts the dev server for the desktop app's preview. It's kept out
+  of git (listed in `.git/info/exclude`).
 - Build: JS 354 KB (111 KB gzipped), CSS 61 KB, about the same as after R8. The demo and its
   `Highlight` use are only on `/kit`, which isn't in the bundle.
+
+### Phase P1
+
+- Checked on `/kit` in both themes and at 375 px, mostly with the keyboard: typing, Up/Down with
+  wrap-around, Enter on a link, an action and a sub-list, Cmd-click (a new tab, checked with
+  `window.open` stubbed), Escape in its three steps (clear, leave the sub-list, close) with focus
+  back on the button, Backspace out of a sub-list, hover and click. A short query on 247 sample
+  pods showed "Showing the best 50 of 247"; the slow sample source showed "Loading objects…" and,
+  with "Loading objects fails" ticked, "Couldn't load objects: the cluster didn't answer" while the
+  other commands kept working.
+- The `/kit` demo has its own `CommandsProvider` with sample sources, and registers "This page"
+  commands with `useCommands`, so it runs the real registry, not a copy. "Follow logs" turning
+  into "Stop following logs" after it runs shows `deps` at work.
+- The palette's inside is only rendered while it's open. Each opening starts with an empty box at
+  the top level, and the registry's loading (`refresh`) runs on opening, not on page load.
+- Escape on the search box calls `preventDefault()` while there's something to clear or a sub-list
+  to leave, which keeps the `<dialog>` open; only the last Escape reaches the dialog and closes it.
+  Checked in Chrome; Safari and Firefox are for P6.
+- No Home/End: focus stays in the search box, where they move the text cursor (the namespace
+  picker works the same way when it has a search box).
+- The highlighted row uses the pickers' quiet fill rather than a Signal orange marker. It's the
+  same thing as the highlighted row in a picker, so it looks the same; the plan's "active row's
+  marker" is dropped.
+- Rows are `div`s with `role="option"` inside `role="group"`s, not links: a listbox can't contain
+  links. Clicks are handled on the row (with Cmd/Ctrl for a new tab), and a mouse press on the
+  list doesn't take focus out of the search box.
+- "Nothing matches" waits while a source is still loading, so it doesn't flash before objects arrive.
+- Narrow rows: the title is cut off first; the detail (a namespace, which tells two same-named pods
+  apart) keeps its width, up to 40% of the row. Found at 375 px, where a long pod name had pushed
+  its namespace out entirely.
+- `useListNavigation` (`src/components/`) is the highlighted row and its keys, now shared with
+  `Combobox`. Its `active` is always a row that exists, even right after the list got shorter (new
+  data, a new query). The namespace picker was checked again on `/kit` after the change.
+- `useModal` is now exported from `Dialog.jsx` for the palette; `modKey` in `Tag.jsx` gives "⌘" on
+  Apple devices and "Ctrl" elsewhere, for key hints (the top bar's ⌘K hint in P2 uses it too).
+- The built-in browser again ran the opening animation slowly while the pane wasn't focused, so the
+  first screenshot caught the palette half faded in; the finished state was checked from the page.
+- Build unchanged from P0 (JS 354 KB, CSS 61 KB): the palette isn't used by the app until P2.
