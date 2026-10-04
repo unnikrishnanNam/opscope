@@ -13,12 +13,15 @@ import "./styles/base.css";
 import "./theme.js"; // keeps the theme in step with the OS and other tabs
 import App from "./App.jsx";
 import { ClustersProvider } from "./clusters.jsx";
+import { CommandsProvider } from "./commands/registry.jsx";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <BrowserRouter>
       <ClustersProvider>
-        <App />
+        <CommandsProvider>
+          <App />
+        </CommandsProvider>
       </ClustersProvider>
     </BrowserRouter>
   </StrictMode>,

@@ -1,0 +1,6 @@
+/* Matched letters: heavier, in the same colour. A span, not <mark>, so
+   screen readers don't announce every bold run as "highlighted". */
+.highlight {
+  font-weight: var(--weight-title);
+  color: var(--text);
+}

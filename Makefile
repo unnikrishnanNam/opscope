@@ -13,7 +13,7 @@ DOCKER_RUN = docker run --rm -p 127.0.0.1:8080:8080 -v opscope-data:/data
 help:
 	@echo "make dev-backend                 run the Go server on :8080"
 	@echo "make dev-frontend                run the Vite dev server on :5173 (proxies /api to :8080)"
-	@echo "make test                        run the Go tests"
+	@echo "make test                        run the Go and frontend tests"
 	@echo "make build                       build the frontend and the Go binary locally"
 	@echo "make docker-build                build the Docker image ($(IMAGE):$(VERSION))"
 	@echo "make docker-run                  run the image; add clusters in the UI"
@@ -31,6 +31,7 @@ dev-frontend:
 
 test:
 	cd backend && go test ./...
+	cd frontend && npm test
 
 build:
 	cd frontend && npm ci && npm run build
