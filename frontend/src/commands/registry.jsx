@@ -104,14 +104,25 @@ export function useCommandList(ctx, query, within = null) {
     if (!within) store.refresh(ctx);
   }, [store, ctx, within]);
 
+  // Building the commands (every object in the cluster, for the objects
+  // source) doesn't depend on the query, so it's done only when the sources
+  // or ctx change, not on every key press; only the ranking below is.
+  const { entries, status } = useMemo(
+    () =>
+      within
+        ? { entries: collectItems(within, ctx), status: [] }
+        : {
+            entries: collect(store.sources(), ctx, (source) => store.data(source, ctx)),
+            status: store.status(ctx),
+          },
+    [store, version, ctx, within],
+  );
+
   return useMemo(() => {
-    const entries = within
-      ? collectItems(within, ctx)
-      : collect(store.sources(), ctx, (source) => store.data(source, ctx));
     // A sub-list keeps its own order (namespaces A to Z); "Recent" is for the top.
     const list = buildList({ entries, query, recent: within ? [] : getRecent() });
-    return { ...list, status: within ? [] : store.status(ctx) };
-  }, [store, version, ctx, query, within]);
+    return { ...list, status };
+  }, [entries, status, query, within]);
 }
 
 // useShortcutCommands returns every command with a `shortcut`, one per
