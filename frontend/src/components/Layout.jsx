@@ -45,7 +45,8 @@ export default function Layout() {
   // (a confirm, the drawer): that one has to be dealt with first.
   useEffect(() => {
     function onKeyDown(event) {
-      if (event.key.toLowerCase() !== "k" || !hasModKey(event) || event.altKey || event.shiftKey) return;
+      // `key` can be missing: Chrome sends keydown events without one when it autofills a field.
+      if (event.key?.toLowerCase() !== "k" ||!hasModKey(event) || event.altKey || event.shiftKey) return;
       if (document.querySelector("dialog[open]:not(.palette)")) return;
       event.preventDefault();
       setPaletteOpen((open) => !open);
