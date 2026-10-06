@@ -55,7 +55,10 @@ frontend/                 React app (Vite, plain JavaScript)
 deploy/kubernetes/        manifests for running Opscope inside a cluster
 data/                     local data (git- and docker-ignored): kubeconfigs, saved clusters
 Dockerfile                builds the single image (for any platform; CI builds amd64 and arm64)
-.github/workflows/        release.yml: publishes the image to GHCR for each version tag
+.github/workflows/        ci.yml: tests, build and image check for every pull request and push to main;
+                          release.yml: publishes the image to GHCR for each version tag
+.github/scripts/          check-manifest-tag.sh: the release's check that the manifest uses its image
+.github/dependabot.yml    weekly updates for the (commit-pinned) GitHub Actions
 Makefile                  common commands
 docs/PHASES.md            build plan, progress and notes
 docs/UI-REDESIGN.md       the interface redesign: design rules, phases and notes
@@ -229,8 +232,8 @@ The manifests in `deploy/kubernetes/` run Opscope as a pod that shows the cluste
   Deployment and a ClusterIP Service
 - `secrets-access.yaml`: an optional second ClusterRole for Secrets (see below)
 
-`opscope.yaml` uses the published image, `ghcr.io/unnikrishnannam/opscope:v1.1.0` (amd64 and
-arm64), so the cluster pulls it by itself. To run your own build instead, set `image:` to
+`opscope.yaml` uses the published image of the latest release (`ghcr.io/unnikrishnannam/opscope`,
+amd64 and arm64), so the cluster pulls it by itself. To run your own build instead, set `image:` to
 `opscope:dev` and, for kind, load it straight into the nodes:
 
 ```bash
@@ -283,22 +286,35 @@ kubectl delete -f deploy/kubernetes/secrets-access.yaml
 
 The Secrets pages then say "this user isn't allowed to read this", and everything else keeps working.
 
-## Releases
+## Checks and releases
+
+Every pull request and every push to `main` runs `.github/workflows/ci.yml`: `go vet`, a `gofmt`
+check and the Go tests; the frontend's tests and build; and a Docker build for amd64 (not pushed).
+`make test` runs the same tests locally.
 
 Pushing a version tag publishes the image. `.github/workflows/release.yml` builds it for amd64 and
 arm64 and pushes `ghcr.io/unnikrishnannam/opscope` with the tags `vX.Y.Z`, `X.Y` and `latest`
-(a pre-release such as `v1.3.0-rc.1` gets only its own tag):
+(a pre-release such as `v1.3.0-rc.1` gets only its own tag). Before anything is pushed, it runs the
+tag's tests and checks that `deploy/kubernetes/opscope.yaml` uses the image being released; if
+either fails, nothing is published. So a release takes three steps:
 
-```bash
-git tag -a v1.2.0 -m "Release v1.2.0"
-```
+1. Change the image tag in `deploy/kubernetes/opscope.yaml` to the new version (for example
+   `ghcr.io/unnikrishnannam/opscope:v1.2.0`), and merge that into `main`.
+2. Tag the merged commit:
 
-```bash
-git push origin v1.2.0
-```
+   ```bash
+   git tag -a v1.2.0 -m "Release v1.2.0"
+   ```
 
-The workflow can also be run by hand from the Actions tab for a tag that already exists. Remember to
-update the image tag in `deploy/kubernetes/opscope.yaml` for each release.
+3. Push the tag:
+
+   ```bash
+   git push origin v1.2.0
+   ```
+
+Pre-releases skip the manifest check, so the manifest stays on the last real release. The
+workflow can also be run by hand from the Actions tab for a tag that already exists; tags from
+before the check (v1.0.0, v1.1.0) are published without it.
 
 ## Configuration
 
