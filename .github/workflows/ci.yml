@@ -1,0 +1,110 @@
+# Checks every pull request and every push to main: the Go code (vet,
+# formatting, tests), the frontend (tests, build) and the Docker image
+# (built for amd64, not pushed).
+#
+# release.yml also calls this workflow for the tag it's about to publish,
+# so an image is only pushed when its tests pass. It then passes `ref` (the
+# tag) and skips the Docker job, since it builds the image itself right after.
+#
+# Actions are pinned to a commit (the comment says which version), so a
+# changed tag upstream can't change what runs here; Dependabot proposes
+# updates (.github/dependabot.yml).
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+    inputs:
+      ref:
+        description: "What to check out and test, e.g. refs/tags/v1.2.0"
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+# A newer push to the same pull request cancels the run still going.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || inputs.ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  backend:
+    name: Backend (Go)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }} # empty outside workflow_call: the commit that triggered the run
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "::error::These files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Test
+        run: go test ./...
+
+  frontend:
+    name: Frontend (tests and build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+
+      # --if-present: tags from before the frontend had tests (v1.0.0, v1.1.0)
+      # have no test script, and a release can still be run for them by hand.
+      - name: Test
+        run: npm run --if-present test
+
+      - name: Build
+        run: npm run build
+
+  docker:
+    name: Docker image (amd64, not pushed)
+    # Not when release.yml calls this: it builds the image itself next.
+    if: ${{ !inputs.ref }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
