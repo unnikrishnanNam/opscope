@@ -12,8 +12,9 @@ We work the same way as before: one small phase at a time, each ending with a wo
 ticked boxes and notes at the bottom of this file. Phases are numbered **P0–P6** so they don't mix
 with the build phases 0–8 or the redesign phases R0–R8.
 
-**Status (2026-10-04):** P0–P6 done. Left for you: Safari and Firefox; one real copy to the
-clipboard, pressing `/` and `?` yourself, and a look at the shortcuts help (see the P6 notes for why).
+**Status (2026-10-07):** P0–P6 done, and the checks left over from P6 (Safari and Firefox, a real
+copy to the clipboard, `/` and `?`, the shortcuts help) were done by hand. Two fixes followed; see
+[After P6](#after-p6). Released in v1.2.0.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -296,7 +297,7 @@ Goal: ready to merge.
 - [x] axe-core run with the palette open (empty, results, sub-list, no match), light and dark; and
       the shortcuts help
 - [x] Keyboard-only walk; screen reader labels; reduced motion (no open animation)
-- [~] 375 px, 768 px and wide; Chrome here, Safari and Firefox for you
+- [x] 375 px, 768 px and wide; Chrome here, Safari and Firefox checked by hand
 - [x] Large-list check: a few thousand objects stay responsive while typing
 - [x] Bundle size noted against R8 (JS 353 KB, CSS 61 KB)
 - [~] README: the palette in "what it shows", the `/names` endpoint, and "Adding commands" (the table
@@ -605,3 +606,15 @@ Things that come up while building, decisions made, and anything that moves betw
     page did the same thing.
   - A visual look at the shortcuts help: the browser pane was hidden whenever it was open, so it was
     checked from its measurements and axe only.
+- **Checked by hand afterwards (2026-10-07):** Safari and Firefox, a real copy to the clipboard,
+  `/` and `?`, and the shortcuts help. All fine.
+
+### After P6
+
+- **Commands were rebuilt on every key press.** `useCommandList` collected the commands (every object
+  in the cluster, from the objects source) and ranked them in one `useMemo` keyed on the query, so
+  each key press built them all again. They're now two: the commands are built when the sources, `ctx`
+  or the sub-list change, and only the ranking runs per key press.
+- **⌘K threw on autofill.** The listener in `Layout.jsx` called `event.key.toLowerCase()`, but
+  Chrome sends `keydown` events without a `key` when it autofills a field. It now uses
+  `event.key?.toLowerCase()`.

@@ -180,7 +180,7 @@ Each release is published to the GitHub Container Registry for amd64 and arm64:
 docker run --rm -p 127.0.0.1:8080:8080 -v opscope-data:/data ghcr.io/unnikrishnannam/opscope:latest
 ```
 
-Open http://localhost:8080 and add a cluster in the UI. Use a version tag (for example `:v1.1.0`)
+Open http://localhost:8080 and add a cluster in the UI. Use a version tag (for example `:v1.2.0`)
 instead of `:latest` to stay on one release.
 
 To build the image yourself:
