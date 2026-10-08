@@ -1,0 +1,212 @@
+# Opscope: Repositioning
+
+Opscope started as a learning project. It is now a lightweight, read-only tool for day-to-day
+Kubernetes operations, and its documentation, project files and public descriptions should say so.
+This plan makes that change visible everywhere Opscope describes itself: the README, the docs, the
+app's own copy, the image metadata and the GitHub repository.
+
+It changes no behaviour. The backend, the API, the manifests and every page work exactly as in
+v1.2.0. New features, fixes and optimizations for the next release are planned separately.
+
+Phases are numbered **D0–D6** so they don't mix with the build phases 0–8, the redesign phases
+R0–R8 or the command palette phases P0–P6. All work happens on the `docs/repositioning` branch.
+
+**Status (2026-10-08):** plan written; D0 not started.
+
+**Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
+
+---
+
+## Decisions
+
+- **Positioning.** "Opscope is a lightweight, read-only Kubernetes dashboard for day-to-day
+  operations." Read-only is presented as the main feature: Opscope needs only `get` and `list`, and
+  nothing in it can change a cluster, so it is safe to give to anyone who needs to look.
+- **Licence: Apache-2.0**, the usual choice in the Kubernetes ecosystem. It includes a patent grant.
+- **The three journals are archived, not rewritten.** `PHASES.md`, `UI-REDESIGN.md` and
+  `COMMAND-PALETTE.md` move to `docs/design/` with their content unchanged and a short note at the
+  top. They remain the record of how and why Opscope was built. This plan joins them when it's done.
+- **User documentation and contributor documentation are separate.** The README is for people who
+  run Opscope. Building, testing, extending and releasing it move to `CONTRIBUTING.md`, and the
+  longer reference material to `docs/`.
+- **GitHub Releases stay the changelog.** No `CHANGELOG.md`.
+- **No version bump** in this work. The version is decided when the next release is planned.
+- **The showcase video is not committed.** At 19 MB it would stay in the git history of every clone
+  for good. It is uploaded to GitHub and embedded by URL (see D5). `docs/showcase/` is git-ignored.
+- **The API is documented but not declared stable.** It exists to serve the web UI and may change
+  between minor versions.
+- **The roadmap lives in GitHub issues.** The ideas collected in the design records ("Possible next
+  steps", "Possible later") become issues labelled `enhancement`, and the README links to that list
+  instead of keeping its own.
+- **No vulnerability reporting channel for now,** and so no `SECURITY.md`. The security model is
+  described in the README and `docs/deployment.md`. A reporting channel can be added later.
+
+---
+
+## Writing style
+
+Everything written or rewritten in this plan follows these rules. The archived journals are left
+as they are.
+
+- **Plain and precise.** Short sentences and concrete statements. No marketing language
+  ("blazing fast", "powerful", "seamless").
+- **Address the reader.** Instructions are in the second person ("Set `OPSCOPE_KUBECONFIG` to…").
+  No "we", no notes addressed to the maintainer, and no learning-project framing.
+- **Say what it does, then why.** Lead with the behaviour, then the reason, especially for security
+  decisions.
+- **Consistent terms:** Opscope (never OpScope), read-only, kubeconfig, metrics-server, Gateway API,
+  command palette. British spelling in prose, as in the existing docs ("colour", "licence" as a noun),
+  except in fixed names (`LICENSE`, `Apache-2.0`, Kubernetes field names).
+- **Every page links onwards.** A short section points to the document with the full details
+  rather than repeating them.
+
+---
+
+## Target layout
+
+```
+README.md                 for users: what it is, video, features, quick start, connecting clusters,
+                          the palette, security model, configuration, screenshots, links
+CONTRIBUTING.md           for contributors: repo layout, development, /kit, tests, adding commands,
+                          CI and releases
+LICENSE                   Apache-2.0
+docs/
+  deployment.md           Docker, kind networking, Kubernetes manifests, permissions, Secret access
+  api.md                  the HTTP API reference
+  design/                 design records, kept for history
+    build-phases.md       was docs/PHASES.md
+    ui-redesign.md        was docs/UI-REDESIGN.md
+    command-palette.md    was docs/COMMAND-PALETTE.md
+    repositioning.md      this plan, once done
+  screenshots/            the README's pictures
+.github/
+  ISSUE_TEMPLATE/         bug report and feature request
+  pull_request_template.md
+```
+
+---
+
+## Workflow for each phase
+
+1. Make the changes listed for the phase.
+2. Check every relative link in the changed files resolves, and read the rendered Markdown.
+3. When app copy changes (D3, D4): `make test` and `npm run build` pass, and the change is checked
+   in the browser in light and dark.
+4. Tick the boxes here and write the phase notes.
+5. Review, then commit as "Phase Dn: …". Nothing is pushed or changed on GitHub without approval.
+
+---
+
+## Phase D0: Licence and project files
+
+Goal: Opscope can legally be used, and the project files a user or contributor looks for exist.
+
+- [ ] `LICENSE`: the Apache-2.0 text, copyright Unnikrishnan Namboothiri
+- [ ] Third-party assets bundled in the app and their licences, listed for the README's licence
+      section: Lucide icons (ISC, already noted in `icons.jsx`), Manrope and JetBrains Mono (SIL OFL 1.1)
+- [ ] `.github/ISSUE_TEMPLATE/`: a bug report (Opscope version, Kubernetes version, how it runs:
+      Docker, in a cluster or from source; what happened and what was expected) and a feature request
+- [ ] `.github/pull_request_template.md`: what changed, how it was checked, docs updated
+- [ ] `.gitignore`: `docs/showcase/`
+
+## Phase D1: Archive the design records
+
+Goal: the journals are kept as history and stop presenting themselves as current documentation.
+
+- [ ] `git mv` the three journals to `docs/design/` (so their history follows them), with lowercase
+      names as in the target layout
+- [ ] A note at the top of each: what it records, that it describes Opscope as it was built, and
+      where the current documentation is
+- [ ] Links between them and to the README updated to the new paths
+- [ ] Code comments that cite phase names ("phase R3", "P0 and P1" in `frontend/src/kit/*` and
+      `Field.jsx`) reworded to describe the code itself
+- [ ] No other changes to the journals' content
+
+## Phase D2: Reference and contributor docs
+
+Goal: everything that leaves the README has a proper home first, so nothing is lost in D4.
+
+- [ ] `docs/deployment.md`: running with Docker (published image and own build), kind networking,
+      running in a cluster, the permissions table, turning Secret access off, probes and shutdown,
+      keeping clusters across restarts (PersistentVolumeClaim)
+- [ ] `docs/api.md`: the endpoint table, resource names, error format, the two optional-feature codes,
+      the background sampling; a note that the API serves the web UI and isn't stable yet
+- [ ] `CONTRIBUTING.md`: requirements, repo layout, running in development, `/kit`, tests
+      (`make test`), code style (gofmt, plain CSS on tokens, no new runtime dependencies without
+      reason), adding commands (the command shape and sources, from the palette's design record),
+      CI, the release steps, and how changes are proposed (issues, pull requests, design docs)
+- [ ] A design doc template or short guidance in `docs/design/` for future features, in the
+      writing style above
+
+## Phase D3: App and image copy
+
+Goal: the app, the image and the code describe Opscope the same way the docs do.
+
+- [ ] `frontend/index.html`: the `description` meta tag
+- [ ] `frontend/public/site.webmanifest`: a `description`
+- [ ] `frontend/src/pages/Welcome.jsx`: the introduction on the first-run screen
+- [ ] `backend/main.go`: the package comment
+- [ ] `.github/workflows/release.yml`: the image's `org.opencontainers.image.description` label;
+      confirm the `licenses` label is set from the repository once GitHub detects the licence
+- [ ] Checked in the browser (welcome screen, light and dark, 375 px and wide); `make test` and the
+      build pass
+
+## Phase D4: README
+
+Goal: a README that tells someone new what Opscope is, why it's safe, and how to run it in a minute.
+
+- [ ] Title, tagline and badges: CI, latest release, image, licence
+- [ ] A placeholder for the video (filled in D5) and a short paragraph on who Opscope is for and
+      why it's read-only
+- [ ] Features, grouped: overview and health, resources, detail pages (YAML, events, logs), live
+      usage, command palette and shortcuts, multiple clusters, themes and small screens
+- [ ] Quick start: one Docker command; one `kubectl apply` and port-forward; links to
+      `docs/deployment.md`
+- [ ] Connecting clusters; the command palette and shortcuts (the user-facing part)
+- [ ] Security model: no login, read-only RBAC, Secret values only on request and never cached,
+      logs never cached; the full details in `docs/deployment.md`
+- [ ] Configuration (environment variables)
+- [ ] Roadmap: GitHub issues for the ideas in the design records (opened with approval at the
+      time), and a short README section linking to them
+- [ ] Screenshots retaken with the current top bar (they predate the palette's search button), in
+      light and dark, from the test clusters
+- [ ] Documentation, Contributing and License sections, including the third-party assets from D0
+
+## Phase D5: Showcase video
+
+Goal: the video plays inline at the top of the README.
+
+- [ ] The video is back in `docs/showcase/` (it is not tracked, so it may need adding again)
+- [ ] Compressed with macOS's `avconvert` to 1280×720 and under 10 MB (GitHub's limit for videos on
+      free plans); the audio track removed if it's silent
+- [ ] Uploaded to GitHub by hand (dropped into an unsent comment box), giving a
+      `github.com/user-attachments/assets/…` URL. GitHub's API can't upload these, so this step is manual
+- [ ] The URL on its own line under the tagline, where GitHub renders it as a player, with a
+      sentence for anyone whose viewer doesn't play video
+- [ ] Checked on github.com once the branch is pushed
+
+## Phase D6: GitHub repository and final review
+
+Goal: the repository page matches the docs, and the branch is ready to merge.
+
+- [ ] With approval at the time: the repository description (the tagline) and topics: `kubernetes`, `dashboard`, `read-only`, `k8s`,
+      `devops`, `go`, `react`
+- [ ] The social preview image uploaded (outstanding since R8; GitHub's web UI only)
+- [ ] Unused repository features reviewed (the Wiki is on and empty)
+- [ ] A last read of every changed file for tone, terms and broken links
+- [ ] This plan moved to `docs/design/repositioning.md` and marked done
+- [ ] Pull request opened; merged after CI and review
+
+---
+
+## Open questions
+
+None. The tagline, the roadmap in GitHub issues, leaving out a reporting channel for now and
+retaking the screenshots were settled on 2026-10-08 and are recorded above. Changes to the GitHub
+repository are approved one at a time in D4 and D6.
+
+---
+
+## Phase notes
+
+Notes on each phase are added here as it's done.
