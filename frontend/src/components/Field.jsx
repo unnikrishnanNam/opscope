@@ -65,7 +65,7 @@ export function Textarea({ mono = false, invalid, className, ...props }) {
 }
 
 // A styled native <select>, for short fixed lists (like "last 500 lines").
-// Long or searchable lists get a Combobox instead (phase R3).
+// Long or searchable lists get a Combobox instead (Combobox.jsx).
 export function Select({ size = "md", invalid, className, children, ...props }) {
   return (
     <select className={controlClass("select", size, className)} aria-invalid={invalid || undefined} {...props}>

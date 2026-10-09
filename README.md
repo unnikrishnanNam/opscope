@@ -19,10 +19,10 @@ in a cluster.
 | --- | --- |
 | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pods-dark.png"><img src="docs/screenshots/pods-light.png" alt="The pods list, with status, readiness, restarts and live usage"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pod-dark.png"><img src="docs/screenshots/pod-light.png" alt="A crash-looping pod's detail page: facts, containers and conditions"></picture> |
 
-The project was built in phases as a learning project; [docs/PHASES.md](docs/PHASES.md) has the
+The project was built in phases as a learning project; [docs/design/build-phases.md](docs/design/build-phases.md) has the
 plan, what each phase delivered, and the decisions made along the way. The interface was then
-redesigned in its own phases, recorded in [docs/UI-REDESIGN.md](docs/UI-REDESIGN.md), and the
-command palette added in [docs/COMMAND-PALETTE.md](docs/COMMAND-PALETTE.md).
+redesigned in its own phases, recorded in [docs/design/ui-redesign.md](docs/design/ui-redesign.md), and the
+command palette added in [docs/design/command-palette.md](docs/design/command-palette.md).
 
 ## Layout
 
@@ -60,9 +60,8 @@ Dockerfile                builds the single image (for any platform; CI builds a
 .github/scripts/          check-manifest-tag.sh: the release's check that the manifest uses its image
 .github/dependabot.yml    weekly updates for the (commit-pinned) GitHub Actions
 Makefile                  common commands
-docs/PHASES.md            build plan, progress and notes
-docs/UI-REDESIGN.md       the interface redesign: design rules, phases and notes
-docs/COMMAND-PALETTE.md   the command palette and shortcuts: design, phases and notes
+docs/design/              design records: the first build, the interface redesign and the
+                          command palette, each with its plan, decisions and notes
 docs/screenshots/         the pictures in this README
 ```
 

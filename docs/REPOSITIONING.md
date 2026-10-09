@@ -11,7 +11,7 @@ v1.2.0. New features, fixes and optimizations for the next release are planned s
 Phases are numbered **D0–D6** so they don't mix with the build phases 0–8, the redesign phases
 R0–R8 or the command palette phases P0–P6. All work happens on the `docs/repositioning` branch.
 
-**Status (2026-10-09):** D0 done; D1 next.
+**Status (2026-10-09):** D0 and D1 done; D2 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -113,14 +113,14 @@ Goal: Opscope can legally be used, and the project files a user or contributor l
 
 Goal: the journals are kept as history and stop presenting themselves as current documentation.
 
-- [ ] `git mv` the three journals to `docs/design/` (so their history follows them), with lowercase
+- [x] `git mv` the three journals to `docs/design/` (so their history follows them), with lowercase
       names as in the target layout
-- [ ] A note at the top of each: what it records, that it describes Opscope as it was built, and
+- [x] A note at the top of each: what it records, that it describes Opscope as it was built, and
       where the current documentation is
-- [ ] Links between them and to the README updated to the new paths
-- [ ] Code comments that cite phase names ("phase R3", "P0 and P1" in `frontend/src/kit/*` and
+- [x] Links between them and to the README updated to the new paths
+- [x] Code comments that cite phase names ("phase R3", "P0 and P1" in `frontend/src/kit/*` and
       `Field.jsx`) reworded to describe the code itself
-- [ ] No other changes to the journals' content
+- [x] No other changes to the journals' content
 
 ## Phase D2: Reference and contributor docs
 
@@ -237,3 +237,24 @@ Notes on each phase are added here as it's done.
 - The pull request template asks what changed, how it was checked, and confirms three things:
   `make test` passes, Opscope stays read-only, and the docs follow the change.
 - `.gitignore` has `docs/showcase/`; the video is still on disk and now ignored rather than untracked.
+
+### Phase D1
+
+- The journals moved with `git mv`, so `git log --follow` still shows their history:
+  `docs/PHASES.md` → `docs/design/build-phases.md`, `docs/UI-REDESIGN.md` → `docs/design/ui-redesign.md`,
+  `docs/COMMAND-PALETTE.md` → `docs/design/command-palette.md`.
+- Each starts with a "Design record" note: which phases it covers, when they were completed, which
+  release they became (v1.0.0, v1.1.0, v1.2.0), that it describes Opscope as it was then, and a link
+  to the README.
+- Only clickable links were changed inside the journals (six, between the three of them). Plain
+  mentions such as "README and PHASES.md updated" are part of what was recorded at the time and were
+  left as written. Their links within the same file (`#possible-next-steps`, `#after-p6`,
+  `#decisions`) are unaffected by the move.
+- README: the three links now point to `docs/design/`, and its layout lists `docs/design/` as one
+  entry. The surrounding text, including "learning project", is rewritten in D4.
+- Code comments: the four `/kit` demos and `Field.jsx` no longer cite R1, R2, R3, P0–P3. The
+  commands demo now says its sample sources are shaped like those in `commands/sources/`, and
+  `Field.jsx` points to `Combobox.jsx`. "Phase" elsewhere in the code is the Kubernetes pod phase and
+  stays.
+- Checked: every relative link and anchor in the README, this plan and the three records resolves
+  (a small script, not committed); 70 frontend tests pass and the build is unchanged.

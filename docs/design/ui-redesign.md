@@ -1,6 +1,11 @@
 # Opscope: UI redesign
 
-The app works (see [PHASES.md](PHASES.md)); this plan gives it a look that matches the new brand kit
+> **Design record.** The plan and working notes for the interface redesign, phases R0–R8, completed
+> on 2026-10-03 and released as v1.1.0. It is kept unchanged as a record of how and why Opscope was
+> built, so it describes the project as it was then, not as it is now. For current documentation,
+> see the [README](../../README.md).
+
+The app works (see [build-phases.md](build-phases.md)); this plan gives it a look that matches the new brand kit
 and is good enough to publish. It changes the frontend only. The backend, the API and what each page
 shows stay the same.
 
@@ -251,7 +256,7 @@ Goal: ready to show people.
 Considered and left out to keep the redesign focused:
 
 - ~~A ⌘K command palette to jump to any resource~~: done later, with keyboard shortcuts, in its own
-  phases; see [COMMAND-PALETTE.md](COMMAND-PALETTE.md)
+  phases; see [command-palette.md](command-palette.md)
 - Syntax colouring beyond simple YAML
 - Remembering column widths or hidden columns per table
 

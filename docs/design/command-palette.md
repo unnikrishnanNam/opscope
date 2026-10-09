@@ -1,8 +1,13 @@
 # Opscope: Command palette
 
+> **Design record.** The plan and working notes for the command palette and keyboard shortcuts,
+> phases P0–P6, completed on 2026-10-04 and released, with two later fixes, as v1.2.0. It is kept
+> unchanged as a record of how and why Opscope was built, so it describes the project as it was
+> then, not as it is now. For current documentation, see the [README](../../README.md).
+
 A ⌘K (Ctrl+K) command palette: one box to jump to any page, any object in the cluster, another
 cluster or namespace, and to run whatever the current page offers (open its logs, copy its name,
-follow logs, ...). It was listed under "Possible later" in [UI-REDESIGN.md](UI-REDESIGN.md).
+follow logs, ...). It was listed under "Possible later" in [ui-redesign.md](ui-redesign.md).
 
 The palette itself is small. Most of the work is the **command registry** under it: one place that
 every feature, now and later, hands its commands to, so adding a feature to Opscope never means
