@@ -11,7 +11,7 @@ v1.2.0. New features, fixes and optimizations for the next release are planned s
 Phases are numbered **D0–D6** so they don't mix with the build phases 0–8, the redesign phases
 R0–R8 or the command palette phases P0–P6. All work happens on the `docs/repositioning` branch.
 
-**Status (2026-10-09):** D0 and D1 done; D2 next.
+**Status (2026-10-09):** D0–D2 done; D3 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -74,6 +74,7 @@ docs/
   deployment.md           Docker, kind networking, Kubernetes manifests, permissions, Secret access
   api.md                  the HTTP API reference
   design/                 design records, kept for history
+    README.md             index of the records, and how to write a new one
     build-phases.md       was docs/PHASES.md
     ui-redesign.md        was docs/UI-REDESIGN.md
     command-palette.md    was docs/COMMAND-PALETTE.md
@@ -126,16 +127,16 @@ Goal: the journals are kept as history and stop presenting themselves as current
 
 Goal: everything that leaves the README has a proper home first, so nothing is lost in D4.
 
-- [ ] `docs/deployment.md`: running with Docker (published image and own build), kind networking,
+- [x] `docs/deployment.md`: running with Docker (published image and own build), kind networking,
       running in a cluster, the permissions table, turning Secret access off, probes and shutdown,
       keeping clusters across restarts (PersistentVolumeClaim)
-- [ ] `docs/api.md`: the endpoint table, resource names, error format, the two optional-feature codes,
+- [x] `docs/api.md`: the endpoint table, resource names, error format, the two optional-feature codes,
       the background sampling; a note that the API serves the web UI and isn't stable yet
-- [ ] `CONTRIBUTING.md`: requirements, repo layout, running in development, `/kit`, tests
+- [x] `CONTRIBUTING.md`: requirements, repo layout, running in development, `/kit`, tests
       (`make test`), code style (gofmt, plain CSS on tokens, no new runtime dependencies without
       reason), adding commands (the command shape and sources, from the palette's design record),
       CI, the release steps, and how changes are proposed (issues, pull requests, design docs)
-- [ ] A design doc template or short guidance in `docs/design/` for future features, in the
+- [x] A design doc template or short guidance in `docs/design/` for future features, in the
       writing style above
 
 ## Phase D3: App and image copy
@@ -194,7 +195,8 @@ Goal: the repository page matches the docs, and the branch is ready to merge.
 - [ ] The social preview image uploaded (outstanding since R8; GitHub's web UI only)
 - [ ] Unused repository features reviewed (the Wiki is on and empty)
 - [ ] A last read of every changed file for tone, terms and broken links
-- [ ] This plan moved to `docs/design/repositioning.md` and marked done
+- [ ] This plan moved to `docs/design/repositioning.md`, marked done, and listed in
+      `docs/design/README.md`
 - [ ] Pull request opened; merged after CI and review
 
 ---
@@ -258,3 +260,35 @@ Notes on each phase are added here as it's done.
   stays.
 - Checked: every relative link and anchor in the README, this plan and the three records resolves
   (a small script, not committed); 70 frontend tests pass and the build is unchanged.
+
+### Phase D2
+
+- Everything was checked against the code rather than copied from the README: routes in
+  `server.go`, status codes, query parameters, response fields, limits (1 MiB request bodies, 500 and
+  10,000 log lines, 100 events, 30-second log requests, 15-second sampling, 15 minutes of history),
+  how the overview counts "unhealthy", and the kubeconfig rules. The raw manifest URLs in
+  `deployment.md` were fetched to confirm they serve the v1.2.0 manifests.
+- **`docs/api.md`** describes every endpoint with its parameters and response shape, the error
+  format and status codes, the two optional-feature codes and the resource types. It states that the
+  API serves the UI and isn't stable, that it has no authentication, and that the only endpoints that
+  change anything (`POST` and `DELETE` on `/api/clusters`) change Opscope's own list of clusters,
+  never a cluster.
+- **`docs/deployment.md`** covers the image tags, Docker with the UI or a kubeconfig file, reaching
+  the API server from a container and kind, building the image, the Kubernetes manifests (applied
+  from a release tag or a clone), how the pod runs, keeping UI-added clusters with a
+  PersistentVolumeClaim (a new example), permissions, Secret access, exposing Opscope safely,
+  configuration and upgrading. New compared with the README: the image tags table, applying the
+  manifests straight from a release tag, the PVC example, that a mounted kubeconfig must be readable
+  by uid 65532 on Linux, that login commands in `OPSCOPE_KUBECONFIG` need the command in the image
+  (it has none), and that a broken environment cluster stops Opscope at startup.
+- **`CONTRIBUTING.md`** has the project's principles (read-only, safe by default, few dependencies,
+  one image, no built-in cluster, fail clearly, from the build plan's guiding rules), issues and
+  proposals, development setup, the repository layout, the checks CI runs, code style, step-by-step
+  "Adding a resource type" (new) and "Adding commands" (from the README), documentation, the release
+  steps and the licence. Two statements were corrected while checking: the backend depends on
+  `sigs.k8s.io/yaml` as well as client-go, and component CSS uses many fixed sizes, so only colours
+  are required to come from tokens.
+- **`docs/design/README.md`** indexes the three records and explains when to write one, its
+  structure (a template) and how phases are lettered. D6 adds this plan to its table.
+- The README is unchanged in this phase; D4 replaces its long sections with links to these documents.
+- Checked: every relative link and anchor in the nine Markdown files resolves.
