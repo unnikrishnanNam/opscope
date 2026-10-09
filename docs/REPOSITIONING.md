@@ -11,7 +11,7 @@ v1.2.0. New features, fixes and optimizations for the next release are planned s
 Phases are numbered **D0–D6** so they don't mix with the build phases 0–8, the redesign phases
 R0–R8 or the command palette phases P0–P6. All work happens on the `docs/repositioning` branch.
 
-**Status (2026-10-09):** D0–D4 done, except D4's roadmap issues (deferred); D5 next.
+**Status (2026-10-09):** D0–D4 done, except D4's roadmap issues (deferred); D5 done (playback to be checked in D6); D6 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -177,14 +177,14 @@ Goal: a README that tells someone new what Opscope is, why it's safe, and how to
 
 Goal: the video plays inline at the top of the README.
 
-- [ ] The video is back in `docs/showcase/` (it is not tracked, so it may need adding again)
-- [ ] Compressed with macOS's `avconvert` to 1280×720 and under 10 MB (GitHub's limit for videos on
+- [x] The video is back in `docs/showcase/` (it is not tracked, so it may need adding again)
+- [~] Compressed with macOS's `avconvert` to 1280×720 and under 10 MB (GitHub's limit for videos on
       free plans); the audio track removed if it's silent
-- [ ] Uploaded to GitHub by hand (dropped into an unsent comment box), giving a
+- [x] Uploaded to GitHub by hand (dropped into an unsent comment box), giving a
       `github.com/user-attachments/assets/…` URL. GitHub's API can't upload these, so this step is manual
-- [ ] The URL on its own line under the tagline, where GitHub renders it as a player, with a
+- [~] The URL on its own line under the tagline, where GitHub renders it as a player, with a
       sentence for anyone whose viewer doesn't play video
-- [ ] Checked on github.com once the branch is pushed
+- [ ] Checked on github.com once the branch is pushed (moved to D6)
 
 ## Phase D6: GitHub repository and final review
 
@@ -194,6 +194,7 @@ Goal: the repository page matches the docs, and the branch is ready to merge.
       `devops`, `go`, `react`
 - [ ] The social preview image uploaded (outstanding since R8; GitHub's web UI only)
 - [ ] Unused repository features reviewed (the Wiki is on and empty)
+- [ ] The video plays in the README on github.com for a visitor who isn't signed in (see D5 notes)
 - [ ] A last read of every changed file for tone, terms and broken links
 - [ ] This plan moved to `docs/design/repositioning.md`, marked done, and listed in
       `docs/design/README.md`
@@ -342,3 +343,30 @@ Notes on each phase are added here as it's done.
   status in palette results; searching labels and images; searching across clusters; pinning
   commands; remembering table columns; syntax highlighting beyond YAML. Persistent storage was left
   out, as `docs/deployment.md` now covers it.
+
+### Phase D5
+
+- The source is 1920 × 1080 at 60 fps, H.264 at 2.9 Mbps with AAC audio at 269 kbps, 47.5 seconds,
+  19.2 MB. The audio isn't silent (peak −1.5 dBFS, RMS −14.5 dBFS, measured from the decoded track),
+  so it was kept.
+- **Changed from the plan:** `avconvert`'s presets target a quality, not a size, and its
+  `Preset1280x720` gave 46.8 MB. The video was re-encoded instead with a short AVFoundation script
+  (`AVAssetReader` to `AVAssetWriter`, not committed): 1280 × 720, H.264 High at 1.2 Mbps with a
+  keyframe at least every 2 seconds, AAC at 128 kbps, and the index at the start of the file so it
+  plays before it has fully downloaded. Result: 7.64 MB, 60 fps, the full 47.5 seconds.
+- Frames at 8, 22 and 38 seconds were compared with the original scaled to the same size: text and
+  edges look the same, with no visible artefacts.
+- The compressed file is `docs/showcase/opscope-showcase.mp4`, next to the original; the folder is
+  git-ignored.- Uploaded by hand to a GitHub comment box that was never submitted:
+  `https://github.com/user-attachments/assets/68c13ac5-ac03-4cff-af9e-cf6c682194e9`. It sits on its own line under the badges, followed by a one-line caption; placed under
+  the badges rather than the tagline, so the badges stay with the title. GitHub's Markdown API
+  renders the line as a `<video>` player named `opscope-showcase.mp4`, with a signed
+  `private-user-images.githubusercontent.com` source generated per render.
+- **Changed from the plan:** no "open it directly" link in the caption. The raw attachment URL
+  answers 404 to visitors who aren't signed in, so the link would fail exactly for the readers it
+  was meant for.
+- **Open:** the URL serves the video to the uploader when signed in (`206 video/mp4` with a GitHub
+  token), but answers 404 to anonymous requests. GitHub may make an attachment public only once
+  published content references it, so this is checked in D6 by viewing the pushed README while
+  signed out. If it still fails, the fallback is to publish the video somewhere public on the
+  repository first (for example in a release's notes) and use that URL.

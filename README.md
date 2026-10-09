@@ -7,7 +7,9 @@ A lightweight, read-only Kubernetes dashboard for day-to-day operations.
 [![Image](https://img.shields.io/badge/image-ghcr.io-blue)](https://github.com/unnikrishnanNam/opscope/pkgs/container/opscope)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
-<!-- Showcase video: added in phase D5 of docs/REPOSITIONING.md. -->
+https://github.com/user-attachments/assets/68c13ac5-ac03-4cff-af9e-cf6c682194e9
+
+*A 48-second tour of Opscope and its command palette.*
 
 Opscope answers the everyday questions about a cluster in a browser: is anything unhealthy, why is
 this pod restarting, what does this Service route to, what did that job log. It shows nodes,
