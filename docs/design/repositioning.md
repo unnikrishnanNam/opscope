@@ -1,5 +1,10 @@
 # Opscope: Repositioning
 
+> **Design record.** The plan and working notes for repositioning Opscope as a tool for day-to-day
+> operations, phases D0–D6, completed on 2026-10-09 and to be released with the next version. It is
+> kept unchanged as a record of how and why Opscope was built, so it describes the project as it
+> was then, not as it is now. For current documentation, see the [README](../../README.md).
+
 Opscope started as a learning project. It is now a lightweight, read-only tool for day-to-day
 Kubernetes operations, and its documentation, project files and public descriptions should say so.
 This plan makes that change visible everywhere Opscope describes itself: the README, the docs, the
@@ -11,7 +16,8 @@ v1.2.0. New features, fixes and optimizations for the next release are planned s
 Phases are numbered **D0–D6** so they don't mix with the build phases 0–8, the redesign phases
 R0–R8 or the command palette phases P0–P6. All work happens on the `docs/repositioning` branch.
 
-**Status (2026-10-09):** D0–D4 done, except D4's roadmap issues (deferred); D5 done (playback to be checked in D6); D6 next.
+**Status (2026-10-09):** D0–D6 done, except the roadmap issues (D4, deferred); the pull request
+is the last step.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -184,19 +190,19 @@ Goal: the video plays inline at the top of the README.
       `github.com/user-attachments/assets/…` URL. GitHub's API can't upload these, so this step is manual
 - [~] The URL on its own line under the tagline, where GitHub renders it as a player, with a
       sentence for anyone whose viewer doesn't play video
-- [ ] Checked on github.com once the branch is pushed (moved to D6)
+- [x] Checked on github.com once the branch is pushed (moved to D6)
 
 ## Phase D6: GitHub repository and final review
 
 Goal: the repository page matches the docs, and the branch is ready to merge.
 
-- [ ] With approval at the time: the repository description (the tagline) and topics: `kubernetes`, `dashboard`, `read-only`, `k8s`,
-      `devops`, `go`, `react`
-- [ ] The social preview image uploaded (outstanding since R8; GitHub's web UI only)
-- [ ] Unused repository features reviewed (the Wiki is on and empty)
-- [ ] The video plays in the README on github.com for a visitor who isn't signed in (see D5 notes)
-- [ ] A last read of every changed file for tone, terms and broken links
-- [ ] This plan moved to `docs/design/repositioning.md`, marked done, and listed in
+- [x] With approval at the time: the repository description (the tagline) and topics: `kubernetes`,
+      `dashboard`, `read-only`, `k8s`, `devops`, `go`, `react`
+- [x] The social preview image uploaded (outstanding since R8; GitHub's web UI only)
+- [x] Unused repository features reviewed (the Wiki is on and empty)
+- [x] The video plays in the README on github.com for a visitor who isn't signed in (see D5 notes)
+- [x] A last read of every changed file for tone, terms and broken links
+- [x] This plan moved to `docs/design/repositioning.md`, marked done, and listed in
       `docs/design/README.md`
 - [ ] Pull request opened; merged after CI and review
 
@@ -370,3 +376,22 @@ Notes on each phase are added here as it's done.
   published content references it, so this is checked in D6 by viewing the pushed README while
   signed out. If it still fails, the fallback is to publish the video somewhere public on the
   repository first (for example in a release's notes) and use that URL.
+
+### Phase D6
+
+- Done by the maintainer: the branch pushed, the video checked in the README on github.com while
+  signed out (it plays, so the attachment is public once published content references it), and the
+  social preview image uploaded. The repository reports a custom Open Graph image.
+- The pushed branch matched the local one (`975b80d`) before this phase's changes.
+- Final read: every file changed on this branch (outside the archived records) was scanned for
+  first-person and learning-project wording, marketing words and old paths. Nothing needed changing:
+  "small" is descriptive ("small screens", "a small JSON API"), and the two "we"s are in older code
+  comments in `main.go`, outside this plan's scope. The only old paths left are this record's
+  account of the move. Every relative link and anchor resolves.
+- This plan moved to `docs/design/repositioning.md` with a "Design record" note like the others,
+  and is listed in `docs/design/README.md` as due in the next release.
+- The repository description is now the tagline, with the topics `dashboard`, `devops`, `go`, `k8s`,
+  `kubernetes`, `react` and `read-only` (set by the maintainer; checked with `gh repo view`).
+- The Wiki, which was on and empty, is turned off (by the maintainer); the documentation lives in
+  the repository.
+- Pending: the pull request.
