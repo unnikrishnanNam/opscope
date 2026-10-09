@@ -11,7 +11,7 @@ v1.2.0. New features, fixes and optimizations for the next release are planned s
 Phases are numbered **D0–D6** so they don't mix with the build phases 0–8, the redesign phases
 R0–R8 or the command palette phases P0–P6. All work happens on the `docs/repositioning` branch.
 
-**Status (2026-10-09):** D0–D3 done; D4 next.
+**Status (2026-10-09):** D0–D4 done, except D4's roadmap issues (deferred); D5 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -156,22 +156,22 @@ Goal: the app, the image and the code describe Opscope the same way the docs do.
 
 Goal: a README that tells someone new what Opscope is, why it's safe, and how to run it in a minute.
 
-- [ ] Title, tagline and badges: CI, latest release, image, licence
-- [ ] A placeholder for the video (filled in D5) and a short paragraph on who Opscope is for and
+- [x] Title, tagline and badges: CI, latest release, image, licence
+- [x] A placeholder for the video (filled in D5) and a short paragraph on who Opscope is for and
       why it's read-only
-- [ ] Features, grouped: overview and health, resources, detail pages (YAML, events, logs), live
+- [x] Features, grouped: overview and health, resources, detail pages (YAML, events, logs), live
       usage, command palette and shortcuts, multiple clusters, themes and small screens
-- [ ] Quick start: one Docker command; one `kubectl apply` and port-forward; links to
+- [x] Quick start: one Docker command; one `kubectl apply` and port-forward; links to
       `docs/deployment.md`
-- [ ] Connecting clusters; the command palette and shortcuts (the user-facing part)
-- [ ] Security model: no login, read-only RBAC, Secret values only on request and never cached,
+- [x] Connecting clusters; the command palette and shortcuts (the user-facing part)
+- [x] Security model: no login, read-only RBAC, Secret values only on request and never cached,
       logs never cached; the full details in `docs/deployment.md`
-- [ ] Configuration (environment variables)
-- [ ] Roadmap: GitHub issues for the ideas in the design records (opened with approval at the
+- [~] Configuration (environment variables)
+- [~] Roadmap: GitHub issues for the ideas in the design records (opened with approval at the
       time), and a short README section linking to them
-- [ ] Screenshots retaken with the current top bar (they predate the palette's search button), in
+- [x] Screenshots retaken with the current top bar (they predate the palette's search button), in
       light and dark, from the test clusters
-- [ ] Documentation, Contributing and License sections, including the third-party assets from D0
+- [x] Documentation, Contributing and License sections, including the third-party assets from D0
 
 ## Phase D5: Showcase video
 
@@ -312,3 +312,33 @@ Notes on each phase are added here as it's done.
   in light and dark at 1280 px and at 375 px (the introduction wraps to three lines wide and five on
   a phone, with no sideways scrolling). No server errors. `go vet`, `gofmt`, the Go tests and the
   70 frontend tests pass; the web manifest and `release.yml` parse.
+
+### Phase D4
+
+- The README is rewritten for people who run Opscope: tagline and badges, a hidden placeholder for
+  the video, what Opscope answers and why read-only makes it safe to hand out, features, a quick
+  start (one Docker command; one `kubectl apply` from the release tag and a port-forward), connecting
+  clusters, the command palette and shortcuts, security, screenshots, a documentation table, roadmap,
+  contributing and licence. It went from 365 lines to 164; the development, layout, API, deployment
+  and release sections now live in the D2 documents and are linked.
+- **Changed from the plan:** no separate configuration table in the README. The three variables for
+  connecting clusters are in "Connecting clusters", which links to the full table in
+  `docs/deployment.md`, so there is one list to keep current.
+- The quick start pins the v1.2.0 manifest URL, so `CONTRIBUTING.md`'s release steps now include
+  updating that version in the README and `docs/deployment.md`.
+- Badges: CI (GitHub's own badge), latest release and two static ones (image, licence); the licence
+  badge is static because GitHub detects the licence only once `LICENSE` is on `main`. All four
+  URLs answered 200 before use.
+- Screenshots retaken as in R8: the same three pages (overview, all pods, the crash-looping Argo CD
+  pod) on multipass, headless Chrome at 1440 × 900 and 2× density, scaled to 1600 × 1000, light and
+  dark. They now show the top bar's Search button and "Opscope v1.2.0" (the server was built with
+  that version) instead of "Opscope dev". The overview was taken once the server had about 12
+  minutes of usage history, so its trend lines are filled in. The server ran from a new `screenshots`
+  launch configuration on :8091 with its data folder in the scratchpad.- **Deferred:** the roadmap issues. The README's Roadmap section links to the open `enhancement`
+  issues, so it works whenever they're opened. Twelve were proposed: more Gateway API kinds
+  (GRPCRoute, TLSRoute, ReferenceGrant, BackendTLSPolicy); loading the overview's lists in parallel
+  (still sequential); watching instead of polling; embedding the UI with `go:embed`; a guide to
+  running behind an authenticating proxy; shipping third-party notices with the built app (D0);
+  status in palette results; searching labels and images; searching across clusters; pinning
+  commands; remembering table columns; syntax highlighting beyond YAML. Persistent storage was left
+  out, as `docs/deployment.md` now covers it.

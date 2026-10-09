@@ -215,8 +215,8 @@ Releases are made by the maintainer. Each version tag publishes the image to
 `ghcr.io/unnikrishnannam/opscope` for amd64 and arm64, tagged `vX.Y.Z`, `X.Y` and `latest`; a
 pre-release such as `v1.3.0-rc.1` gets only its own tag.
 
-1. Change the image tag in `deploy/kubernetes/opscope.yaml` to the new version and merge that into
-   `main`.
+1. Change the image tag in `deploy/kubernetes/opscope.yaml` to the new version, and the version in
+   the manifest URLs in `README.md` and `docs/deployment.md`. Merge that into `main`.
 2. Tag the merged commit and push the tag:
 
    ```bash
