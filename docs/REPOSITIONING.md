@@ -11,7 +11,7 @@ v1.2.0. New features, fixes and optimizations for the next release are planned s
 Phases are numbered **D0–D6** so they don't mix with the build phases 0–8, the redesign phases
 R0–R8 or the command palette phases P0–P6. All work happens on the `docs/repositioning` branch.
 
-**Status (2026-10-09):** D0–D2 done; D3 next.
+**Status (2026-10-09):** D0–D3 done; D4 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -143,13 +143,13 @@ Goal: everything that leaves the README has a proper home first, so nothing is l
 
 Goal: the app, the image and the code describe Opscope the same way the docs do.
 
-- [ ] `frontend/index.html`: the `description` meta tag
-- [ ] `frontend/public/site.webmanifest`: a `description`
-- [ ] `frontend/src/pages/Welcome.jsx`: the introduction on the first-run screen
-- [ ] `backend/main.go`: the package comment
-- [ ] `.github/workflows/release.yml`: the image's `org.opencontainers.image.description` label;
+- [x] `frontend/index.html`: the `description` meta tag
+- [x] `frontend/public/site.webmanifest`: a `description`
+- [x] `frontend/src/pages/Welcome.jsx`: the introduction on the first-run screen
+- [x] `backend/main.go`: the package comment
+- [~] `.github/workflows/release.yml`: the image's `org.opencontainers.image.description` label;
       confirm the `licenses` label is set from the repository once GitHub detects the licence
-- [ ] Checked in the browser (welcome screen, light and dark, 375 px and wide); `make test` and the
+- [x] Checked in the browser (welcome screen, light and dark, 375 px and wide); `make test` and the
       build pass
 
 ## Phase D4: README
@@ -292,3 +292,23 @@ Notes on each phase are added here as it's done.
   structure (a template) and how phases are lettered. D6 adds this plan to its table.
 - The README is unchanged in this phase; D4 replaces its long sections with links to these documents.
 - Checked: every relative link and anchor in the nine Markdown files resolves.
+
+### Phase D3
+
+- The tagline, "A lightweight, read-only Kubernetes dashboard for day-to-day operations.", is now the
+  page's `description` meta tag, the web manifest's new `description`, the image's
+  `org.opencontainers.image.description` label and the package comment in `main.go`. The welcome
+  screen opens with it and keeps its list of what Opscope shows.
+- **Changed from the plan:** the published v1.2.0 image has an empty
+  `org.opencontainers.image.licenses` label (checked in its config on GHCR): `metadata-action` takes
+  it from the licence GitHub detects, and the repository had none. Rather than depend on that
+  detection, `release.yml` now sets `org.opencontainers.image.licenses=Apache-2.0` explicitly. Both
+  labels take effect with the next release; v1.2.0's image keeps its labels.
+- "Small, read-only Kubernetes dashboard" remains only in the README (D4) and the archived design
+  records.
+- Checked with a new `built-empty` launch configuration: the production build served by the Go
+  server on :8091 with an empty data folder and no cluster, so the welcome screen shows. The page
+  description, the manifest and the welcome text were read from the page; the screen was looked at
+  in light and dark at 1280 px and at 375 px (the introduction wraps to three lines wide and five on
+  a phone, with no sideways scrolling). No server errors. `go vet`, `gofmt`, the Go tests and the
+  70 frontend tests pass; the web manifest and `release.yml` parse.

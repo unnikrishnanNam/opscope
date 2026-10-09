@@ -12,8 +12,8 @@ export default function Welcome() {
       <Logo height={44} />
       <h1 className="welcome-title">Connect a cluster to get started</h1>
       <p className="welcome-lead">
-        Opscope is a small, read-only Kubernetes dashboard: nodes, workloads, config, networking, logs and live usage.
-        It never changes anything in a cluster.
+        Opscope is a lightweight, read-only Kubernetes dashboard for day-to-day operations: nodes, workloads, config,
+        networking, logs and live usage. It never changes anything in a cluster.
       </p>
 
       <div className="welcome-options">
