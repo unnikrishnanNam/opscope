@@ -1,6 +1,7 @@
 {
   "name": "Opscope",
   "short_name": "Opscope",
+  "description": "A lightweight, read-only Kubernetes dashboard for day-to-day operations.",
   "icons": [
     {
       "src": "/android-chrome-192x192.png",

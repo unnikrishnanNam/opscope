@@ -1,4 +1,5 @@
-// Opscope is a small, read-only Kubernetes dashboard.
+// Opscope is a lightweight, read-only Kubernetes dashboard for day-to-day
+// operations.
 //
 // This file is the entry point: it reads configuration from environment
 // variables, loads the known clusters, starts the HTTP server, and shuts it

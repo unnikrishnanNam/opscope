@@ -1,5 +1,10 @@
 # Opscope: Build Phases
 
+> **Design record.** The plan and working notes for Opscope's first build, phases 0–8, completed
+> on 2026-10-03 and released as v1.0.0. It is kept unchanged as a record of how and why Opscope was
+> built, so it describes the project as it was then, not as it is now. For current documentation,
+> see the [README](../../README.md).
+
 Opscope is a small, read-only Kubernetes dashboard. It has a Go backend that talks to the
 cluster and a React frontend that shows what the backend returns. Everything ships as one
 Docker image.
@@ -10,8 +15,8 @@ After a phase is done, we come back here, tick the boxes, and note anything that
 **Status (2026-10-03):** all phases (0–8) are done. Ideas that were deliberately left out are
 collected under [Possible next steps](#possible-next-steps) at the end. The interface was then
 redesigned, with light and dark themes and the "Opscope" name, in phases R0–R8; see
-[UI-REDESIGN.md](UI-REDESIGN.md). A ⌘K command palette and keyboard shortcuts followed in phases
-P0–P6; see [COMMAND-PALETTE.md](COMMAND-PALETTE.md).
+[ui-redesign.md](ui-redesign.md). A ⌘K command palette and keyboard shortcuts followed in phases
+P0–P6; see [command-palette.md](command-palette.md).
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -453,7 +458,7 @@ Things that were considered and deliberately left out, roughly from most to leas
 - **Persistent storage in the cluster:** swap the `emptyDir` at `/data` for a PersistentVolumeClaim
   so clusters added in the UI survive pod restarts.
 - **Faster overview on big clusters:** run its list calls in parallel instead of one after another.
-- ~~**Dark theme**~~: done in the UI redesign ([UI-REDESIGN.md](UI-REDESIGN.md)).
+- ~~**Dark theme**~~: done in the UI redesign ([ui-redesign.md](ui-redesign.md)).
 - **Embedding the frontend** in the Go binary with `go:embed` instead of serving a folder.
 - **Watching instead of polling,** with client-go informers and a push channel to the browser. More
   efficient, but a lot more moving parts for a learning project.

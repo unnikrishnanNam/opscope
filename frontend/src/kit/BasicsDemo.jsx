@@ -9,7 +9,7 @@ import { Kbd, Tag } from "../components/Tag.jsx";
 import { Skeleton, SkeletonText, Spinner } from "../components/Loading.jsx";
 import Tooltip from "../components/Tooltip.jsx";
 
-// Basic components on /kit (phase R1). Hover and keyboard focus are real:
+// Basic components on /kit. Hover and keyboard focus are real:
 // point at things and press Tab to see them.
 
 const { CopyIcon, MonitorIcon, MoonIcon, PlusIcon, RefreshIcon, SunIcon, TrashIcon, UploadIcon } = icons;

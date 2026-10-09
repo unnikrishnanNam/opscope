@@ -18,7 +18,7 @@ import { MetricsUnavailable, Sparkline, UsageBar } from "../components/Usage.jsx
 import { ClustersIcon, PlusIcon, PodsIcon, RefreshIcon } from "../components/icons.jsx";
 import * as sample from "./samples.js";
 
-// Data display components on /kit (phase R2), all fed with sample data.
+// Data display components on /kit, all fed with sample data.
 
 /* --------------------------------------------------------------------------
    Cards and tiles

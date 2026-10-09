@@ -103,7 +103,8 @@ jobs:
             type=raw,value=latest,enable=${{ !contains(env.TAG, '-') }}
           labels: |
             org.opencontainers.image.title=Opscope
-            org.opencontainers.image.description=A small, read-only Kubernetes dashboard
+            org.opencontainers.image.description=A lightweight, read-only Kubernetes dashboard for day-to-day operations
+            org.opencontainers.image.licenses=Apache-2.0
 
       - name: Build and push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0

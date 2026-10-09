@@ -3,3 +3,6 @@ frontend/dist/
 backend/opscope
 .DS_Store
 data/
+
+# The showcase video is uploaded to GitHub and embedded in the README, not committed.
+docs/showcase/

@@ -20,7 +20,7 @@ import {
   TrashIcon,
 } from "../components/icons.jsx";
 
-// Navigation and overlay components on /kit (phase R3).
+// Navigation and overlay components on /kit.
 
 const NAMESPACES = [
   "argocd",

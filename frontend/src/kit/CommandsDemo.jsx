@@ -20,8 +20,8 @@ import {
 } from "../components/icons.jsx";
 import * as sample from "./samples.js";
 
-// The command registry and palette on /kit (phases P0 and P1), with sample
-// sources shaped like the real ones that arrive in P2 and P3.
+// The command registry and palette on /kit, with sample sources shaped like
+// the real ones in commands/sources/ (pages, namespaces, theme, objects).
 
 const sources = [
   {
