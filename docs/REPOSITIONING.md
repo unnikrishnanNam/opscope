@@ -11,7 +11,7 @@ v1.2.0. New features, fixes and optimizations for the next release are planned s
 Phases are numbered **D0–D6** so they don't mix with the build phases 0–8, the redesign phases
 R0–R8 or the command palette phases P0–P6. All work happens on the `docs/repositioning` branch.
 
-**Status (2026-10-08):** plan written; D0 not started.
+**Status (2026-10-09):** D0 done; D1 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -101,13 +101,13 @@ docs/
 
 Goal: Opscope can legally be used, and the project files a user or contributor looks for exist.
 
-- [ ] `LICENSE`: the Apache-2.0 text, copyright Unnikrishnan Namboothiri
-- [ ] Third-party assets bundled in the app and their licences, listed for the README's licence
+- [x] `LICENSE`: the Apache-2.0 text, copyright Unnikrishnan Namboothiri
+- [x] Third-party assets bundled in the app and their licences, listed for the README's licence
       section: Lucide icons (ISC, already noted in `icons.jsx`), Manrope and JetBrains Mono (SIL OFL 1.1)
-- [ ] `.github/ISSUE_TEMPLATE/`: a bug report (Opscope version, Kubernetes version, how it runs:
+- [x] `.github/ISSUE_TEMPLATE/`: a bug report (Opscope version, Kubernetes version, how it runs:
       Docker, in a cluster or from source; what happened and what was expected) and a feature request
-- [ ] `.github/pull_request_template.md`: what changed, how it was checked, docs updated
-- [ ] `.gitignore`: `docs/showcase/`
+- [x] `.github/pull_request_template.md`: what changed, how it was checked, docs updated
+- [x] `.gitignore`: `docs/showcase/`
 
 ## Phase D1: Archive the design records
 
@@ -210,3 +210,30 @@ repository are approved one at a time in D4 and D6.
 ## Phase notes
 
 Notes on each phase are added here as it's done.
+
+### Phase D0
+
+- `LICENSE` is the canonical Apache-2.0 text (byte-identical to apache.org's before editing), with
+  the appendix's copyright line filled in: "Copyright 2026 Unnikrishnan Namboothiri". There is no
+  `NOTICE` file; Apache-2.0 requires one only when a project chooses to have it.
+- Third-party assets for the README's licence section (D4):
+
+  | Asset                                     | Version          | Licence | Copyright                          |
+  | ----------------------------------------- | ---------------- | ------- | ---------------------------------- |
+  | Lucide icons (a subset, in `icons.jsx`)   | 1.51.0           | ISC     | Lucide Icons and Contributors      |
+  | Manrope (variable)                        | Fontsource 5.3.0 | OFL-1.1 | The Manrope Project Authors        |
+  | JetBrains Mono (variable)                 | Fontsource 5.3.0 | OFL-1.1 | The JetBrains Mono Project Authors |
+
+- **Found:** the production build strips comments, so the Lucide notice in `icons.jsx` and the
+  licence comments of bundled npm packages (React, React Router) don't reach `frontend/dist` or the
+  image. The source repository carries every notice; the built app does not. Shipping a notices file
+  with the app would be a behaviour change, so it's left out of this plan and noted for a later
+  release.
+- Issue forms (YAML) rather than Markdown templates, so the required fields are enforced. The bug
+  report asks for the Opscope version (the sidebar shows it), the Kubernetes version (the cluster
+  switcher shows it), how Opscope runs and the browser, and warns against pasting kubeconfigs,
+  tokens or Secret values. The feature request states that changing cluster state is out of scope.
+  Both use the repository's existing `bug` and `enhancement` labels. Blank issues stay allowed.
+- The pull request template asks what changed, how it was checked, and confirms three things:
+  `make test` passes, Opscope stays read-only, and the docs follow the change.
+- `.gitignore` has `docs/showcase/`; the video is still on disk and now ignored rather than untracked.

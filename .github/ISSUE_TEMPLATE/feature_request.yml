@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest something that would make day-to-day work with Opscope easier.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Opscope is read-only by design: it never creates, changes or deletes anything in a cluster.
+        Requests to change cluster state (scaling, restarting, deleting, editing) are out of scope.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you're trying to do, and what makes it hard today.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you'd like
+      description: How Opscope could help. Pages, commands or shortcuts you have in mind are welcome.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: How you handle this now (kubectl, another tool), if at all.
+    validations:
+      required: false

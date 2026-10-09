@@ -1,0 +1,83 @@
+name: Bug report
+description: Something in Opscope doesn't work as described.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Please leave out anything sensitive: kubeconfigs, tokens,
+        Secret values and log lines that contain them.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, including any error message shown in Opscope.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The page and the steps that lead to the problem.
+      placeholder: |
+        1. Open Pods with the namespace set to "default"
+        2. Open a pod and choose the Logs tab
+        3. ...
+    validations:
+      required: true
+
+  - type: input
+    id: opscope-version
+    attributes:
+      label: Opscope version
+      description: Shown at the bottom of the sidebar, or returned by `/api/health`.
+      placeholder: v1.2.0
+    validations:
+      required: true
+
+  - type: input
+    id: kubernetes-version
+    attributes:
+      label: Kubernetes version
+      description: Shown next to the cluster's name in the cluster switcher.
+      placeholder: v1.31.4
+    validations:
+      required: true
+
+  - type: dropdown
+    id: how-it-runs
+    attributes:
+      label: How Opscope runs
+      options:
+        - Docker (the published image)
+        - Docker (an image built locally)
+        - Inside a cluster (deploy/kubernetes)
+        - From source (make dev-backend / dev-frontend)
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and operating system
+      placeholder: Firefox 150 on macOS
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Server logs
+      description: Relevant lines from Opscope's own output (`docker logs`, `kubectl logs`), if any.
+      render: text
+    validations:
+      required: false
