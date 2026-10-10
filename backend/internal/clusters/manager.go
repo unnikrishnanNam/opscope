@@ -19,6 +19,7 @@ import (
 
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -38,9 +39,10 @@ type Cluster struct {
 	Context string `json:"context"`
 	Server  string `json:"server"`
 
-	Client  *kubernetes.Clientset `json:"-"` // typed client for built-in kinds
-	Dynamic dynamic.Interface     `json:"-"` // dynamic client for custom resources (Gateway API)
-	Stream  *kubernetes.Clientset `json:"-"` // typed client without a timeout, for log streams
+	Client   *kubernetes.Clientset `json:"-"` // typed client for built-in kinds
+	Dynamic  dynamic.Interface     `json:"-"` // dynamic client for custom resources (Gateway API)
+	Metadata metadata.Interface    `json:"-"` // metadata-only client: lists Secrets without their values
+	Stream   *kubernetes.Clientset `json:"-"` // typed client without a timeout, for log streams
 }
 
 // savedCluster is the file format for clusters added in the UI.
@@ -93,14 +95,15 @@ func (m *Manager) LoadFromFile(path, contextName, name string) (*Cluster, error)
 		name = config.CurrentContext
 	}
 	cluster := &Cluster{
-		ID:      slugify(name),
-		Name:    name,
-		Source:  SourceEnv,
-		Context: config.CurrentContext,
-		Server:  server,
-		Client:  clients.kube,
-		Dynamic: clients.dyn,
-		Stream:  clients.stream,
+		ID:       slugify(name),
+		Name:     name,
+		Source:   SourceEnv,
+		Context:  config.CurrentContext,
+		Server:   server,
+		Client:   clients.kube,
+		Dynamic:  clients.dyn,
+		Metadata: clients.meta,
+		Stream:   clients.stream,
 	}
 	m.mu.Lock()
 	m.clusters[cluster.ID] = cluster
@@ -127,14 +130,15 @@ func (m *Manager) LoadInCluster(name string) (*Cluster, error) {
 		name = "in-cluster"
 	}
 	cluster := &Cluster{
-		ID:      slugify(name),
-		Name:    name,
-		Source:  SourceEnv,
-		Context: "(service account)",
-		Server:  server,
-		Client:  clients.kube,
-		Dynamic: clients.dyn,
-		Stream:  clients.stream,
+		ID:       slugify(name),
+		Name:     name,
+		Source:   SourceEnv,
+		Context:  "(service account)",
+		Server:   server,
+		Client:   clients.kube,
+		Dynamic:  clients.dyn,
+		Metadata: clients.meta,
+		Stream:   clients.stream,
 	}
 	m.mu.Lock()
 	m.clusters[cluster.ID] = cluster
@@ -183,14 +187,15 @@ func (m *Manager) loadSavedFile(file string) error {
 		return fmt.Errorf("id %q is already used by the environment cluster, skipping", saved.ID)
 	}
 	m.clusters[saved.ID] = &Cluster{
-		ID:      saved.ID,
-		Name:    saved.Name,
-		Source:  SourceUI,
-		Context: saved.Context,
-		Server:  server,
-		Client:  clients.kube,
-		Dynamic: clients.dyn,
-		Stream:  clients.stream,
+		ID:       saved.ID,
+		Name:     saved.Name,
+		Source:   SourceUI,
+		Context:  saved.Context,
+		Server:   server,
+		Client:   clients.kube,
+		Dynamic:  clients.dyn,
+		Metadata: clients.meta,
+		Stream:   clients.stream,
 	}
 	return nil
 }
@@ -227,14 +232,15 @@ func (m *Manager) Add(name string, kubeconfig []byte, contextName string) (*Clus
 		return nil, err
 	}
 	cluster := &Cluster{
-		ID:      id,
-		Name:    name,
-		Source:  SourceUI,
-		Context: config.CurrentContext,
-		Server:  server,
-		Client:  clients.kube,
-		Dynamic: clients.dyn,
-		Stream:  clients.stream,
+		ID:       id,
+		Name:     name,
+		Source:   SourceUI,
+		Context:  config.CurrentContext,
+		Server:   server,
+		Client:   clients.kube,
+		Dynamic:  clients.dyn,
+		Metadata: clients.meta,
+		Stream:   clients.stream,
 	}
 
 	// Only save clusters we can actually talk to.

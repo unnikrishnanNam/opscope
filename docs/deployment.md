@@ -181,16 +181,23 @@ make docker-build && kind load docker-image opscope:dev --name <cluster>
 Opscope only ever uses `get` and `list`. It never creates, changes or deletes anything, and it polls
 rather than watching.
 
-| API group                   | Resources                                             | Used for               |
-| --------------------------- | ----------------------------------------------------- | ---------------------- |
-| core (`""`)                 | namespaces, nodes, pods, services, configmaps, events | Lists and detail pages |
-| core (`""`)                 | pods/log (`get`)                                      | The Logs tab           |
-| `apps`                      | deployments, statefulsets, daemonsets                 | Workloads              |
-| `batch`                     | jobs, cronjobs                                        | Workloads              |
-| `networking.k8s.io`         | ingresses                                             | Networking             |
-| `gateway.networking.k8s.io` | gateways, httproutes, gatewayclasses                  | Gateway API (optional) |
-| `metrics.k8s.io`            | nodes, pods                                           | CPU and memory usage   |
-| core (`""`)                 | secrets (`secrets-access.yaml` only)                  | Secrets pages, Reveal  |
+| API group                   | Resources                                                                  | Used for               |
+| --------------------------- | -------------------------------------------------------------------------- | ---------------------- |
+| core (`""`)                 | namespaces, nodes, pods, services, configmaps, events                      | Lists and detail pages |
+| core (`""`)                 | persistentvolumeclaims, persistentvolumes, serviceaccounts, resourcequotas | Topology and diagnosis |
+| core (`""`)                 | pods/log (`get`)                                                           | The Logs tab           |
+| `apps`                      | deployments, statefulsets, daemonsets                                      | Workloads              |
+| `apps`                      | replicasets                                                                | Topology and diagnosis |
+| `batch`                     | jobs, cronjobs                                                             | Workloads              |
+| `discovery.k8s.io`          | endpointslices                                                             | Topology and diagnosis |
+| `networking.k8s.io`         | ingresses                                                                  | Networking             |
+| `networking.k8s.io`         | ingressclasses                                                             | Topology and diagnosis |
+| `storage.k8s.io`            | storageclasses                                                             | Topology and diagnosis |
+| `autoscaling`               | horizontalpodautoscalers                                                   | Topology and diagnosis |
+| `policy`                    | poddisruptionbudgets                                                       | Topology and diagnosis |
+| `gateway.networking.k8s.io` | gateways, httproutes, gatewayclasses, referencegrants                      | Gateway API (optional) |
+| `metrics.k8s.io`            | nodes, pods                                                                | CPU and memory usage   |
+| core (`""`)                 | secrets (`secrets-access.yaml` only)                                       | Secrets pages, Reveal  |
 
 The same applies to a kubeconfig used from outside the cluster: Opscope can show only what that
 user is allowed to read. Anything it can't read is reported on the page that needs it, and the rest

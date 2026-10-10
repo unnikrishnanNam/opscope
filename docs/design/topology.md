@@ -26,7 +26,7 @@ Phases are numbered **G0–G7** so they don't mix with the build phases 0–8 or
 R, P and D. All work happens on the `feature/topology` branch, and each phase is committed there
 once it works, its tests pass and its notes are written. This feature has no issue of its own.
 
-**Status (2026-10-10):** planned, open questions answered. G0 is next.
+**Status (2026-10-11):** G0 done (the snapshot). G1 is next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -115,6 +115,7 @@ once it works, its tests pass and its notes are written. This feature has no iss
 
 ```
 backend/internal/
+  kube/         shared by resources and snapshot: clients, Gateway API types, pod status, skipped kinds
   snapshot/     loads every kind a cluster has into one Snapshot; keeps the latest per cluster
   graph/        Build(snapshot) → Graph: nodes, edges, states, apps; views of it (cluster, namespace, app, neighbourhood)
   diagnose/     the rules and the engine: findings, traces, impact, problems
@@ -132,7 +133,7 @@ package (`internal/kube`) so `resources` and `graph` both use them.
 ```go
 type Snapshot struct {
 	Taken   time.Time
-	Skipped []resources.Skipped // kinds that couldn't be read, and why (not_installed, forbidden, failed)
+	Skipped []kube.Skipped // kinds that couldn't be read, and why (not_installed, forbidden, failed)
 
 	Namespaces     []corev1.Namespace
 	Nodes          []corev1.Node
@@ -142,11 +143,11 @@ type Snapshot struct {
 	// ... StatefulSets, DaemonSets, Jobs, CronJobs, Services, EndpointSlices, Ingresses,
 	// IngressClasses, PVCs, PVs, StorageClasses, ServiceAccounts, ResourceQuotas, HPAs, PDBs,
 	// Gateways, HTTPRoutes, GatewayClasses, ReferenceGrants
-	ConfigMaps     []ConfigMapKeys                 // name, namespace, labels, key names; no values
+	ConfigMaps     []ConfigMap                     // metadata and key names; no values
 	Secrets        []metav1.PartialObjectMetadata  // metadata only; values never fetched
 	Events         []corev1.Event                  // Warning events only
 
-	index // lookups by UID, by kind/namespace/name, pods by owner, events by object UID
+	index // lookups by kind/namespace/name, by UID, by owner, events by object UID
 }
 ```
 
@@ -408,16 +409,16 @@ The timeline is planned in its own record, which decides storage. This work prep
 
 Goal: Opscope can take a snapshot of a whole cluster, with nothing visible changing yet.
 
-- [ ] `internal/snapshot`: every kind listed in parallel, across all namespaces, into `Snapshot`
-- [ ] Secrets through the metadata client; ConfigMaps reduced to key names; Warning events only
-- [ ] Objects slimmed as they arrive (`managedFields`, `last-applied-configuration`)
-- [ ] Kinds that can't be read go in `Skipped` (`not_installed`, `forbidden`, `failed`); nothing read at all is an error
-- [ ] Lookups: by UID, by kind/namespace/name, pods by owner, events by object
-- [ ] `Store`: the latest snapshot per cluster, a maximum age (10 s), one load at a time per cluster, dropped with its cluster
-- [ ] `podStatus` and the Gateway API structs moved to `internal/kube`, with `resources` using them
-- [ ] RBAC: the new kinds added to `deploy/kubernetes/opscope.yaml`, and the list in `docs/deployment.md`
-- [ ] Go tests with client-go's fake clients: all kinds, a forbidden kind, Gateway API missing, the store's reuse and single load
-- [ ] Benchmark: a generated 5,000-pod snapshot; load time measured on the multipass cluster
+- [x] `internal/snapshot`: every kind listed in parallel, across all namespaces, into `Snapshot`
+- [x] Secrets through the metadata client; ConfigMaps reduced to key names; Warning events only
+- [x] Objects slimmed as they arrive (`managedFields`, `last-applied-configuration`)
+- [x] Kinds that can't be read go in `Skipped` (`not_installed`, `forbidden`, `failed`); nothing read at all is an error
+- [x] Lookups: by kind/namespace/name, by UID, by owner, events by object
+- [x] `Store`: the latest snapshot per cluster, a maximum age (10 s), one load at a time per cluster, dropped with its cluster
+- [x] `podStatus` and the Gateway API structs moved to `internal/kube`, with `resources` using them
+- [x] RBAC: the new kinds added to `deploy/kubernetes/opscope.yaml`, and the list in `docs/deployment.md`
+- [x] Go tests with client-go's fake clients: all kinds, a forbidden kind, Gateway API missing, the store's reuse and single load
+- [~] Benchmark: a generated 5,000-pod snapshot; load time measured on the kind cluster, not multipass (see notes)
 
 ## Phase G1: Graph model
 
@@ -525,4 +526,41 @@ snapshots are taken every 30 seconds, and problems sit at the top of the "Recent
 
 ## Phase notes
 
-<Added as each phase is done.>
+### G0
+
+- **`internal/kube`** now holds what `resources` and `snapshot` share: `Clients` (with a new
+  metadata client on every cluster), `Skipped` and `Skip` (which tell "not installed" and
+  "forbidden" from a failure), `PodStatus`, the event time and count helpers, and the Gateway API
+  types. `resources.Clients` and `resources.Skipped` are aliases of these, so no caller changed.
+- The Gateway API types embed `metav1.ObjectMeta`, like Kubernetes' own types. Every object in a
+  snapshot is therefore a `metav1.Object`, and one generic function indexes all 26 kinds. Their
+  one-word statuses became methods (`Gateway.Summary()`, `HTTPRoute.Summary()`,
+  `GatewayClass.Summary()`), used by the tables, the detail pages and later the graph. They also
+  gained the fields the graph needs (listener certificate refs, each parent's ref and
+  controller in a route's status) and a `ReferenceGrant` type. ReferenceGrants are read as `v1`,
+  falling back to `v1beta1` on clusters that serve only that.
+- Lists are read in pages of 500, so a large cluster never needs one huge answer or runs into the
+  client's 10-second timeout on a single call. Events are filtered to Warnings on the API server
+  and checked again after, so a proxy or fake that ignores field selectors can't let Normal events
+  in.
+- `Store` ties each snapshot to the exact `*clusters.Cluster` it was taken from. A cluster that
+  is removed and added again under the same ID never sees the old one's snapshot. The load runs
+  on its own with a one-minute limit, so a caller who gives up doesn't fail the others waiting for
+  it. Failed loads aren't kept, so the next request tries again. `Forget(keep)` drops removed
+  clusters, as `metrics.History.Forget` does; the server starts using the store, and calling
+  `Forget`, in G1 with the first endpoint.
+- `TestClusterRolesCoverSnapshot` reads the manifests in `deploy/kubernetes/` and fails if the
+  snapshot reads a kind no ClusterRole lets Opscope list. The new ClusterRole was checked with a
+  server-side dry run on the kind cluster (nothing was applied). The Opscope pod already running
+  in that cluster keeps its old role until the manifests are applied again.
+- **Speed.** Building the lookups for a generated snapshot of 9,050 objects (5,000 pods, 1,000
+  Deployments, ReplicaSets, Services and ConfigMaps, 50 nodes) with 10,000 events takes 3.2 ms and
+  7.5 MB of allocations on an M4 Pro (`BenchmarkBuildIndex`), well inside the 200 ms budget.
+  Reading the kind cluster (95 objects, 10 pods) takes 27 ms and holds about 0.6 MiB; the four
+  Gateway API kinds are skipped as `not_installed` there. `TestLoadLive` measures any cluster when
+  `OPSCOPE_TEST_KUBECONFIG` is set, and only reads.
+- The multipass VMs were stopped during G0, so the load time there wasn't measured. G1 is checked
+  against its `topology-test` namespace anyway and will measure it then.
+- Nothing visible changed. The existing endpoints were checked against the kind cluster after
+  the refactor: lists, `/names`, a pod's detail page, the overview, and Gateway API's
+  `not_installed` answer.

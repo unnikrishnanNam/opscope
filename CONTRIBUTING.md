@@ -84,10 +84,12 @@ only in development and is left out of production builds.
 backend/                  Go server
   main.go                 entry point: reads env vars, loads clusters, serves, shuts down cleanly
   internal/clusters/      known clusters (environment, in-cluster, added in the UI), clients for each
+  internal/kube/          what several packages share: the clients, Gateway API types, pod status
   internal/resources/     one file per resource type: lists it and flattens it into table rows;
                           detail.go builds detail pages, gatewayapi.go reads Gateway API resources,
                           names.go builds the search index
   internal/metrics/       live usage from metrics-server, and the in-memory history
+  internal/snapshot/      the whole cluster read at once, for the topology and diagnosis
   internal/server/        HTTP routes, middleware, static file serving
 frontend/                 React app (Vite, plain JavaScript)
   src/api.js              fetch helper and the useApi hook
@@ -168,10 +170,13 @@ runs the Go tests and the frontend tests. Before opening a pull request, also ch
    `detail_sections.go` if it needs any.
 3. **Permissions:** the resource in the ClusterRole in `deploy/kubernetes/opscope.yaml`, with only
    `get` and `list`.
-4. **Frontend:** an entry in `src/sections.js` (with `aliases` for kubectl's short names) and its
+4. **Snapshot:** if the topology and diagnosis should see it, a field on `Snapshot`, a line in
+   `loaders` (`internal/snapshot/load.go`) and a line in `buildIndex`. A test checks that the
+   ClusterRole lets Opscope list every kind the snapshot reads.
+5. **Frontend:** an entry in `src/sections.js` (with `aliases` for kubectl's short names) and its
    columns in `src/columns.jsx`. The sidebar, the route, the palette's "Go to" and object search
    follow from these.
-5. **Docs:** the resource list in the README, the permissions table in
+6. **Docs:** the resource list in the README, the permissions table in
    [`docs/deployment.md`](docs/deployment.md) and the resource table in [`docs/api.md`](docs/api.md).
 
 ### Adding commands

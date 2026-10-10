@@ -11,6 +11,8 @@ import (
 	"sort"
 	"time"
 
+	"opscope/internal/kube"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -22,12 +24,8 @@ type Query struct {
 	Type      string // events only: "Warning" or "Normal"; "" means both
 }
 
-// Clients holds the two ways of talking to a cluster. Listers take
-// interfaces (not the concrete clients) so tests can pass client-go's fakes.
-type Clients struct {
-	Kube    kubernetes.Interface // typed: built-in kinds like Pods and Services
-	Dynamic dynamic.Interface    // untyped: any kind, used for Gateway API custom resources
-}
+// Clients holds the ways of talking to a cluster (see kube.Clients).
+type Clients = kube.Clients
 
 // Lister lists one kind of resource as JSON-ready rows.
 type Lister func(ctx context.Context, clients Clients, q Query) (any, error)

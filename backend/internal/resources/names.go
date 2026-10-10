@@ -2,13 +2,12 @@ package resources
 
 import (
 	"context"
-	"errors"
 	"maps"
 	"reflect"
 	"slices"
 	"sync"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"opscope/internal/kube"
 )
 
 // The command palette searches every object in a cluster by name. Rather
@@ -22,16 +21,8 @@ type ObjectName struct {
 	Name      string `json:"name"`
 }
 
-// Skipped is a kind that's left out of the index, and why:
-//
-//	not_installed  the cluster doesn't have it (Gateway API)
-//	forbidden      this user isn't allowed to list it (often Secrets)
-//	failed         anything else; Error says what
-type Skipped struct {
-	Resource string `json:"resource"`
-	Code     string `json:"code"`
-	Error    string `json:"error,omitempty"`
-}
+// Skipped is a kind that's left out of the index, and why (see kube.Skipped).
+type Skipped = kube.Skipped
 
 // NameIndex is what GET /api/clusters/{id}/names returns.
 type NameIndex struct {
@@ -79,21 +70,17 @@ func ListNames(ctx context.Context, clients Clients) (*NameIndex, error) {
 	read := 0
 	for i, kind := range kinds {
 		r := results[i]
-		switch {
-		case errors.Is(r.err, ErrGatewayAPINotInstalled):
-			index.Skipped = append(index.Skipped, Skipped{Resource: kind, Code: "not_installed"})
-		case apierrors.IsForbidden(r.err):
-			index.Skipped = append(index.Skipped, Skipped{Resource: kind, Code: "forbidden"})
-		case r.err != nil:
-			index.Skipped = append(index.Skipped, Skipped{Resource: kind, Code: "failed", Error: r.err.Error()})
-			if firstErr == nil {
+		if r.err != nil {
+			skipped := kube.Skip(kind, r.err)
+			index.Skipped = append(index.Skipped, skipped)
+			if skipped.Code == "failed" && firstErr == nil {
 				firstErr = r.err
 			}
-		default:
-			read++
-			for _, m := range metas(r.rows) {
-				index.Objects = append(index.Objects, ObjectName{Resource: kind, Namespace: m.Namespace, Name: m.Name})
-			}
+			continue
+		}
+		read++
+		for _, m := range metas(r.rows) {
+			index.Objects = append(index.Objects, ObjectName{Resource: kind, Namespace: m.Namespace, Name: m.Name})
 		}
 	}
 

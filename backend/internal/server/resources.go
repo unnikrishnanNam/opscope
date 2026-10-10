@@ -111,7 +111,7 @@ func getSecretValue(manager *clusters.Manager) http.HandlerFunc {
 
 // clientsOf bundles a cluster's clients for the resources package.
 func clientsOf(cluster *clusters.Cluster) resources.Clients {
-	return resources.Clients{Kube: cluster.Client, Dynamic: cluster.Dynamic}
+	return resources.Clients{Kube: cluster.Client, Dynamic: cluster.Dynamic, Metadata: cluster.Metadata}
 }
 
 // queryFrom reads the list options from the URL's query string.
