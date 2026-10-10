@@ -1,0 +1,528 @@
+# Opscope: Topology and diagnosis
+
+Opscope shows *what* is unhealthy: a pod in `CrashLoopBackOff`, a Deployment at 0/3, a route that
+isn't accepted. This record adds *why*. Opscope builds a graph of the cluster in which every object
+is connected to what it runs on, what it uses and what sends traffic to it. It then follows that
+graph from a symptom to the object that is broken for its own reasons, the root cause, and shows
+the path with the evidence for each step.
+
+The feature has three parts, built in this order:
+
+1. **The model:** one snapshot of a cluster turned into nodes and typed edges, including objects
+   that are referred to but don't exist.
+2. **Diagnosis:** rules that turn raw status into findings with evidence and name the object to
+   blame, and a walk that chains findings from symptom to root cause.
+3. **Views:** a diagnosis on every detail page, a map around one object, a topology page for an
+   app, a namespace or the whole cluster, and a list of problems on the overview.
+
+Most of the value is in the second part. A graph shows what is connected; the rules say why
+something fails. They are built and tested before anything is drawn.
+
+What stays the same: Opscope stays read-only and uses only `get` and `list`. Every existing page,
+endpoint and shortcut keeps working as it does. A timeline of changes is planned separately; this
+work lays its foundation (see [Toward the timeline](#toward-the-timeline)).
+
+Phases are numbered **G0–G7** so they don't mix with the build phases 0–8 or the phases lettered
+R, P and D. All work happens on the `feature/topology` branch, and each phase is committed there
+once it works, its tests pass and its notes are written. This feature has no issue of its own.
+
+**Status (2026-10-10):** planned, open questions answered. G0 is next.
+
+**Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
+
+---
+
+## Decisions
+
+- **Still read-only, and still polling.** Opscope uses only `get` and `list`. It doesn't use
+  `watch` or informers. A snapshot of a cluster comes from list calls, and a later snapshot from
+  more list calls.
+- **One snapshot per cluster, covering the whole cluster.** Every view (a detail page's diagnosis,
+  a namespace map, the cluster map, the problems list) is computed from the same snapshot. There is
+  no snapshot per namespace, because references cross namespaces (an HTTPRoute and its Gateway, a
+  cross-namespace backend and its ReferenceGrant, pods and their nodes) and because the cluster
+  view needs everything anyway.
+- **Snapshots are taken on demand first, then in the background.** Up to G5, a snapshot is taken
+  when a view asks for one and reused for up to 10 seconds, the UI's refresh interval. In G6
+  Opscope takes one for every cluster every 30 seconds, **even when nobody is looking**. The
+  timeline needs that, and it makes the cluster-wide view cheap. Clusters that don't answer are
+  retried less often, backing off to once every 5 minutes.
+- **No secret values in the snapshot.** Secrets are listed metadata only (`PartialObjectMetadata`,
+  through client-go's metadata client), so their values never even reach Opscope. ConfigMaps keep
+  their key names and drop their values. Without the optional Secrets role, Secrets are "unknown"
+  in the graph, not "missing".
+- **New kinds, read with `get` and `list` only:** ReplicaSets, EndpointSlices,
+  PersistentVolumeClaims, PersistentVolumes, StorageClasses, ServiceAccounts, ResourceQuotas,
+  IngressClasses, HorizontalPodAutoscalers, PodDisruptionBudgets and Gateway API ReferenceGrants.
+  The ClusterRole in `deploy/kubernetes/opscope.yaml` grows by these, and
+  [Permissions](../deployment.md#permissions) lists them. A kind Opscope can't read is skipped, the
+  same way `GET /names` skips one, and its objects become "unknown".
+- **Missing and unknown are first-class.** An object that is referred to but doesn't exist becomes
+  a node in the **missing** state. One Opscope isn't allowed to read, or whose API isn't installed,
+  is **unknown**. A missing Secret is often the whole answer, and a list page can never show it.
+- **Edges point from the dependent to its dependency** ("A needs B"): Deployment → ReplicaSet →
+  Pod → Node, Pod → Secret, Service → Pod, HTTPRoute → Service, HTTPRoute → Gateway. Diagnosis walks
+  edges forward to find a cause, and backward to find the impact. The layout ignores direction and
+  places nodes by kind (see [Drawing](#drawing)).
+- **Diagnosis uses explicit rules that name the culprit.** "Something this depends on is unhealthy,
+  so that's the cause" isn't used: it blames a busy node for every crash loop on it. Each rule says
+  which object it blames and with what evidence. When no rule explains a failure, Opscope says so
+  and lists unhealthy neighbours as "possibly related", marked as a guess.
+- **Every finding has a confidence:** `certain` (read from structured status: a container state, a
+  condition, a missing object), `likely` (read from event text, which changes between Kubernetes
+  versions) or `possible` (the fallback above). The UI shows anything less than certain.
+- **No AI.** Explanations are deterministic, come with their evidence, and are the same every time
+  for the same cluster.
+- **Suggested next steps are read-only.** A step is a link to an Opscope page or tab (previous logs,
+  an event, the node) or a read-only kubectl command to copy (`get`, `describe`, `logs`), as the
+  palette already offers. A fix ("create the Secret", "raise the memory limit") is described in
+  prose, never as a command.
+- **The text comes first.** The diagnosis is an indented trace on the detail page, which works
+  with the keyboard, a screen reader and a 375 px screen. Every graph view also has a list form, so
+  no information exists only in a picture.
+- **Zoom levels follow the namespace picker.** With "All namespaces" selected, the topology page
+  shows the cluster: namespaces holding apps. With a namespace selected, it shows that namespace's
+  objects. `?app=` narrows it to one app. A detail page's Map tab shows the object's neighbourhood.
+- **Our own renderer and layout.** The graph is SVG drawn by our own component. The layout is our
+  own layered layout: one column per kind, rows ordered to reduce crossings. Kubernetes kinds
+  already have a natural left-to-right order, so a general graph layout library isn't needed. The
+  layout is one function, `layout(graph) → positions`. If it doesn't look good on real clusters by
+  the end of G4, [elkjs](https://github.com/kieler/elkjs) (its layered algorithm, loaded only on
+  graph pages) replaces that function and the rest stays. The choice is recorded in G4's notes.
+- **No new Go dependencies.** The metadata client is part of client-go. Snapshot loading uses the
+  standard library for running one load at a time per cluster.
+- **Apps are grouped by labels, then by what selects what.** An app is the first label of
+  `app.kubernetes.io/part-of`, `app.kubernetes.io/instance`, `app.kubernetes.io/name` and `app` that
+  a workload has, or the workload itself. Services, routes and config join the app of the
+  workloads they select or are used by.
+- **Problems sit at the top of the "Recent warnings" card** on the overview, not in a card of
+  their own. Warnings that no finding explains (a one-off probe failure) stay visible below them.
+  This may change once the feature has been used for a while.
+- **The Map tab's shortcut is `5` on every kind.** Logs keeps `4` (pods only), as documented in the
+  README, so on other kinds `4` does nothing. A tab keeps the same key everywhere.
+- **Scenarios run on the `opscope-test` kind cluster.** The broken-app manifests in
+  `test/scenarios/` are applied there in their own namespace (`opscope-scenarios`) and deleted
+  afterwards. The multipass cluster is only read.
+- **Out of scope:** the recorded timeline (its own record), dependencies inferred from
+  configuration (an env var pointing at `postgres.db.svc`), NetworkPolicy analysis, and kinds
+  beyond those listed. They're under [Later](#later).
+
+---
+
+## Design
+
+### Packages
+
+```
+backend/internal/
+  snapshot/     loads every kind a cluster has into one Snapshot; keeps the latest per cluster
+  graph/        Build(snapshot) → Graph: nodes, edges, states, apps; views of it (cluster, namespace, app, neighbourhood)
+  diagnose/     the rules and the engine: findings, traces, impact, problems
+    testdata/   scenarios: objects as YAML, and the root causes expected for them
+  server/       topology.go: the new endpoints
+```
+
+The `snapshot` package is the only one that talks to a cluster. `graph` and `diagnose` are pure
+functions over a `Snapshot`, so their tests build objects in Go or read them from YAML and need no
+fake clients. `resources.podStatus` and the local Gateway API structs move to a small shared
+package (`internal/kube`) so `resources` and `graph` both use them.
+
+### The snapshot
+
+```go
+type Snapshot struct {
+	Taken   time.Time
+	Skipped []resources.Skipped // kinds that couldn't be read, and why (not_installed, forbidden, failed)
+
+	Namespaces     []corev1.Namespace
+	Nodes          []corev1.Node
+	Pods           []corev1.Pod
+	ReplicaSets    []appsv1.ReplicaSet
+	Deployments    []appsv1.Deployment
+	// ... StatefulSets, DaemonSets, Jobs, CronJobs, Services, EndpointSlices, Ingresses,
+	// IngressClasses, PVCs, PVs, StorageClasses, ServiceAccounts, ResourceQuotas, HPAs, PDBs,
+	// Gateways, HTTPRoutes, GatewayClasses, ReferenceGrants
+	ConfigMaps     []ConfigMapKeys                 // name, namespace, labels, key names; no values
+	Secrets        []metav1.PartialObjectMetadata  // metadata only; values never fetched
+	Events         []corev1.Event                  // Warning events only
+
+	index // lookups by UID, by kind/namespace/name, pods by owner, events by object UID
+}
+```
+
+- All kinds are listed in parallel across all namespaces, like `ListNames` does. One kind failing
+  doesn't fail the snapshot. If nothing could be read, the cluster itself is the problem and the
+  error is returned as today (`clusters.Explain`).
+- Objects are slimmed as they arrive: `managedFields` and the `last-applied-configuration`
+  annotation are dropped. This keeps a large cluster's snapshot in tens of megabytes, not hundreds.
+- `snapshot.Store` keeps the latest snapshot per cluster. `Get(ctx, cluster)` returns it when it is
+  younger than the maximum age, and loads a new one otherwise. Concurrent callers wait for the
+  same load instead of starting their own. When a cluster is removed, its snapshot is dropped,
+  like `metrics.History.Forget`.
+- From G6, `Store.Collect` refreshes every cluster on a ticker, the same pattern as
+  `metrics.History.Collect`, and views always use the latest snapshot.
+- Every response built from a snapshot says when it was taken and which kinds were skipped, so the
+  UI can show "as of 12 s ago" and "Opscope can't read Secrets in this cluster".
+
+Target: a cluster of 5,000 pods loads in under 2 seconds and is built and diagnosed in under
+200 ms. A Go benchmark with a generated snapshot of that size checks the second number.
+
+### The graph
+
+```go
+type Node struct {
+	ID        string `json:"id"`        // "pods/shop/checkout-7d9f-x2k": resource/namespace/name, as in URLs
+	Resource  string `json:"resource"`  // "pods"; links to the detail page when Opscope has one
+	Kind      string `json:"kind"`      // "Pod"
+	Namespace string `json:"namespace,omitempty"`
+	Name      string `json:"name"`
+	App       string `json:"app,omitempty"`
+	State     string `json:"state"`     // ok, progressing, degraded, failing, missing, unknown
+	Status    string `json:"status"`    // what the list page shows: "CrashLoopBackOff", "2/3", "Accepted"
+}
+
+type Edge struct {
+	From     string `json:"from"`  // the dependent
+	To       string `json:"to"`    // what it needs
+	Type     string `json:"type"`  // see below
+	Via      string `json:"via,omitempty"` // where the reference is: "env STRIPE_KEY", "volume config", "backendRef 2"
+	Optional bool   `json:"optional,omitempty"` // optional: true references can't break anything
+}
+```
+
+**States.** `ok`; `progressing` (a rollout or a pod starting, within its deadline); `degraded`
+(working, but not fully: 2/3 ready, a node under memory pressure); `failing`; `missing`;
+`unknown`. Each kind's state comes from what its list page already works out (`podStatus`,
+ready/desired, route and gateway conditions), so the graph and the tables always agree.
+
+**Edges:**
+
+| Type        | From → To                                                                           | Read from                                                                       |
+| ----------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `owns`      | Deployment → ReplicaSet → Pod; StatefulSet, DaemonSet, Job → Pod; CronJob → Job     | `ownerReferences` (reversed)                                                    |
+| `runs-on`   | Pod → Node                                                                          | `spec.nodeName`                                                                 |
+| `uses`      | Pod or pod template → ConfigMap, Secret, PVC, ServiceAccount                        | volumes (incl. projected), `env.valueFrom`, `envFrom`, `imagePullSecrets`, `serviceAccountName` |
+| `uses`      | PVC → PV → StorageClass; Ingress → IngressClass, TLS Secret; Gateway → TLS Secret   | `volumeName`, `storageClassName` (or the default class), `tls`, `certificateRefs` |
+| `selects`   | Service → Pod; PDB → Pod                                                            | label selectors, same namespace; readiness from EndpointSlices                  |
+| `routes-to` | Ingress → Service; HTTPRoute → Service                                              | backends, `defaultBackend`, `backendRefs`                                       |
+| `attaches`  | HTTPRoute → Gateway → GatewayClass                                                  | `parentRefs`, `gatewayClassName`                                                |
+| `permits`   | HTTPRoute → ReferenceGrant (for a backend in another namespace)                     | the grant in the backend's namespace                                            |
+| `scales`    | HPA → Deployment or StatefulSet                                                     | `scaleTargetRef`                                                                |
+
+Workloads get `uses` edges from their pod template as well as their pods. A Deployment whose pods
+are never created (a quota, Pod Security admission) still shows what it needs.
+
+**Views of the graph** are functions that return a subgraph, already shaped for drawing:
+
+- `Neighbourhood(id, depth)`: the object and everything within `depth` edges (default 2), plus
+  the whole chain behind any failing node in it.
+- `Namespace(ns)` and `App(ns, app)`: every object, with each workload's pods collapsed into one
+  node ("3/4 ready") unless asked to expand. ReplicaSets are hidden unless they matter (more than
+  one with pods during a rollout, or one with a FailedCreate). Nodes (machines) are added only when
+  a pod's problem is its node.
+- `Cluster()`: namespaces as groups, apps as nodes with a summary ("4 workloads, 1 failing"),
+  Gateways and GatewayClasses as shared entry points, routes between them as edges, and nodes
+  (machines) as a strip of health underneath. A namespace with nothing wrong in it can collapse to
+  one tile.
+
+Each view can be limited to problems: only nodes that aren't `ok`, the chains between them, and
+their direct parents for context.
+
+### Diagnosis
+
+A **rule** looks at one object and returns findings:
+
+```go
+type Rule struct {
+	ID       string // "pod.config-missing"
+	Resource string // the kind it looks at: "pods"
+	Check    func(c *Context, n *graph.Node) []Finding
+}
+
+type Finding struct {
+	ID         string     `json:"id"`         // stable: rule + object + blamed objects
+	Rule       string     `json:"rule"`
+	Object     string     `json:"object"`     // node ID the finding is about
+	Severity   string     `json:"severity"`   // failing, degraded, info
+	Confidence string     `json:"confidence"` // certain, likely, possible
+	Title      string     `json:"title"`      // "Secret shop/stripe-key doesn't exist"
+	Detail     string     `json:"detail"`     // a sentence or two of explanation; the fix in prose
+	Evidence   []Evidence `json:"evidence"`   // condition, container state, event, or reference, with times
+	Blames     []string   `json:"blames"`     // node IDs that cause this one
+	Next       []Step     `json:"next"`       // links and read-only kubectl commands
+}
+```
+
+`Context` gives rules the snapshot's lookups (by name, by UID, events for an object, a pod's
+owners) and the graph's edges. Rules live in one file per kind (`rules_pods.go`,
+`rules_workloads.go`, `rules_network.go`, ...), so each is easy to find and test.
+
+The **engine** runs every rule on every object once per snapshot and keeps the findings by object.
+Then:
+
+- **Trace** for an object: its findings, then for each blamed object its findings, and so on, as a
+  tree. A finding that blames nothing, or blames only objects with no findings, is a **root cause**.
+  The walk stops at cycles and at a depth of 10.
+- **Grouping:** findings with the same rule and the same blamed objects are merged. A Deployment
+  with 30 pods failing the same way shows "30 pods: CreateContainerConfigError" once, not 30 times.
+- **Impact** for an object: the reverse walk. For a missing Secret, that's every pod, workload,
+  Service and route whose trace leads to it.
+- **Problems** for a namespace or the cluster: the root causes, each with the objects it explains,
+  sorted by severity and then by how much each one explains. Headline: "3 problems explain 17
+  unhealthy objects."
+- **Fallback:** an object that is `failing` or `degraded` with no finding from any rule gets one
+  from the `unexplained` rule (confidence `possible`): its conditions and recent warnings as
+  evidence, and its unhealthy neighbours as "possibly related".
+
+Diagnosis runs once per snapshot and is cached with it, so every view is a lookup.
+
+### Rules
+
+The first set (G2) covers the failures people hit most. The second (G3) completes the catalogue.
+
+| Rule                         | Phase | Looks at          | Detects                                                                                                      | Blames                                         |
+| ---------------------------- | ----- | ----------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
+| `pod.config-missing`         | G2    | Pod               | `CreateContainerConfigError`: a ConfigMap, Secret or key that doesn't exist                                  | the missing object (or key)                    |
+| `pod.mount-failed`           | G2    | Pod               | stuck in `ContainerCreating` with `FailedMount`: a volume's ConfigMap, Secret or PVC                         | the missing or unbound object                  |
+| `pod.image-pull`             | G2    | Pod               | `ErrImagePull`, `ImagePullBackOff`, `InvalidImageName`, split into not found, unauthorized, unreachable      | the pull Secret when unauthorized; else itself |
+| `pod.crash-loop`             | G2    | Pod               | `CrashLoopBackOff`, with the last exit: `OOMKilled` (the memory limit), an exit code, a failed liveness probe | itself (root), with a link to previous logs    |
+| `pod.unschedulable`          | G2    | Pod               | `PodScheduled=False`: not enough CPU or memory, taints, node selector or affinity matching no node, unbound PVC | the nodes, the PVC                             |
+| `pod.node-down`              | G2    | Pod               | its node is NotReady or unreachable, so the pod is `Unknown` or stuck `Terminating`                          | the node                                       |
+| `node.not-ready`             | G2    | Node              | `Ready` is False or Unknown; when the kubelet last reported                                                  | itself (root)                                  |
+| `workload.unavailable`       | G2    | Deployment, StatefulSet, DaemonSet | fewer replicas ready than wanted                                                            | its pods that aren't ready, grouped            |
+| `replicaset.create-failed`   | G2    | ReplicaSet        | `ReplicaFailure` or `FailedCreate`: a ResourceQuota, Pod Security admission, a missing ServiceAccount        | the quota, the namespace, the ServiceAccount   |
+| `service.no-endpoints`       | G2    | Service           | the selector matches no pods                                                                                 | itself (root)                                  |
+| `service.no-ready-endpoints` | G2    | Service           | pods match, but none are ready                                                                               | those pods                                     |
+| `route.backend`              | G2    | HTTPRoute, Ingress | a backend Service missing, without a ReferenceGrant, or with no ready endpoints                             | the Service or the missing grant               |
+| `pod.not-ready`              | G3    | Pod               | running but not ready: a failing readiness probe                                                             | itself (root)                                  |
+| `pod.evicted`                | G3    | Pod               | evicted for memory or disk pressure                                                                          | the node                                       |
+| `pod.init-failed`            | G3    | Pod               | an init container failing (`Init:Error`, `Init:CrashLoopBackOff`), with the same detail as the main containers | itself, or what the init container needs       |
+| `node.pressure`              | G3    | Node              | memory, disk or PID pressure; cordoned                                                                       | itself (root)                                  |
+| `deployment.rollout-stuck`   | G3    | Deployment        | `ProgressDeadlineExceeded`: the new revision's pods fail while the old one still serves                      | the new ReplicaSet's pods                      |
+| `statefulset.ordered`        | G3    | StatefulSet       | waiting for a lower ordinal to become ready                                                                  | that pod                                       |
+| `job.failed`                 | G3    | Job, CronJob      | `BackoffLimitExceeded`, `DeadlineExceeded`; a CronJob's last run failing                                     | the failed pods, the failed Job                |
+| `pvc.pending`                | G3    | PVC               | no StorageClass, a missing class, `ProvisioningFailed`                                                       | the StorageClass, or itself                    |
+| `hpa.not-scaling`            | G3    | HPA               | `ScalingActive=False` (often missing metrics), at its maximum                                                | the target, or itself                          |
+| `route.not-accepted`         | G3    | HTTPRoute         | `Accepted=False`: no matching listener, hostname, or a missing Gateway                                       | the Gateway                                    |
+| `gateway.not-programmed`     | G3    | Gateway           | `Programmed` or `Accepted` is False                                                                          | the GatewayClass, or itself                    |
+| `gatewayclass.not-accepted`  | G3    | GatewayClass      | no controller accepted it: is its controller installed?                                                      | itself (root)                                  |
+| `ingress.class`              | G3    | Ingress           | a missing IngressClass, or a missing TLS Secret                                                              | the missing object                             |
+| `unexplained`                | G3    | anything failing  | the fallback above                                                                                           | possibly related neighbours                    |
+
+Rules read structured fields first: container states, conditions, references between objects.
+They read event text only where Kubernetes puts the reason nowhere else (scheduling, mounts,
+image pulls), and then they set `likely`.
+
+### API
+
+All `GET`, all built from the cluster's snapshot, and each response includes
+`"snapshot": {"taken": "...", "skipped": [...]}`.
+
+| Endpoint                                                            | Returns                                                                     |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `/api/clusters/{id}/diagnosis/{resource}/{namespace}/{name}`        | the object's state, its trace (findings with nested causes) and its impact |
+| `/api/clusters/{id}/diagnosis/{resource}/{name}`                    | the same, for cluster-wide kinds (nodes, GatewayClasses)                   |
+| `/api/clusters/{id}/topology?namespace=&app=&focus=&depth=&problems=` | `{nodes, edges, groups, findings}` for one view (see above)                |
+| `/api/clusters/{id}/problems?namespace=`                            | the root causes, each with the objects it explains                          |
+
+The `diagnosis` prefix keeps these from clashing with `/{resource}/{namespace}/{name}`: a fixed
+segment beats a placeholder, as for `overview` and `names`. `docs/api.md` documents all three.
+
+### Views
+
+**Diagnosis on the detail page (G2).** At the top of the Summary tab, when the object or anything
+behind it has a finding:
+
+```
+✕ Deployment shop/checkout                          0/3 ready
+  └ ✕ 3 pods: CreateContainerConfigError
+      └ ⚠ Secret shop/stripe-key doesn't exist       root cause · certain
+          Container api reads env STRIPE_KEY from secretKeyRef stripe-key/api-key.
+          Create the Secret in shop, or change the reference.
+          Evidence: "secret \"stripe-key\" not found" (container api, 2 min ago)
+          Next: kubectl get secrets -n shop   [Copy]
+
+  Also affected: Service shop/checkout (no ready endpoints), HTTPRoute shop/storefront
+```
+
+Each object in the trace links to its page; a missing one links to nothing and says so. An
+object that is fine shows one quiet line ("Opscope found nothing wrong with this object or what it
+needs"). An object that is a root cause shows what it affects.
+
+**Map tab (G4).** The object's neighbourhood, drawn. Its shortcut is `5`. Selecting a node opens a drawer with its
+state, its findings and a link to its page.
+
+**Topology page (G5, G6).** A new page in the Cluster group (`g t`). It follows the namespace
+picker: a namespace (G5) or the whole cluster (G6). It has a "Problems only" toggle, a List view
+that shows the same content as an outline, and the same drawer. On screens narrower than 768 px it
+opens in List view.
+
+**Problems on the overview (G3).** At the top of the "Recent warnings" card: the root causes, each
+with how many objects it explains, linking to the root object's diagnosis. The warnings follow
+below them.
+
+**Command palette.** On a detail page: "Show diagnosis", "Open map", "Copy root cause". From
+anywhere: "Problems", and Topology as a page.
+
+### Drawing
+
+- **Columns by kind,** left to right, roughly in the direction traffic flows: GatewayClass,
+  Gateway, Ingress | HTTPRoute | Service | Deployment, StatefulSet, DaemonSet, CronJob, Job |
+  ReplicaSet (when shown) | Pod | ConfigMap, Secret, PVC, ServiceAccount | PV, StorageClass | Node.
+  Each column has a quiet header.
+- **Rows** are ordered to reduce crossings: a few passes of the barycenter heuristic (each node
+  moves to the average row of its neighbours in the next column, then the previous one), starting
+  from an order sorted by name. The same graph always gets the same layout, so a refresh doesn't
+  move anything. When a node appears or disappears, the others keep their order.
+- **Nodes** are cards: the kind's icon (from `icons.jsx`), the name, and the status badge already
+  used by the tables. Missing nodes have a dashed outline and a "missing" tag. Unknown nodes are
+  greyed with "can't read". Collapsed pods show a small stack and "3/4".
+- **Edges** are smooth curves. Solid for `owns`, `routes-to` and `attaches`, dashed for `uses`,
+  thin for `selects`; optional references are fainter. The chain from a selected node to its root
+  cause is drawn thicker in the error colour. Animation respects `prefers-reduced-motion`.
+- **Pan and zoom** with the mouse, a trackpad or touch, and buttons for fit, zoom in and zoom out.
+- **Keyboard:** every node is focusable; arrow keys move along edges, Enter opens the drawer,
+  Escape closes it. Each node's accessible name says its kind, name, state and status.
+- Built on `/kit` first with sample graphs (healthy, broken, large, missing and unknown nodes), in
+  both themes, before it reaches a page. Colours come from the existing tokens and are checked
+  with the palette validator.
+
+### Toward the timeline
+
+The timeline is planned in its own record, which decides storage. This work prepares for it:
+
+- G6's background snapshots are exactly what the timeline compares: the difference between two
+  consecutive snapshots is the list of changes. The timeline adds the comparison and storage, not
+  a second way of reading the cluster.
+- Findings have stable IDs, so the timeline can record when each one appeared and cleared ("this
+  started at 14:03").
+- Decided for the timeline, so the snapshot keeps what it needs: ConfigMap changes are stored as
+  before/after values, since the UI already shows ConfigMap values to anyone who can open it, with
+  a setting to store only hashes instead. Secret changes are stored as one hash per key, never a
+  value. Logs are never stored. The snapshot therefore gains ConfigMap values (G6) only when the
+  timeline needs them, not before.
+
+---
+
+## Phase G0: Snapshot
+
+Goal: Opscope can take a snapshot of a whole cluster, with nothing visible changing yet.
+
+- [ ] `internal/snapshot`: every kind listed in parallel, across all namespaces, into `Snapshot`
+- [ ] Secrets through the metadata client; ConfigMaps reduced to key names; Warning events only
+- [ ] Objects slimmed as they arrive (`managedFields`, `last-applied-configuration`)
+- [ ] Kinds that can't be read go in `Skipped` (`not_installed`, `forbidden`, `failed`); nothing read at all is an error
+- [ ] Lookups: by UID, by kind/namespace/name, pods by owner, events by object
+- [ ] `Store`: the latest snapshot per cluster, a maximum age (10 s), one load at a time per cluster, dropped with its cluster
+- [ ] `podStatus` and the Gateway API structs moved to `internal/kube`, with `resources` using them
+- [ ] RBAC: the new kinds added to `deploy/kubernetes/opscope.yaml`, and the list in `docs/deployment.md`
+- [ ] Go tests with client-go's fake clients: all kinds, a forbidden kind, Gateway API missing, the store's reuse and single load
+- [ ] Benchmark: a generated 5,000-pod snapshot; load time measured on the multipass cluster
+
+## Phase G1: Graph model
+
+Goal: `GET /topology` returns a correct graph for a namespace and a neighbourhood. No UI yet.
+
+- [ ] `internal/graph`: nodes with states, every edge type in the table above, missing and unknown nodes
+- [ ] Pod-template edges for workloads; optional references marked
+- [ ] App grouping by labels, then by selection
+- [ ] Views: `Neighbourhood`, `Namespace`, `App`, with pods collapsed per workload and the problems-only filter
+- [ ] `GET /api/clusters/{id}/topology` for a namespace, an app and a focus object
+- [ ] Go tests: one per edge type, missing and unknown references, cross-namespace references, app grouping
+- [ ] Checked against the multipass cluster's `topology-test` namespace (Gateway → routes → services → pods)
+
+## Phase G2: Diagnosis and the first rules
+
+Goal: a broken object's detail page explains why, down to the root cause.
+
+- [ ] `internal/diagnose`: `Rule`, `Finding`, `Context`, the engine, traces, grouping, impact
+- [ ] The G2 rules from the table
+- [ ] Scenarios in `diagnose/testdata/`: each one's objects (with status) as YAML, and its expected root causes; a test runs them all
+- [ ] Broken-app manifests in `test/scenarios/` (missing Secret, bad image, OOM, crash loop,
+      unschedulable, selector matching nothing, route to a missing Service, quota), applied to the
+      `opscope-test` kind cluster in the `opscope-scenarios` namespace to reproduce each scenario and
+      capture its objects as test data, then deleted
+- [ ] `GET /api/clusters/{id}/diagnosis/...`, both forms
+- [ ] The diagnosis at the top of the Summary tab: trace, evidence, next steps, impact, "as of"
+- [ ] Palette: "Show diagnosis", "Copy root cause"
+- [ ] `docs/api.md`: the diagnosis endpoint
+- [ ] Checked in the browser against the scenarios: light and dark, keyboard only, a screen reader, 375 px
+
+## Phase G3: Complete rules and problems
+
+Goal: every common failure is explained, and the overview lists root causes.
+
+- [ ] The G3 rules from the table, each with a scenario
+- [ ] The `unexplained` fallback and confidence shown in the UI
+- [ ] `GET /api/clusters/{id}/problems`
+- [ ] Problems at the top of the overview's "Recent warnings" card, following the namespace picker
+- [ ] Palette: "Problems"
+- [ ] Checked against both test clusters, including what the multipass cluster already has wrong (argocd-server's crash loop)
+
+## Phase G4: Graph renderer and the Map tab
+
+Goal: any object's neighbourhood is drawn, and it looks good.
+
+- [ ] `graph/layout.js`: kind columns, barycenter ordering, a stable layout; Vitest tests (no overlaps, the same input gives the same layout, collapsed pods)
+- [ ] `TopologyGraph` component: cards, curved edges, the chain to a root cause highlighted, missing and unknown styles
+- [ ] Pan, zoom, fit; keyboard movement along edges; accessible names
+- [ ] `/kit` page with sample graphs, both themes
+- [ ] A drawer for the selected node (reusing `Drawer`)
+- [ ] The Map tab on detail pages (shortcut `5`); palette "Open map"
+- [ ] Decide: keep our own layout, or switch the layout function to elkjs (recorded in the notes)
+
+## Phase G5: Topology page for namespaces and apps
+
+Goal: a namespace or one app can be seen whole, with its problems.
+
+- [ ] The Topology page in `sections.js` (`g t`), following the namespace picker
+- [ ] App picker (`?app=`), "Problems only" toggle, List view; List by default under 768 px
+- [ ] Collapsed pods expand on request; ReplicaSets shown only when they matter
+- [ ] Refreshes every 10 seconds without moving the layout
+- [ ] Checked on the multipass cluster: `topology-test`, a large namespace, and a namespace with problems
+
+## Phase G6: Background snapshots and the cluster view
+
+Goal: the whole cluster can be seen at once, and snapshots are kept fresh for the timeline.
+
+- [ ] `Store.Collect`: every cluster every 30 s, backing off to 5 minutes for clusters that don't answer
+- [ ] `OPSCOPE_SNAPSHOT_INTERVAL` setting, documented in `docs/deployment.md`
+- [ ] The `Cluster()` view: namespaces holding apps, Gateways as entry points, the node strip, healthy namespaces collapsed
+- [ ] The Topology page with "All namespaces" selected shows it
+- [ ] Memory and API load measured on the multipass cluster over an hour; noted below
+- [ ] Checked with several clusters connected, one of them unreachable
+
+## Phase G7: Documentation and release
+
+Goal: the feature is documented and ready to release.
+
+- [ ] README: features, a screenshot of a diagnosis and of a topology, the new shortcut
+- [ ] `docs/api.md`: topology and problems endpoints; `docs/deployment.md`: permissions and the setting
+- [ ] Screenshots in light and dark
+- [ ] A final pass over this record; the status line updated; the record added to `docs/design/README.md` once released
+
+---
+
+## Later
+
+- **The timeline**, in its own record: comparing snapshots, storage, the before/after view, and
+  findings on the timeline ("this started 3 minutes after revision 7 rolled out").
+- **Recent changes without storage:** Kubernetes keeps some history itself. ReplicaSets and
+  ControllerRevisions hold rollout history, `managedFields` records which tool changed which field
+  and when, and conditions and container states have times. A "What changed recently" section on a
+  diagnosis could use these before the timeline exists.
+- **Inferred dependencies:** env vars and ConfigMap values naming a Service (`postgres.db.svc`,
+  `http://api:8080`) as `inferred` edges, marked as a guess. They'd show which app calls which.
+- **NetworkPolicy:** which policies select a pod and whether they could block a route's traffic.
+- **More kinds:** GRPCRoute, TLSRoute, CRDs with standard conditions (cert-manager Certificates,
+  Argo CD Applications) through a generic conditions rule.
+
+## Open questions
+
+None at the moment. The four questions raised while planning were answered on 2026-10-10 and moved
+into Decisions: scenarios run on the kind cluster, the Map tab's shortcut is `5`, background
+snapshots are taken every 30 seconds, and problems sit at the top of the "Recent warnings" card.
+
+## Phase notes
+
+<Added as each phase is done.>
