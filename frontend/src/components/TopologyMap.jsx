@@ -63,8 +63,11 @@ export default function TopologyMap({ clusterId, objectId, namespace, label }) {
 
 // TopologyView shows a view as a map with a panel for the selected card,
 // or as a list; on a phone it starts as a list.
-//   tools   more controls for the toolbar
-export function TopologyView({ clusterId, view, focus, namespace, label, fitKey, tools, height }) {
+//   tools     more controls for the toolbar
+//   empty     what to say when the view is empty
+//   expanded  workloads whose pods are shown one by one, and onExpand(id,
+//             on) to change that; without it, groups stay grouped
+export function TopologyView({ clusterId, view, focus, namespace, label, fitKey, tools, height, empty, expanded, onExpand }) {
   const [mode, setMode] = useState(() => (window.matchMedia?.(NARROW).matches ? "list" : "map"));
   const [selected, setSelected] = useState(null);
   const graph = useRef(null);
@@ -120,6 +123,7 @@ export function TopologyView({ clusterId, view, focus, namespace, label, fitKey,
               label={label}
               inset={shown ? PANEL_W : 0}
               fitKey={fitKey}
+              empty={empty}
             />
             {shown && (
               <TopologyPanel
@@ -134,13 +138,22 @@ export function TopologyView({ clusterId, view, focus, namespace, label, fitKey,
                   graph.current?.showCard(id);
                 }}
                 onClose={close}
+                expanded={expanded}
+                onExpand={
+                  onExpand &&
+                  ((id, on) => {
+                    // The group's card goes; its workload's stays, to group them again.
+                    setSelected(id);
+                    onExpand(id, on);
+                  })
+                }
               />
             )}
           </div>
           <Legend />
         </>
       ) : (
-        <TopologyList clusterId={clusterId} view={view} focus={focus} namespace={namespace} />
+        <TopologyList clusterId={clusterId} view={view} focus={focus} namespace={namespace} empty={empty} />
       )}
     </div>
   );

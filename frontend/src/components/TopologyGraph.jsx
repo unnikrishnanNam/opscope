@@ -23,11 +23,23 @@ const DRAG = 4; // px a press must move before it pans instead of clicking
 //   label      names the map for screen readers
 //   inset      px on the right covered by a panel, kept clear when showing a card
 //   fitKey     the view is fitted on screen again when this changes
+//   empty      what to say when there's nothing to draw
 //   ref        { showCard(id), focusCard(id), fit() }
 //
 // Drag or scroll to pan; zoom with ⌘/Ctrl and the wheel, a pinch, the
 // buttons or + and −. Arrow keys move along edges, Enter opens a card.
-export default function TopologyGraph({ view, focus, namespace, selected, onSelect, label, inset = 0, fitKey, ref }) {
+export default function TopologyGraph({
+  view,
+  focus,
+  namespace,
+  selected,
+  onSelect,
+  label,
+  inset = 0,
+  fitKey,
+  empty = "Nothing to show.",
+  ref,
+}) {
   const hintId = useId();
   const viewportRef = useRef(null);
   const cards = useRef(new Map());
@@ -247,7 +259,7 @@ export default function TopologyGraph({ view, focus, namespace, selected, onSele
       <p id={hintId} className="visually-hidden">
         Arrow keys move along connections, Enter shows a card's details, + and − zoom, 0 fits the map on screen.
       </p>
-      {view.nodes.length === 0 && <p className="topo-empty">Nothing to show.</p>}
+      {view.nodes.length === 0 && <p className="topo-empty">{empty}</p>}
       <div className="topo-canvas" style={{ transform, visibility: t ? "visible" : "hidden" }}>
         <svg className="topo-edges" width={placed.width} height={placed.height} aria-hidden="true" focusable="false">
           {placed.edges.map((e) => (
@@ -308,8 +320,13 @@ export default function TopologyGraph({ view, focus, namespace, selected, onSele
           style={{ top: Math.max(0, headingsTop(t)) }}
           aria-hidden="true"
         >
-          {placed.columns.map((c) => (
-            <div key={c.key} className="topo-column" style={{ left: c.x * t.k + t.x, width: NODE_W * t.k }}>
+          {placed.columns.map((c, i) => (
+            // A heading may use the gap beside its column, so it fits when zoomed out.
+            <div
+              key={c.key}
+              className="topo-column"
+              style={{ left: c.x * t.k + t.x, width: ((placed.columns[i + 1]?.x ?? c.x + NODE_W) - c.x) * t.k - 8 }}
+            >
               {c.label}
             </div>
           ))}
@@ -445,17 +462,18 @@ function headingsTop(t) {
 
 // firstView shows the whole map if it can be read that way. Otherwise it
 // shows the focused card at a readable size, as near the middle as it can
-// without leaving space beside the map that it could fill.
+// without leaving space beside the map that it could fill; with no focus,
+// the top left, where the map starts.
 function firstView(placed, size, focus) {
   const whole = fitAll(placed, size);
-  const card = placed.nodes[focus] ?? Object.values(placed.nodes)[0];
-  if (whole.k >= READABLE || !card) return whole;
+  if (whole.k >= READABLE) return whole;
   const k = READABLE;
+  const card = placed.nodes[focus];
   const fill = (want, room, length) => (length * k + 2 * PAD <= room ? (room - length * k) / 2 : clamp(want, room - PAD - length * k, PAD));
   return {
     k,
-    x: fill(size.w / 2 - (card.x + NODE_W / 2) * k, size.w, placed.width),
-    y: fill(size.h / 2 - (card.y + NODE_H / 2) * k, size.h, placed.height),
+    x: fill(card ? size.w / 2 - (card.x + NODE_W / 2) * k : PAD, size.w, placed.width),
+    y: fill(card ? size.h / 2 - (card.y + NODE_H / 2) * k : PAD, size.h, placed.height),
   };
 }
 

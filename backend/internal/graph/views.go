@@ -28,7 +28,7 @@ type PodGroup struct {
 }
 
 // View is what the topology endpoint returns: nodes and the edges between
-// them, sorted, plus the apps of a namespace view.
+// them, sorted, plus the apps of the namespace for a namespace or app view.
 type View struct {
 	Nodes []*Node `json:"nodes"`
 	Edges []*Edge `json:"edges"`
@@ -63,13 +63,16 @@ func (g *Graph) Namespace(namespace string, o Options) *View {
 }
 
 // App shows one app of a namespace: its objects, what sends traffic to them
-// or scales them, and what all of that needs.
+// or scales them, and what all of that needs. Like a namespace view, it
+// lists the namespace's apps, so a page can offer the others.
 func (g *Graph) App(namespace, app string, o Options) *View {
 	p := g.project(o, "")
 	seeds := p.where(func(n *Node) bool { return n.Namespace == namespace && n.App == app })
 	parents := p.parents(seeds, set(RoutesTo, Selects, Scales))
 	inside := func(n *Node) bool { return (n.Namespace == namespace && n.App == app) || parents[n.ID] }
-	return p.view(p.dependencies(append(seeds, sortedKeys(parents)...), inside), "", o)
+	view := p.view(p.dependencies(append(seeds, sortedKeys(parents)...), inside), "", o)
+	view.Apps = p.apps(namespace)
+	return view
 }
 
 // Neighbourhood shows one object and everything within depth edges of it,
@@ -465,9 +468,12 @@ func (p *projection) adjacent(a, b string) bool {
 
 var unusedConfig = set("configmaps", "secrets", "serviceaccounts")
 
-// apps lists the apps of a namespace with their worst state.
+// apps lists the apps of a namespace with their worst state. An app of
+// nothing but configuration (a Secret Helm keeps, labelled but used by
+// nothing) isn't listed: its view would be empty.
 func (p *projection) apps(namespace string) []App {
 	byName := map[string]*App{}
+	drawn := map[string]bool{}
 	for _, n := range p.nodes {
 		if n.Namespace != namespace || n.App == "" {
 			continue
@@ -481,10 +487,15 @@ func (p *projection) apps(namespace string) []App {
 		if workloads[n.Resource] && n.Pods == nil && !p.ownedByWorkload(n.ID) {
 			app.Workloads++
 		}
+		if !unusedConfig[n.Resource] {
+			drawn[n.App] = true
+		}
 	}
 	apps := []App{}
-	for _, app := range byName {
-		apps = append(apps, *app)
+	for name, app := range byName {
+		if drawn[name] {
+			apps = append(apps, *app)
+		}
 	}
 	sort.Slice(apps, func(i, j int) bool { return apps[i].Name < apps[j].Name })
 	return apps

@@ -95,13 +95,13 @@ Press ⌘K (Ctrl+K on Windows and Linux), or the search box in the top bar, and 
 Enter runs the highlighted command, ⌘/Ctrl+Enter opens a link in a new tab, and Escape clears the
 search, then closes the palette. Recently used commands come first when nothing is typed.
 
-| Keys                         | Action                                                |
-| ---------------------------- | ----------------------------------------------------- |
-| `g` then `o` `n` `p` `d` `s` | Overview, Nodes, Pods, Deployments, Services          |
-| `g` then `c`                 | Manage clusters                                       |
-| `1` `2` `3` `4` `5`          | An object's Summary, YAML, Events, Logs and Map tabs  |
-| `/`                          | Filter the current list                               |
-| `?`                          | Every shortcut available on the current page          |
+| Keys                             | Action                                                 |
+| -------------------------------- | ------------------------------------------------------ |
+| `g` then `o` `t` `n` `p` `d` `s` | Overview, Topology, Nodes, Pods, Deployments, Services |
+| `g` then `c`                     | Manage clusters                                        |
+| `1` `2` `3` `4` `5`              | An object's Summary, YAML, Events, Logs and Map tabs   |
+| `/`                              | Filter the current list                                |
+| `?`                              | Every shortcut available on the current page           |
 
 Shortcuts are ignored while you type in a field.
 

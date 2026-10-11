@@ -15,7 +15,17 @@ import ProblemList, { PROBLEMS_ID, problemSummary } from "../components/ProblemL
 import StatusBadge, { statusTone } from "../components/StatusBadge.jsx";
 import Tooltip from "../components/Tooltip.jsx";
 import { Sparkline, UsageBar } from "../components/Usage.jsx";
-import { CpuIcon, ErrorIcon, MemoryIcon, NodesIcon, PodsIcon, RefreshIcon, SuccessIcon, WarningIcon } from "../components/icons.jsx";
+import {
+  CpuIcon,
+  ErrorIcon,
+  MemoryIcon,
+  NodesIcon,
+  PodsIcon,
+  RefreshIcon,
+  SuccessIcon,
+  TopologyIcon,
+  WarningIcon,
+} from "../components/icons.jsx";
 import { allPages, detailPath, nsQuery } from "../sections.js";
 import "./Overview.css";
 
@@ -192,6 +202,13 @@ export default function Overview({ page }) {
           id={WARNINGS_ID}
           title={hasProblems ? "Problems and recent warnings" : "Recent warnings"}
           aside={hasProblems ? problemSummary(problems.data.problems) : warningsAside(warnings.data)}
+          action={
+            hasProblems && (
+              <Button variant="quiet" size="sm" icon={TopologyIcon} to={problemsMap(cluster.id, namespace)}>
+                Show on map
+              </Button>
+            )
+          }
         >
           {hasProblems && (
             <>
@@ -212,6 +229,15 @@ export default function Overview({ page }) {
       )}
     </section>
   );
+}
+
+// problemsMap is the Topology page showing only problems, in the namespace
+// picked here; with all namespaces, it offers them, those with problems first.
+function problemsMap(clusterId, namespace) {
+  const params = new URLSearchParams();
+  if (namespace) params.set("ns", namespace);
+  params.set("problems", "true");
+  return `/c/${clusterId}/topology?${params}`;
 }
 
 function warningsAside(warnings) {

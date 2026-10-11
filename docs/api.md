@@ -255,7 +255,8 @@ several requests in a row read the cluster only once.
 
 A node's `id` is its resource type, namespace and name, as in the detail page's URL. Pods of one
 workload are grouped into one node whose `id` starts with `pods:` and which has `pods` set, unless
-`expand` asks for them. `apps` is returned for a namespace only. `snapshot` says when the cluster
+`expand` asks for them. `apps`, the namespace's apps, is returned for a namespace or an app (apps
+of nothing but unused configuration are left out). `snapshot` says when the cluster
 was read and which resource types couldn't be (as in `/names`); objects of those types are
 `unknown` rather than `missing`. `findings` are the diagnosis's findings about every object shown,
 the pods in a group included, as in the [diagnosis](#get-apiclustersiddiagnosisresourcenamespacename)

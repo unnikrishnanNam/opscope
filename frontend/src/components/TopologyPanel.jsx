@@ -23,7 +23,9 @@ const CONFIDENCE = {
 //   view, index  the map's view and its findings (see graph/trace.js)
 //   id           the selected card; focus, the map's own object
 //   onSelect(id) picks another card; onClose() closes the panel
-export default function TopologyPanel({ clusterId, view, index, id, focus, namespace, onSelect, onClose }) {
+//   expanded, onExpand(id, on)  workloads whose pods are shown one by one,
+//                and how to change that (optional)
+export default function TopologyPanel({ clusterId, view, index, id, focus, namespace, onSelect, onClose, expanded, onExpand }) {
   const titleId = useId();
   const titleRef = useRef(null);
   const search = nsQuery(useLocation().search);
@@ -39,7 +41,7 @@ export default function TopologyPanel({ clusterId, view, index, id, focus, names
   if (!n) return null;
   const Icon = kindIcon(n.resource);
   const ctx = { clusterId, search, nodes, namespace };
-  const here = id === focus || n.pods?.owner === focus; // its page is this one
+  const here = Boolean(focus) && (id === focus || n.pods?.owner === focus); // its page is this one
   const page = here ? null : pageOf(clusterId, n, nodes);
   const findings = merge(index.byNode.get(id) ?? [], index);
 
@@ -70,15 +72,30 @@ export default function TopologyPanel({ clusterId, view, index, id, focus, names
       </p>
       {n.message && n.state !== "missing" && <p className="topo-panel-message">{n.message}</p>}
 
-      {/* Links to its page and its own map; there are none for the page's own object. */}
-      {page && (
+      {/* Links to its page and its own map (there are none for the page's
+          own object), and showing a group's pods one by one. */}
+      {(page || (onExpand && (n.pods || expanded?.includes(id)))) && (
         <div className="topo-panel-actions">
-          <Button size="sm" to={page.path + search}>
-            Open {page.label}
-          </Button>
-          <Button size="sm" variant="quiet" icon={MapIcon} to={`${page.path}?${mapQuery(search)}`}>
-            Its map
-          </Button>
+          {page && (
+            <Button size="sm" to={page.path + search}>
+              Open {page.label}
+            </Button>
+          )}
+          {page && (
+            <Button size="sm" variant="quiet" icon={MapIcon} to={`${page.path}?${mapQuery(search)}`}>
+              Its map
+            </Button>
+          )}
+          {onExpand && n.pods && n.pods.total > 1 && (
+            <Button size="sm" variant="quiet" onClick={() => onExpand(n.pods.owner, true)}>
+              Show each pod
+            </Button>
+          )}
+          {onExpand && expanded?.includes(id) && (
+            <Button size="sm" variant="quiet" onClick={() => onExpand(id, false)}>
+              Group its pods
+            </Button>
+          )}
         </div>
       )}
 

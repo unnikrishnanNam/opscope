@@ -1,0 +1,85 @@
+.topology-page .page-header-block {
+  margin-bottom: var(--space-4);
+}
+
+.topology-page > .callout {
+  max-width: none;
+  margin-bottom: var(--space-4);
+}
+
+/* An app in the picker, with its state's mark. */
+.topology-app {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.topology-app-all {
+  width: 12px;
+}
+
+/* All namespaces: pick one. */
+.topology-choose-text {
+  margin-bottom: var(--space-3);
+  color: var(--text-muted);
+}
+
+.topology-namespaces {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.topology-namespace {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.topology-namespace:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.topology-namespace:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.topology-namespace-icon {
+  flex-shrink: 0;
+  color: var(--text-subtle);
+}
+
+.topology-namespace-name {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: var(--weight-strong);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.topology-namespace-problems {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-strong);
+  color: var(--text-subtle);
+}
+
+.topology-namespace-problems.has-problems {
+  color: var(--bad);
+}

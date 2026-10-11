@@ -236,8 +236,8 @@ func TestAppView(t *testing.T) {
 	if hasID(v.Nodes, "deployments/shop/api") || hasID(v.Nodes, "pods:replicasets/shop/api-1") {
 		t.Error("the other app's workload isn't part of this one")
 	}
-	if v.Apps != nil {
-		t.Error("only a namespace view lists apps")
+	if len(v.Apps) != 3 || v.Apps[0].Name != "api" {
+		t.Errorf("an app view lists the namespace's apps, to pick another; got %v", v.Apps)
 	}
 }
 
@@ -442,5 +442,18 @@ func TestLongViaIsShortened(t *testing.T) {
 		if len(e.Via) != 6 || e.Via[5] != "and 2 more" {
 			t.Errorf("via = %v", e.Via)
 		}
+	}
+}
+
+// An app of nothing but configuration nobody uses isn't offered: its view
+// would be empty.
+func TestAppsLeaveOutConfigOnly(t *testing.T) {
+	s := prepared(&snapshot.Snapshot{
+		Secrets: []metav1.PartialObjectMetadata{{ObjectMeta: meta("a", "release", "app", "chart")}},
+		Pods:    []corev1.Pod{readyPod(meta("a", "web", "app", "web"), "")},
+	})
+	v := Of(s).Namespace("a", Options{})
+	if len(v.Apps) != 1 || v.Apps[0].Name != "web" {
+		t.Errorf("apps = %v", v.Apps)
 	}
 }

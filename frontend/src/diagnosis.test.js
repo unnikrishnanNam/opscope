@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { objectParts, problemSummary, rootCauseText, rootSteps } from "./diagnosis.js";
+import { objectParts, problemSummary, problemsByNamespace, rootCauseText, rootSteps } from "./diagnosis.js";
 
 const step = (title, objects, root, causes = []) => ({ title, objects, root, causes });
 
@@ -47,5 +47,18 @@ describe("problemSummary", () => {
     ];
     expect(problemSummary(problems)).toBe("2 problems, affecting 5 objects");
     expect(problemSummary([{ objects: ["nodes/worker-1"], affects: [] }])).toBe("1 problem, affecting 1 object");
+  });
+});
+
+describe("problemsByNamespace", () => {
+  it("counts a problem in every namespace it touches", () => {
+    const problems = [
+      { objects: ["secrets/shop/stripe"], affects: [{ id: "deployments/shop/api", namespace: "shop" }] },
+      { objects: ["nodes/worker-2"], affects: [{ id: "pods/shop/web-1", namespace: "shop" }, { id: "pods/blog/db-0", namespace: "blog" }] },
+    ];
+    expect([...problemsByNamespace(problems)]).toEqual([
+      ["shop", 2],
+      ["blog", 1],
+    ]);
   });
 });

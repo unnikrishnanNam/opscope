@@ -22,6 +22,7 @@ export const sections = [
     group: "Cluster",
     items: [
       { path: "overview", shortcut: "g o", icon: icons.OverviewIcon, label: "Overview", about: "Counts, node health and recent warnings at a glance." },
+      { path: "topology", shortcut: "g t", icon: icons.TopologyIcon, aliases: ["map", "graph", "dependencies"], label: "Topology", about: "How the objects in a namespace depend on each other, and where what's failing starts." },
       { path: "nodes", shortcut: "g n", icon: icons.NodesIcon, resource: "nodes", aliases: ["no", "node"], clusterScoped: true, metrics: "nodes", label: "Nodes", about: "Machines in the cluster, their status, capacity and usage." },
     ],
   },

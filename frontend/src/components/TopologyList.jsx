@@ -11,7 +11,7 @@ import "./TopologyList.css";
 // object with its status, what's wrong with it and what it connects to.
 // It reads the same with a screen reader or on a phone, so nothing a map
 // shows exists only in the picture.
-export default function TopologyList({ clusterId, view, focus, namespace }) {
+export default function TopologyList({ clusterId, view, focus, namespace, empty = "Nothing to show." }) {
   const search = nsQuery(useLocation().search);
   const placed = useMemo(() => layout(view), [view]);
   const index = useMemo(() => indexFindings(view), [view]);
@@ -26,7 +26,7 @@ export default function TopologyList({ clusterId, view, focus, namespace }) {
       .map((p) => p.id),
   }));
 
-  if (view.nodes.length === 0) return <p className="topo-list-empty">Nothing to show.</p>;
+  if (view.nodes.length === 0) return <p className="topo-list-empty">{empty}</p>;
 
   return (
     <div className="topo-list">

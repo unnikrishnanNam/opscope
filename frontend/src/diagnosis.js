@@ -35,3 +35,19 @@ export function problemSummary(problems) {
 export function pluralKind(kind) {
   return kind.endsWith("s") ? `${kind}es` : `${kind}s`;
 }
+
+// problemsByNamespace counts the problems in each namespace: a problem is in
+// every namespace its objects, or what it affects, are in (a node that's
+// down is a problem wherever its pods are).
+export function problemsByNamespace(problems) {
+  const counts = new Map();
+  for (const p of problems) {
+    const namespaces = new Set([
+      ...p.objects.map((id) => objectParts(id).namespace),
+      ...p.affects.map((n) => n.namespace ?? ""),
+    ]);
+    namespaces.delete("");
+    for (const ns of namespaces) counts.set(ns, (counts.get(ns) ?? 0) + 1);
+  }
+  return counts;
+}

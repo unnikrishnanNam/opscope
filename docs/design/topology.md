@@ -26,7 +26,7 @@ Phases are numbered **G0–G7** so they don't mix with the build phases 0–8 or
 R, P and D. All work happens on the `feature/topology` branch, and each phase is committed there
 once it works, its tests pass and its notes are written. This feature has no issue of its own.
 
-**Status (2026-10-11):** G0 (the snapshot), G1 (the graph and `GET /topology`), G2 (the diagnosis on detail pages), G3 (the remaining rules and problems on the overview) and G4 (the map) done. G5 is next.
+**Status (2026-10-11):** G0 (the snapshot), G1 (the graph and `GET /topology`), G2 (the diagnosis on detail pages), G3 (the remaining rules and problems on the overview), G4 (the map) and G5 (the Topology page) done. G6 is next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -358,9 +358,11 @@ picked without closing it. A List view shows the same content as text, and is wh
 on a phone.
 
 **Topology page (G5, G6).** A new page in the Cluster group (`g t`). It follows the namespace
-picker: a namespace (G5) or the whole cluster (G6). It has a "Problems only" toggle, a List view
-that shows the same content as an outline, and the same drawer. On screens narrower than 768 px it
-opens in List view.
+picker: a namespace (G5) or the whole cluster (G6; until then, "All namespaces" lists the
+namespaces to choose from, those with problems first). It has an app picker (`?app=`), a "Problems
+only" switch (`?problems=true`), a List view that shows the same content as an outline, and the
+same panel, which can also show a group's pods one by one. On screens narrower than 768 px it
+opens in List view. The overview's problems card links to it ("Show on map").
 
 **Problems on the overview (G3).** At the top of the "Recent warnings" card: the root causes, each
 with how many objects it explains, linking to the root object's diagnosis. The warnings follow
@@ -503,11 +505,11 @@ Goal: any object's neighbourhood is drawn, and it looks good.
 
 Goal: a namespace or one app can be seen whole, with its problems.
 
-- [ ] The Topology page in `sections.js` (`g t`), following the namespace picker
-- [ ] App picker (`?app=`), "Problems only" toggle, List view; List by default under 768 px
-- [ ] Collapsed pods expand on request; ReplicaSets shown only when they matter
-- [ ] Refreshes every 10 seconds without moving the layout
-- [ ] Checked on the multipass cluster: `topology-test`, a large namespace, and a namespace with problems
+- [x] The Topology page in `sections.js` (`g t`), following the namespace picker
+- [x] App picker (`?app=`), "Problems only" toggle, List view; List by default under 768 px
+- [x] Collapsed pods expand on request; ReplicaSets shown only when they matter
+- [x] Refreshes every 10 seconds without moving the layout
+- [x] Checked on the multipass cluster: `topology-test`, a large namespace, and a namespace with problems
 
 ## Phase G6: Background snapshots and the cluster view
 
@@ -797,3 +799,34 @@ snapshots are taken every 30 seconds, and problems sit at the top of the "Recent
   the map and the diagnosis of each of the 26 workloads, Services, Ingresses, Jobs and autoscalers
   in the namespace: every root cause was on its map, with its finding. A request takes under a
   millisecond once the cluster has been read. The scenarios namespace was deleted afterwards.
+
+### G5
+
+- **The page** is `pages/Topology.jsx`, built from G4's `TopologyView`: the map or the list, the
+  panel, the legend. Its own controls sit in the same toolbar: the app picker (each app with its
+  state's mark, and a search box when there are many), "Problems only", and "Group all pods" once
+  any are shown one by one. The app and the filter are in the URL, so a link shows the same map;
+  which pods are shown one by one isn't, and resets with the namespace.
+- **"All namespaces"** lists the namespaces to map, those with problems first and how many each
+  has (`problemsByNamespace` in `diagnosis.js`: a problem counts in every namespace its objects or
+  what it affects are in). G6 replaces this with the cluster's own map.
+- **Pods one by one.** The panel of a group of pods offers "Show each pod"; the workload's card is
+  then selected, offering "Group its pods". It's the endpoint's `expand`.
+- **An app view lists the namespace's apps too** (it didn't), so the picker works while an app is
+  shown. Apps of nothing but configuration nobody uses (the `gridops` Secret on multipass) aren't
+  listed: their view is empty. An app that isn't in the namespace (after switching namespaces with
+  one picked) says so, with a button to show the whole namespace.
+- **Switching** the app or the filter keeps the last map on screen until the next one arrives, and
+  then fits it; a refresh fits nothing and moves nothing. On kind, with the scenarios running and a
+  CronJob starting a Job every minute, six refreshes in a row added two cards and changed the order
+  of none.
+- With no object to start from, the first view shows the top left of the map, or all of it when it
+  can be read that way. Column headings may use the gap beside their column, so they still fit when
+  zoomed out.
+- **Checked in the browser** on multipass: `topology-test` (19 objects: the Gateway, routes, an
+  Ingress, the data plane), `argocd`, its largest namespace (32 objects; 8 with "Problems only":
+  two Services, three workloads and their crash-looping or unready pods, each a root cause),
+  `default` with its nine apps (`statefull`: a StatefulSet's three pods, claims, volumes and class,
+  shown one by one and grouped again), and on kind the scenarios namespace (57 objects). In both
+  themes, at 375 px (it opens as a list), and with `g t` and the palette. The scenarios namespace
+  was deleted afterwards.
