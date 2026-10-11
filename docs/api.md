@@ -204,6 +204,79 @@ A pod's logs as plain text, sent with `Cache-Control: no-store`.
 Without `follow`, a request is cut off after 30 seconds. A request the API server rejects (no
 previous run, a container that doesn't exist) returns `400` with its message.
 
+## Topology
+
+### `GET /api/clusters/{id}/topology`
+
+A graph of objects and what they need, for one namespace, one app or one object's neighbourhood.
+Opscope reads the whole cluster at once for it and uses that reading for up to 10 seconds, so
+several requests in a row read the cluster only once.
+
+| Parameter   | Effect                                                                                  |
+| ----------- | --------------------------------------------------------------------------------------- |
+| `namespace` | A namespace: everything in it, what points at it from elsewhere, and what all of that needs |
+| `app`       | With `namespace`, one app of that namespace                                             |
+| `focus`     | One object's ID (`pods/shop/web-1`, `nodes/worker-1`) and everything within `depth` edges of it |
+| `depth`     | With `focus`, from 1 to 5; default 2                                                    |
+| `expand`    | Workloads whose pods are shown one by one, as comma-separated IDs, or `all`             |
+| `problems`  | `true`: only objects that aren't `ok`, and what points at them                          |
+
+`focus` or `namespace` is required. An unknown `focus` answers `404`.
+
+```json
+{
+  "nodes": [
+    { "id": "deployments/shop/api", "resource": "deployments", "kind": "Deployment", "namespace": "shop",
+      "name": "api", "app": "api", "state": "failing", "status": "0/2", "message": "None of its pods are ready." },
+    { "id": "pods:replicasets/shop/api-7d9f", "resource": "pods", "kind": "Pod", "namespace": "shop",
+      "name": "api", "app": "api", "state": "failing", "status": "0/2 ready",
+      "message": "secret \"stripe\" not found",
+      "pods": { "owner": "deployments/shop/api", "ready": 0, "total": 2,
+                "members": ["pods/shop/api-7d9f-a", "pods/shop/api-7d9f-b"] } },
+    { "id": "secrets/shop/stripe", "resource": "secrets", "kind": "Secret", "namespace": "shop",
+      "name": "stripe", "app": "api", "state": "missing", "status": "Missing",
+      "message": "It's referred to, but doesn't exist." }
+  ],
+  "edges": [
+    { "from": "deployments/shop/api", "to": "pods:replicasets/shop/api-7d9f", "type": "owns" },
+    { "from": "pods:replicasets/shop/api-7d9f", "to": "secrets/shop/stripe", "type": "uses",
+      "via": ["container api: env STRIPE_KEY"] }
+  ],
+  "apps": [{ "name": "api", "state": "failing", "workloads": 1 }],
+  "snapshot": { "taken": "2026-10-11T10:00:00Z", "skipped": [{ "resource": "secrets", "code": "forbidden" }] }
+}
+```
+
+A node's `id` is its resource type, namespace and name, as in the detail page's URL. Pods of one
+workload are grouped into one node whose `id` starts with `pods:` and which has `pods` set, unless
+`expand` asks for them. `apps` is returned for a namespace only. `snapshot` says when the cluster
+was read and which resource types couldn't be (as in `/names`); objects of those types are
+`unknown` rather than `missing`.
+
+| `state`       | Meaning                                                                           |
+| ------------- | --------------------------------------------------------------------------------- |
+| `ok`          | Working                                                                           |
+| `progressing` | Starting, rolling out or scaling, for less than 5 minutes                         |
+| `degraded`    | Working, but not fully: some replicas not ready, a node under pressure            |
+| `failing`     | Not working                                                                       |
+| `missing`     | Referred to by another object, but doesn't exist                                  |
+| `unknown`     | Referred to, but Opscope can't read that resource type                            |
+
+An edge points from an object to something it needs. `via` says where the references are (at most
+five, then "and N more"), and `optional` is `true` when every reference is optional, so a missing
+target breaks nothing.
+
+| `type`      | From → to                                                                   |
+| ----------- | --------------------------------------------------------------------------- |
+| `owns`      | Deployment → ReplicaSet → pods, CronJob → Job → pods, and other owners      |
+| `runs-on`   | Pod → node                                                                  |
+| `uses`      | Pod or workload → ConfigMap, Secret, claim, service account; claim → volume → StorageClass; Ingress → IngressClass, TLS Secret; Gateway → certificate Secret |
+| `selects`   | Service or PodDisruptionBudget → pods                                       |
+| `routes-to` | Ingress or HTTPRoute → Service                                              |
+| `attaches`  | HTTPRoute → Gateway → GatewayClass                                          |
+| `permits`   | HTTPRoute → the ReferenceGrant that lets it reach a Service in another namespace; a missing one is named `(none)` |
+| `scales`    | HorizontalPodAutoscaler → what it scales                                    |
+
 ## Usage
 
 Usage comes from metrics-server. Without it, these endpoints answer `404` with
@@ -270,4 +343,8 @@ curl -s "http://localhost:8080/api/clusters/multipass/pods?namespace=kube-system
 
 ```bash
 curl -sN "http://localhost:8080/api/clusters/multipass/pods/web/api-7d9f/logs?tail=100&follow=true"
+```
+
+```bash
+curl -s "http://localhost:8080/api/clusters/multipass/topology?namespace=web&problems=true"
 ```

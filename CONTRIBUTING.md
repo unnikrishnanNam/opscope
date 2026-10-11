@@ -90,6 +90,7 @@ backend/                  Go server
                           names.go builds the search index
   internal/metrics/       live usage from metrics-server, and the in-memory history
   internal/snapshot/      the whole cluster read at once, for the topology and diagnosis
+  internal/graph/         the snapshot as a graph of objects and what they need, and its views
   internal/server/        HTTP routes, middleware, static file serving
 frontend/                 React app (Vite, plain JavaScript)
   src/api.js              fetch helper and the useApi hook
@@ -171,7 +172,7 @@ runs the Go tests and the frontend tests. Before opening a pull request, also ch
 3. **Permissions:** the resource in the ClusterRole in `deploy/kubernetes/opscope.yaml`, with only
    `get` and `list`.
 4. **Snapshot:** if the topology and diagnosis should see it, a field on `Snapshot`, a line in
-   `loaders` (`internal/snapshot/load.go`) and a line in `buildIndex`. A test checks that the
+   `loaders` (`internal/snapshot/load.go`) and a line in `BuildIndex`. A test checks that the
    ClusterRole lets Opscope list every kind the snapshot reads.
 5. **Frontend:** an entry in `src/sections.js` (with `aliases` for kubectl's short names) and its
    columns in `src/columns.jsx`. The sidebar, the route, the palette's "Go to" and object search

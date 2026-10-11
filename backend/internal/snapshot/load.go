@@ -38,7 +38,7 @@ type loader struct {
 }
 
 // loaders lists every kind a snapshot holds. Adding a kind means a field on
-// Snapshot, a line here and a line in buildIndex.
+// Snapshot, a line here and a line in BuildIndex.
 var loaders = []loader{
 	{"namespaces", func(ctx context.Context, c kube.Clients, s *Snapshot) (err error) {
 		s.Namespaces, err = listAll(ctx, c.Kube.CoreV1().Namespaces().List, func(l *corev1.NamespaceList) []corev1.Namespace { return l.Items })
@@ -198,7 +198,7 @@ func Load(ctx context.Context, clients kube.Clients) (*Snapshot, error) {
 		return nil, firstErr
 	}
 
-	s.buildIndex()
+	s.BuildIndex()
 	return s, nil
 }
 

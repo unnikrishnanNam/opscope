@@ -19,6 +19,7 @@ import (
 	"opscope/internal/clusters"
 	"opscope/internal/metrics"
 	"opscope/internal/server"
+	"opscope/internal/snapshot"
 )
 
 // version is overwritten at build time with:
@@ -85,7 +86,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           server.New(cfg, manager, history, logger),
+		Handler:           server.New(cfg, manager, history, snapshot.NewStore(), logger),
 		ReadHeaderTimeout: 10 * time.Second, // don't let a slow client hold a connection open forever
 	}
 

@@ -23,8 +23,7 @@ type testStore struct {
 
 func newTestStore() *testStore {
 	ts := &testStore{taken: time.Now()}
-	ts.Store = NewStore()
-	ts.Store.load = func(ctx context.Context, c *clusters.Cluster) (*Snapshot, error) {
+	ts.Store = NewStoreReading(func(ctx context.Context, c *clusters.Cluster) (*Snapshot, error) {
 		ts.loads.Add(1)
 		if ts.release != nil {
 			<-ts.release
@@ -33,7 +32,7 @@ func newTestStore() *testStore {
 			return nil, ts.err
 		}
 		return &Snapshot{Taken: ts.taken}, nil
-	}
+	})
 	return ts
 }
 

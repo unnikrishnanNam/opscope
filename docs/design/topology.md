@@ -26,7 +26,7 @@ Phases are numbered **G0–G7** so they don't mix with the build phases 0–8 or
 R, P and D. All work happens on the `feature/topology` branch, and each phase is committed there
 once it works, its tests pass and its notes are written. This feature has no issue of its own.
 
-**Status (2026-10-11):** G0 done (the snapshot). G1 is next.
+**Status (2026-10-11):** G0 (the snapshot) and G1 (the graph and `GET /topology`) done. G2 is next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -424,13 +424,13 @@ Goal: Opscope can take a snapshot of a whole cluster, with nothing visible chang
 
 Goal: `GET /topology` returns a correct graph for a namespace and a neighbourhood. No UI yet.
 
-- [ ] `internal/graph`: nodes with states, every edge type in the table above, missing and unknown nodes
-- [ ] Pod-template edges for workloads; optional references marked
-- [ ] App grouping by labels, then by selection
-- [ ] Views: `Neighbourhood`, `Namespace`, `App`, with pods collapsed per workload and the problems-only filter
-- [ ] `GET /api/clusters/{id}/topology` for a namespace, an app and a focus object
-- [ ] Go tests: one per edge type, missing and unknown references, cross-namespace references, app grouping
-- [ ] Checked against the multipass cluster's `topology-test` namespace (Gateway → routes → services → pods)
+- [x] `internal/graph`: nodes with states, every edge type in the table above, missing and unknown nodes
+- [x] Pod-template edges for workloads; optional references marked
+- [x] App grouping by labels, then by selection
+- [x] Views: `Neighbourhood`, `Namespace`, `App`, with pods collapsed per workload and the problems-only filter
+- [x] `GET /api/clusters/{id}/topology` for a namespace, an app and a focus object
+- [x] Go tests: one per edge type, missing and unknown references, cross-namespace references, app grouping
+- [x] Checked against the multipass cluster's `topology-test` namespace (Gateway → routes → services → pods)
 
 ## Phase G2: Diagnosis and the first rules
 
@@ -566,3 +566,58 @@ snapshots are taken every 30 seconds, and problems sit at the top of the "Recent
 - Nothing visible changed. The existing endpoints were checked against the kind cluster after
   the refactor: lists, `/names`, a pod's detail page, the overview, and Gateway API's
   `not_installed` answer.
+
+### G1
+
+- **The graph is built once per snapshot.** `Snapshot.Derived` keeps values computed from a
+  snapshot (the graph now, the diagnosis in G2) and drops them with it. `graph.Of(s)` builds on
+  first use. Building the graph of a generated cluster of 5,000 pods, 1,000 Deployments and
+  Services takes 24 ms (`BenchmarkBuild`); a namespace view of it takes 7 ms
+  (`BenchmarkNamespaceView`). On the multipass cluster a `/topology` request takes under a
+  millisecond once the snapshot is read.
+- **Things the real cluster taught**, each with a test:
+  - Every pod has an automatic volume that refers to the `kube-root-ca.crt` ConfigMap. Edges to
+    it are left out; they would tie every pod in a namespace to one object and say nothing.
+  - Every pod has a service account, nearly always `default`. Only one that's named gets an edge.
+  - A Gateway's controller (NGINX Gateway Fabric here) owns the Deployment, Service and
+    ConfigMaps it runs the Gateway with. The Gateway gets `owns` edges to them, which shows its
+    data plane. The Deployment is still an app's root, since only an owner that is itself a
+    workload makes something part of another app.
+  - Static pods (etcd, kube-apiserver) name their Node as owner. That owner reference is left
+    out; the pod's `runs-on` edge already says where it is, and grouping a machine's static pods
+    as if the machine had made them was wrong.
+  - A routing object that sends traffic to two apps (`web-route` to `web-app` and `api-app`)
+    joins the one whose name is most like its own, then the first by name.
+- **What a view leaves out**, so it stays readable:
+  - A ReplicaSet is shown only during a rollout (more than one of a Deployment's ReplicaSets has
+    pods), when it can't create pods (`ReplicaFailure`), or when nothing owns it. One whose pods
+    are failing isn't: the pods already say so.
+  - A workload's pod-template edges are dropped when its pods have the same edges. They're kept
+    when it has no pods, where they're the only way to see what it needs.
+  - ConfigMaps, Secrets and ServiceAccounts nothing uses (each namespace's `kube-root-ca.crt`
+    and `default`, Helm's release Secrets) aren't shown, unless one is the focused object.
+  - Machines are shown only when they aren't OK, or next to the focused object.
+  - An edge lists at most five of its references, then "and N more". The graph keeps them all
+    for the diagnosis.
+- **Views follow edges with care.** From inside the namespace or app, every dependency is
+  followed. From outside it, only to cluster-wide objects: a namespace view shows a Gateway in
+  another namespace and that Gateway's class, but not the other apps that Gateway serves. A
+  neighbourhood also includes everything behind any unhealthy node in it, so the cause of a
+  problem is never cut off by the depth.
+- **States.** A workload is unhealthy when its pods are failing *or* have been running but not
+  ready for more than 5 minutes; Argo CD's application controller showed the second kind. A
+  Deployment takes on a ReplicaSet's `ReplicaFailure` message, but not its pods' failures, which
+  it judges itself. A missing ReferenceGrant is a node named `(none)`, a name Kubernetes can't
+  give anything.
+- **The store is in use.** `server.New` takes the snapshot store, removing a cluster drops its
+  snapshot, and `snapshot.NewStoreReading` lets tests give the server snapshots made by hand.
+  The Gateway API types gained named structs (`ListenerTLS`, `HTTPRouteRule`, `GrantFrom`,
+  `GrantTo`) so tests and rules can build them.
+- **Checked against multipass,** read only: `topology-test` (Gateway → two routes and an Ingress
+  → two Services → their pods, and the Gateway's own data plane), every other namespace, and the
+  problems filter on `argocd` (two crash-looping Deployments and their Services with no ready
+  pods) and `default`, where a pod has been stuck in ContainerCreating for 97 days because the
+  ConfigMap it mounts doesn't exist; the graph shows that edge. Also on the kind cluster, where
+  the four Gateway API kinds are reported as skipped.
+- Not done: the cluster-wide view (`Cluster()`) stays in G6 as planned; `/topology` without a
+  namespace or focus answers `400` until then.

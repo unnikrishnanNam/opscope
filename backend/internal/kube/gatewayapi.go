@@ -102,13 +102,15 @@ type Gateway struct {
 
 // GatewayListener is one port a Gateway accepts traffic on.
 type GatewayListener struct {
-	Name     string `json:"name"`
-	Port     int32  `json:"port"`
-	Protocol string `json:"protocol"` // HTTP, HTTPS, TLS, TCP, UDP
-	Hostname string `json:"hostname"` // only this host, if set
-	TLS      *struct {
-		CertificateRefs []ObjectRef `json:"certificateRefs"` // usually Secrets
-	} `json:"tls"`
+	Name     string       `json:"name"`
+	Port     int32        `json:"port"`
+	Protocol string       `json:"protocol"` // HTTP, HTTPS, TLS, TCP, UDP
+	Hostname string       `json:"hostname"` // only this host, if set
+	TLS      *ListenerTLS `json:"tls"`
+}
+
+type ListenerTLS struct {
+	CertificateRefs []ObjectRef `json:"certificateRefs"` // usually Secrets
 }
 
 // Summary sums up a Gateway's conditions in one word, and why when something
@@ -138,16 +140,18 @@ func (g *Gateway) Summary() (status, message string) {
 type HTTPRoute struct {
 	metav1.ObjectMeta `json:"metadata"`
 	Spec              struct {
-		Hostnames  []string    `json:"hostnames"`
-		ParentRefs []ObjectRef `json:"parentRefs"`
-		Rules      []struct {
-			BackendRefs []BackendRef `json:"backendRefs"`
-		} `json:"rules"`
+		Hostnames  []string        `json:"hostnames"`
+		ParentRefs []ObjectRef     `json:"parentRefs"`
+		Rules      []HTTPRouteRule `json:"rules"`
 	} `json:"spec"`
 	Status struct {
 		// One entry per parent Gateway, written by that Gateway's controller.
 		Parents []RouteParentStatus `json:"parents"`
 	} `json:"status"`
+}
+
+type HTTPRouteRule struct {
+	BackendRefs []BackendRef `json:"backendRefs"`
 }
 
 type BackendRef struct {
@@ -224,17 +228,23 @@ func (c *GatewayClass) Summary() (status, message string) {
 type ReferenceGrant struct {
 	metav1.ObjectMeta `json:"metadata"`
 	Spec              struct {
-		From []struct {
-			Group     string `json:"group"`
-			Kind      string `json:"kind"`
-			Namespace string `json:"namespace"`
-		} `json:"from"`
-		To []struct {
-			Group string  `json:"group"`
-			Kind  string  `json:"kind"`
-			Name  *string `json:"name"` // nil: every object of that kind
-		} `json:"to"`
+		From []GrantFrom `json:"from"`
+		To   []GrantTo   `json:"to"`
 	} `json:"spec"`
+}
+
+// GrantFrom is who a ReferenceGrant lets in: a kind in a namespace.
+type GrantFrom struct {
+	Group     string `json:"group"`
+	Kind      string `json:"kind"`
+	Namespace string `json:"namespace"`
+}
+
+// GrantTo is what a ReferenceGrant lets them refer to.
+type GrantTo struct {
+	Group string  `json:"group"`
+	Kind  string  `json:"kind"`
+	Name  *string `json:"name"` // nil: every object of that kind
 }
 
 // ListReferenceGrants lists every ReferenceGrant. They moved from v1beta1 to

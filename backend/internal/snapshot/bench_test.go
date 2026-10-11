@@ -50,7 +50,7 @@ func BenchmarkBuildIndex(b *testing.B) {
 	s := generated()
 	b.ReportAllocs()
 	for b.Loop() {
-		s.buildIndex()
+		s.BuildIndex()
 	}
 	b.ReportMetric(float64(s.Size()), "objects")
 }

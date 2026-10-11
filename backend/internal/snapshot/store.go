@@ -47,9 +47,15 @@ type pending struct {
 }
 
 func NewStore() *Store {
+	return NewStoreReading(loadCluster)
+}
+
+// NewStoreReading is a Store that takes snapshots with load instead of
+// reading the cluster, for tests of code that uses a Store.
+func NewStoreReading(load func(context.Context, *clusters.Cluster) (*Snapshot, error)) *Store {
 	return &Store{
 		maxAge:  MaxAge,
-		load:    loadCluster,
+		load:    load,
 		entries: map[string]*entry{},
 	}
 }

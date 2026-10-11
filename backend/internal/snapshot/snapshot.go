@@ -13,6 +13,7 @@ package snapshot
 
 import (
 	"sort"
+	"sync"
 	"time"
 
 	"opscope/internal/kube"
@@ -64,6 +65,9 @@ type Snapshot struct {
 	Events                   []corev1.Event // Warning events only
 
 	index
+
+	derivedMu sync.Mutex
+	derived   map[string]any
 }
 
 // ConfigMap is a ConfigMap without its values: its metadata and the names
@@ -139,13 +143,32 @@ func (s *Snapshot) Skip(resource string) (kube.Skipped, bool) {
 	return skipped, ok
 }
 
+// Derived returns what build computes from this snapshot, building it only
+// the first time it's asked for. The graph and the diagnosis are kept this
+// way: computed once per snapshot, shared by every request that uses it,
+// and gone when the snapshot is.
+func (s *Snapshot) Derived(name string, build func() any) any {
+	s.derivedMu.Lock()
+	defer s.derivedMu.Unlock()
+	if value, ok := s.derived[name]; ok {
+		return value
+	}
+	if s.derived == nil {
+		s.derived = map[string]any{}
+	}
+	value := build()
+	s.derived[name] = value
+	return value
+}
+
 // Size is how many objects the snapshot holds, not counting events.
 func (s *Snapshot) Size() int {
 	return len(s.objects)
 }
 
-// buildIndex fills in the lookups. It runs once, after every list is read.
-func (s *Snapshot) buildIndex() {
+// BuildIndex fills in the lookups. Load calls it once every list is read;
+// call it yourself on a snapshot put together by hand, as tests do.
+func (s *Snapshot) BuildIndex() {
 	s.index = index{
 		objects: map[Key]metav1.Object{},
 		uids:    map[types.UID]Key{},
