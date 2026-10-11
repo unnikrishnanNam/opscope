@@ -17,6 +17,7 @@ import SecretKeys from "../components/SecretKeys.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
 import { Tag } from "../components/Tag.jsx";
 import Tabs from "../components/Tabs.jsx";
+import TopologyMap from "../components/TopologyMap.jsx";
 import { detailCommands } from "./detailCommands.js";
 import "./ResourceDetail.css";
 
@@ -54,6 +55,8 @@ export default function ResourceDetail({ page }) {
     { value: "events", label: "Events", count: d?.events.length, shortcut: "3" },
   ];
   if (page.resource === "pods") tabs.push({ value: "logs", label: "Logs", shortcut: "4" });
+  // A tab keeps its key on every kind, so the map is 5 even without logs.
+  tabs.push({ value: "map", label: "Map", shortcut: "5" });
 
   const status = d?.fields.find((f) => f.label === "Status")?.value;
 
@@ -115,6 +118,14 @@ export default function ResourceDetail({ page }) {
               events={d.events}
               showObject={false}
               emptyText="No recent events for this object."
+            />
+          )}
+          {tab === "map" && (
+            <TopologyMap
+              clusterId={cluster.id}
+              objectId={[page.resource, ...parts].join("/")}
+              namespace={namespace}
+              label={`Map of ${d.kind} ${name} and what it's connected to`}
             />
           )}
           {tab === "logs" && (

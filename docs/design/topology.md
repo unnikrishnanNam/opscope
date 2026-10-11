@@ -26,7 +26,7 @@ Phases are numbered **G0–G7** so they don't mix with the build phases 0–8 or
 R, P and D. All work happens on the `feature/topology` branch, and each phase is committed there
 once it works, its tests pass and its notes are written. This feature has no issue of its own.
 
-**Status (2026-10-11):** G0 (the snapshot), G1 (the graph and `GET /topology`), G2 (the diagnosis on detail pages) and G3 (the remaining rules and problems on the overview) done. G4 is next.
+**Status (2026-10-11):** G0 (the snapshot), G1 (the graph and `GET /topology`), G2 (the diagnosis on detail pages), G3 (the remaining rules and problems on the overview) and G4 (the map) done. G5 is next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -88,7 +88,8 @@ once it works, its tests pass and its notes are written. This feature has no iss
   already have a natural left-to-right order, so a general graph layout library isn't needed. The
   layout is one function, `layout(graph) → positions`. If it doesn't look good on real clusters by
   the end of G4, [elkjs](https://github.com/kieler/elkjs) (its layered algorithm, loaded only on
-  graph pages) replaces that function and the rest stays. The choice is recorded in G4's notes.
+  graph pages) replaces that function and the rest stays. **Decided in G4: our own layout stays**
+  (see G4's notes).
 - **No new Go dependencies.** The metadata client is part of client-go. Snapshot loading uses the
   standard library for running one load at a time per cluster.
 - **Apps are grouped by labels, then by what selects what.** An app is the first label of
@@ -350,8 +351,11 @@ Each object in the trace links to its page; a missing one links to nothing and s
 object that is fine shows one quiet line ("Opscope found nothing wrong with this object or what it
 needs"). An object that is a root cause shows what it affects.
 
-**Map tab (G4).** The object's neighbourhood, drawn. Its shortcut is `5`. Selecting a node opens a drawer with its
-state, its findings and a link to its page.
+**Map tab (G4).** The object's neighbourhood, drawn, with "Steps away" from 1 to 3. Its shortcut is
+`5`. Selecting a card opens a panel over the map's right side with its state, its findings, its
+connections and links to its page and its own map; the map stays usable, so the next card can be
+picked without closing it. A List view shows the same content as text, and is where the tab starts
+on a phone.
 
 **Topology page (G5, G6).** A new page in the Cluster group (`g t`). It follows the namespace
 picker: a namespace (G5) or the whole cluster (G6). It has a "Problems only" toggle, a List view
@@ -362,31 +366,51 @@ opens in List view.
 with how many objects it explains, linking to the root object's diagnosis. The warnings follow
 below them.
 
-**Command palette.** On a detail page: "Show diagnosis", "Open map", "Copy root cause". From
+**Command palette.** On a detail page: "Show diagnosis", "Show map", "Copy root cause". From
 anywhere: "Problems", and Topology as a page.
 
 ### Drawing
 
 - **Columns by kind,** left to right, roughly in the direction traffic flows: GatewayClass,
-  Gateway, Ingress | HTTPRoute | Service | Deployment, StatefulSet, DaemonSet, CronJob, Job |
-  ReplicaSet (when shown) | Pod | ConfigMap, Secret, PVC, ServiceAccount | PV, StorageClass | Node.
-  Each column has a quiet header.
-- **Rows** are ordered to reduce crossings: a few passes of the barycenter heuristic (each node
-  moves to the average row of its neighbours in the next column, then the previous one), starting
-  from an order sorted by name. The same graph always gets the same layout, so a refresh doesn't
-  move anything. When a node appears or disappears, the others keep their order.
-- **Nodes** are cards: the kind's icon (from `icons.jsx`), the name, and the status badge already
-  used by the tables. Missing nodes have a dashed outline and a "missing" tag. Unknown nodes are
-  greyed with "can't read". Collapsed pods show a small stack and "3/4".
+  IngressClass | Gateway, Ingress | HTTPRoute | Service, HPA, PDB, ReferenceGrant | Deployment,
+  StatefulSet, DaemonSet, CronJob, Job | ReplicaSet and a CronJob's Jobs | Pod | ConfigMap,
+  Secret, PVC, ServiceAccount, ResourceQuota | PV | StorageClass | Node. Empty columns are left
+  out. Each column has a quiet heading (the kind, or the column's name when it holds several),
+  which stays in sight when the map is panned down.
+- **Rows** are ordered to reduce crossings: sweeps of the barycenter heuristic (each card moves to
+  the average row of its neighbours in the column just compared), each followed by swapping
+  neighbours where that uncrosses edges, starting from an order grouped by app and kind and sorted
+  by name. Then each card moves toward the middle of what it connects to, keeping its order and
+  its distance from its neighbours (a least-squares fit, solved by isotonic regression). The same
+  view always gets the same layout. Given the previous layout, cards keep their order across a
+  refresh; new ones find their place among them.
+- **Long edges** run through a lane in each column they cross, between cards rather than over
+  them. Long edges that share an end share their lanes, at whichever end more of them meet: a
+  Gateway's edges to its data plane are one line until they part, and the pods' edges to their
+  machine join before reaching it.
+- **Cards** are buttons over an SVG layer of edges: the kind's icon and name, the object's name,
+  and its status with a mark. A failing or degraded card has a coloured bar down its left edge, as
+  a diagnosis does. Missing cards have a dashed outline and a "missing" tag; unknown ones are
+  dashed and grey with "can't read". A group of pods shows cards stacked behind and "3/4 ready".
+  The map's own object has the orange line, as the open tab does. A card holding a root cause is
+  tagged "root cause". A card shows the worse of its state and its own findings: an Ingress has
+  no status to read, so its finding about a missing Service makes it "failing".
 - **Edges** are smooth curves. Solid for `owns`, `routes-to` and `attaches`, dashed for `uses`,
-  thin for `selects`; optional references are fainter. The chain from a selected node to its root
-  cause is drawn thicker in the error colour. Animation respects `prefers-reduced-motion`.
-- **Pan and zoom** with the mouse, a trackpad or touch, and buttons for fit, zoom in and zoom out.
-- **Keyboard:** every node is focusable; arrow keys move along edges, Enter opens the drawer,
-  Escape closes it. Each node's accessible name says its kind, name, state and status.
-- Built on `/kit` first with sample graphs (healthy, broken, large, missing and unknown nodes), in
-  both themes, before it reaches a page. Colours come from the existing tokens and are checked
-  with the palette validator.
+  thin for `selects` and `runs-on`, dotted for `blames`; optional references are fainter. The
+  chain from the selected card (or the map's own object) to its root causes is drawn thick in the
+  colour of the problem, with dots running toward the cause; where the blamed object isn't next to
+  it on the map (a Deployment blames its new ReplicaSet's pods), the chain follows the map between
+  them. The dots stand still for people who ask for less motion.
+- **Pan and zoom** by dragging, scrolling (with ⌘/Ctrl to zoom), a pinch, or buttons for zoom in,
+  zoom out, fit and "back to this object". The first view shows the whole map if it can be read
+  that way (at 80% or more), otherwise the object at 80%, with as little empty space as possible.
+- **Keyboard:** the map is one Tab stop; arrow keys move along edges (left and right) or within a
+  column (up and down), Enter opens a card's panel, Escape closes it and returns to the card, `+`,
+  `−` and `0` zoom and fit, Home goes back to the object. Each card's accessible name says its
+  kind, name, state and status, and whether it's a root cause or the map's own object.
+- Built on `/kit` first with sample maps (broken, healthy, missing and unknown, large), in both
+  themes, before it reached a page. Colours are the existing tokens; edges are drawn at full mark
+  strength, which the kit checks at 3:1.
 
 ### Toward the timeline
 
@@ -467,13 +491,13 @@ Goal: every common failure is explained, and the overview lists root causes.
 
 Goal: any object's neighbourhood is drawn, and it looks good.
 
-- [ ] `graph/layout.js`: kind columns, barycenter ordering, a stable layout; Vitest tests (no overlaps, the same input gives the same layout, collapsed pods)
-- [ ] `TopologyGraph` component: cards, curved edges, the chain to a root cause highlighted, missing and unknown styles
-- [ ] Pan, zoom, fit; keyboard movement along edges; accessible names
-- [ ] `/kit` page with sample graphs, both themes
-- [ ] A drawer for the selected node (reusing `Drawer`)
-- [ ] The Map tab on detail pages (shortcut `5`); palette "Open map"
-- [ ] Decide: keep our own layout, or switch the layout function to elkjs (recorded in the notes)
+- [x] `graph/layout.js`: kind columns, barycenter ordering, a stable layout; Vitest tests (no overlaps, the same input gives the same layout, collapsed pods)
+- [x] `TopologyGraph` component: cards, curved edges, the chain to a root cause highlighted, missing and unknown styles
+- [x] Pan, zoom, fit; keyboard movement along edges; accessible names
+- [x] `/kit` page with sample graphs, both themes
+- [~] A drawer for the selected node (reusing `Drawer`): a panel over the map instead (see notes)
+- [x] The Map tab on detail pages (shortcut `5`); palette "Show map"
+- [x] Decide: keep our own layout, or switch the layout function to elkjs (recorded in the notes)
 
 ## Phase G5: Topology page for namespaces and apps
 
@@ -737,3 +761,39 @@ snapshots are taken every 30 seconds, and problems sit at the top of the "Recent
   tenth of them broken, takes 41 ms (`BenchmarkBuildAndDiagnose`), once per snapshot, inside the
   plan's 200 ms. A problems request for one namespace then takes 0.2 ms (`BenchmarkProblems`).
 - Checked in the browser on both clusters, in both themes, at 375 px.
+
+### G4
+
+- **Our own layout stays; elkjs isn't needed.** On the real clusters (multipass's `topology-test`
+  Gateway, Argo CD, a machine with 60 objects around it, and the kind scenarios) the columns read
+  naturally and the edges rarely cross. It lays out a generated namespace of 416 cards in 20 ms and
+  one of 1,000 cards in 60 ms (in Node), keeps cards in place across refreshes (which elkjs doesn't offer),
+  and adds no dependency. Two things made the difference on real clusters, both in
+  `graph/layout.js` with tests: lanes for long edges, shared at their busier end, and a
+  transpose pass after each sweep. The layout reports its crossings, which the tests check.
+- **The panel instead of the `Drawer`.** The `Drawer` is modal: picking the next card would mean
+  closing it first. The panel sits over the map's right side and leaves the map usable; Escape or
+  its close button returns focus to the card. On a phone it covers the map, which starts as a list
+  there anyway.
+- **The topology endpoint carries findings** about everything shown (the pods in groups included),
+  so the map can draw chains and fill the panel without another request. What they blame is added
+  to the view when nothing else would put it there, with a new `blames` edge: a ResourceQuota
+  has no edges, so the over-quota scenario's map ended at its ReplicaSet until then. A test checks
+  that every scenario's map reaches its root causes and has their findings.
+- **Neighbourhoods stop at what many objects share.** The first map of `default/app-frontend` on
+  multipass had 24 objects: two steps out, through its machine, it reached every pod on that
+  machine and their problems. A neighbourhood now reaches a node, a namespace or a class but doesn't
+  go on through it, unless it's the map's own object; the same map has three objects (the pod, its
+  missing ConfigMap, its machine).
+- **States.** A workload whose rollout is stuck while its old pods still serve was "failing" (red,
+  with "1/1"), though its diagnosis said "degraded". A workload with a failure is now failing only
+  when none of its replicas are ready, and degraded otherwise. An Ingress can't say anything about
+  its own health, so a card shows the worse of its state and its own findings.
+- **What a card doesn't do** (yet): animate when the layout changes on a refresh (cards keep their
+  order, so little moves), or show an edge's `via` on hover; the panel lists them.
+- **Checked in the browser** on both clusters, in both themes, at 375 px (the tab opens as a list;
+  the panel covers the map), with the keyboard (Tab into the map, arrows along edges, Enter, Escape,
+  `5` from anywhere on the page). On the kind cluster with the scenarios running, a script fetched
+  the map and the diagnosis of each of the 26 workloads, Services, Ingresses, Jobs and autoscalers
+  in the namespace: every root cause was on its map, with its finding. A request takes under a
+  millisecond once the cluster has been read. The scenarios namespace was deleted afterwards.

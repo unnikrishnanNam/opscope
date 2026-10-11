@@ -74,8 +74,9 @@ func (g *Graph) App(namespace, app string, o Options) *View {
 
 // Neighbourhood shows one object and everything within depth edges of it,
 // in either direction, plus everything behind any unhealthy node among them,
-// so a problem's cause is never cut off. It returns false when there's no
-// such object.
+// so a problem's cause is never cut off. It doesn't go on through objects
+// many others share (see sharedBy). It returns false when there's no such
+// object.
 func (g *Graph) Neighbourhood(id string, depth int, o Options) (*View, bool) {
 	focus, ok := g.nodes[id]
 	if !ok {
@@ -95,6 +96,9 @@ func (g *Graph) Neighbourhood(id string, depth int, o Options) (*View, bool) {
 	for range depth {
 		var next []string
 		for _, from := range frontier {
+			if from != id && sharedBy[p.nodes[from].Resource] {
+				continue
+			}
 			for _, e := range p.out[from] {
 				if !keep[e.To] {
 					keep[e.To] = true
@@ -122,6 +126,11 @@ func (g *Graph) Neighbourhood(id string, depth int, o Options) (*View, bool) {
 	}
 	return p.view(keep, id, o), true
 }
+
+// sharedBy lists kinds that many unrelated objects point at. A
+// neighbourhood reaches them but doesn't go on through them: a pod's
+// machine is part of its picture, the other pods on that machine aren't.
+var sharedBy = set("nodes", "storageclasses", "ingressclasses", "gatewayclasses", "namespaces")
 
 // ---- Projection ----
 
@@ -438,7 +447,7 @@ func (p *projection) view(keep map[string]bool, focus string, o Options) *View {
 		view.Nodes = append(view.Nodes, p.nodes[id])
 	}
 	sort.Slice(view.Nodes, func(i, j int) bool { return view.Nodes[i].ID < view.Nodes[j].ID })
-	sortEdges(view.Edges)
+	SortEdges(view.Edges)
 	return view
 }
 

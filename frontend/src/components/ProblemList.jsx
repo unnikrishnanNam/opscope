@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { objectParts } from "../diagnosis.js";
+import { objectParts, pluralKind } from "../diagnosis.js";
 
 export { problemSummary } from "../diagnosis.js";
 import { detailPath } from "../sections.js";
 import Button from "./Button.jsx";
-import { ObjectLink, pluralKind } from "./Diagnosis.jsx";
+import { ObjectLink } from "./Diagnosis.jsx";
 import { Tag } from "./Tag.jsx";
 import { ErrorIcon, WarningIcon } from "./icons.jsx";
 import "./ProblemList.css";

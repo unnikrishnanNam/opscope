@@ -72,6 +72,10 @@ const (
 	Attaches = "attaches"  // HTTPRoute → Gateway → GatewayClass
 	Permits  = "permits"   // HTTPRoute → the ReferenceGrant that lets it reach a Service in another namespace
 	Scales   = "scales"    // HorizontalPodAutoscaler → Deployment or StatefulSet
+
+	// Blames is only in views: the diagnosis says From fails because of To,
+	// and no other edge joins them (a ResourceQuota in a ReplicaSet's way).
+	Blames = "blames"
 )
 
 // Edge says that From needs To.
@@ -126,10 +130,10 @@ func Build(s *snapshot.Snapshot) *Graph {
 	b.addApps()
 
 	for _, edges := range g.out {
-		sortEdges(edges)
+		SortEdges(edges)
 	}
 	for _, edges := range g.in {
-		sortEdges(edges)
+		SortEdges(edges)
 	}
 	return g
 }
@@ -176,7 +180,8 @@ func (g *Graph) addEdge(from, to, typ, via string, optional bool) {
 	}
 }
 
-func sortEdges(edges []*Edge) {
+// SortEdges sorts edges by From, then To, then type.
+func SortEdges(edges []*Edge) {
 	sort.Slice(edges, func(i, j int) bool {
 		a, b := edges[i], edges[j]
 		if a.From != b.From {

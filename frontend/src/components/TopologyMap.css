@@ -1,0 +1,63 @@
+/* The Map tab: a toolbar, the map in a frame that fills the screen below
+   it, and the legend. */
+
+.topo-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.topo-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+
+.topo-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.topo-toolbar-label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-strong);
+  color: var(--text-subtle);
+}
+
+.topo-toolbar-about {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-strong);
+  color: var(--text-subtle);
+}
+
+.topo-frame {
+  position: relative;
+  height: 480px; /* until measured */
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.topo-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+}
+
+.topo-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.topo-legend .topo-chain path {
+  fill: none;
+}

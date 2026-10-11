@@ -15,6 +15,7 @@ import PodStatusBar from "../components/PodStatusBar.jsx";
 import StackBar from "../components/StackBar.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
 import Tabs from "../components/Tabs.jsx";
+import { TopologyView } from "../components/TopologyMap.jsx";
 import { SegmentedControl, Switch } from "../components/Toggle.jsx";
 import { MetricsUnavailable, Sparkline, UsageBar } from "../components/Usage.jsx";
 import { ClustersIcon, PlusIcon, PodsIcon, RefreshIcon } from "../components/icons.jsx";
@@ -331,6 +332,39 @@ function Diagnoses() {
   );
 }
 
+const TOPOLOGIES = {
+  broken: { label: "Broken", view: sample.topologyBroken, focus: "deployments/shop/checkout", namespace: "shop" },
+  healthy: { label: "Healthy", view: sample.topologyHealthy, focus: "deployments/blog/blog", namespace: "blog" },
+  missing: { label: "Missing and unknown", view: sample.topologyMissing, focus: "ingresses/lab/secure", namespace: "lab" },
+  large: { label: "Large", view: sample.topologyLarge, namespace: "shop" },
+};
+
+function Topology() {
+  const [which, setWhich] = useState("broken");
+  const t = TOPOLOGIES[which];
+  return (
+    <div className="kit-stack">
+      <SegmentedControl
+        label="Sample"
+        size="sm"
+        value={which}
+        onChange={setWhich}
+        options={Object.entries(TOPOLOGIES).map(([value, { label }]) => ({ value, label }))}
+      />
+      <TopologyView
+        key={which}
+        clusterId="lab"
+        view={t.view}
+        focus={t.focus}
+        namespace={t.namespace}
+        label={`Map: ${t.label.toLowerCase()} sample`}
+        fitKey={which}
+        height={460}
+      />
+    </div>
+  );
+}
+
 function Problems() {
   return (
     <Card title="Problems and recent warnings" aside={problemSummary(sample.problems.problems)}>
@@ -349,6 +383,13 @@ function Row({ label, children }) {
 }
 
 export const dataSections = [
+  {
+    id: "topology",
+    title: "Topology map",
+    about:
+      "An object's neighbourhood: kinds in columns, roughly the way traffic flows. The way from the focused card (or the selected one) to its root causes is drawn in the problem's colour. Drag or scroll to pan, ⌘/Ctrl and scroll to zoom; arrow keys move along edges, Enter opens a card's details.",
+    render: () => <Topology />,
+  },
   {
     id: "diagnoses",
     title: "Diagnosis",

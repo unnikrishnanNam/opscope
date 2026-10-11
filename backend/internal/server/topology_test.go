@@ -69,6 +69,7 @@ func TestTopology(t *testing.T) {
 		Nodes    []struct{ ID, State string }
 		Edges    []struct{ From, To, Type string }
 		Apps     []struct{ Name string }
+		Findings []struct{ Object, Rule string }
 		Snapshot struct {
 			Taken   time.Time
 			Skipped []any
@@ -82,6 +83,9 @@ func TestTopology(t *testing.T) {
 	}
 	if len(body.Edges) != 1 || body.Edges[0].Type != "uses" {
 		t.Errorf("edges = %+v", body.Edges)
+	}
+	if len(body.Findings) != 2 || body.Findings[0].Rule != "missing" || body.Findings[1].Object != "pods/shop/web" {
+		t.Errorf("findings = %+v", body.Findings)
 	}
 	if body.Snapshot.Taken.IsZero() || body.Snapshot.Skipped == nil {
 		t.Errorf("snapshot = %+v", body.Snapshot)
@@ -168,9 +172,12 @@ func TestDiagnosis(t *testing.T) {
 
 // Lists in the diagnosis are never null, so the page can read them as lists.
 func TestDiagnosisListsAreNeverNull(t *testing.T) {
-	body := get(newTopologyServer(t, shopSnapshot), "/api/clusters/lab/diagnosis/configmaps/shop/settings").Body.String()
-	if strings.Contains(body, "null") {
-		t.Errorf("found null in %s", body)
+	server := newTopologyServer(t, shopSnapshot)
+	for _, path := range []string{"/diagnosis/configmaps/shop/settings", "/topology?namespace=empty"} {
+		body := get(server, "/api/clusters/lab"+path).Body.String()
+		if strings.Contains(body, "null") {
+			t.Errorf("%s: found null in %s", path, body)
+		}
 	}
 }
 

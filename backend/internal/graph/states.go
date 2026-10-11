@@ -304,8 +304,11 @@ func (b *builder) setReplicas(id string, r replicas, pods []State) {
 	switch {
 	case r.desired == 0:
 		b.set(id, OK, status, "")
-	case r.failure != "":
+	case r.failure != "" && r.ready == 0:
 		b.set(id, Failing, status, r.failure)
+	case r.failure != "":
+		// A stuck rollout while the old pods still serve: working, not fully.
+		b.set(id, Degraded, status, r.failure)
 	case r.ready >= r.desired && r.updated >= r.desired && !r.rolling:
 		b.set(id, OK, status, "")
 	case unhealthy > 0 && r.ready == 0:

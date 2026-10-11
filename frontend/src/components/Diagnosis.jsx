@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router";
 import { copyText } from "../clipboard.js";
-import { objectParts, rootCauseText, rootSteps } from "../diagnosis.js";
+import { objectParts, pluralKind, rootCauseText, rootSteps } from "../diagnosis.js";
 import { focusSectionSoon } from "../focus.js";
 import { age } from "../format.js";
 import { detailPath, nsQuery } from "../sections.js";
@@ -173,7 +173,7 @@ export function ObjectLink({ id, ctx, showStatus = false }) {
   );
 }
 
-function Evidence({ items, open }) {
+export function Evidence({ items, open }) {
   if (items.length === 0) return null;
   return (
     <details className="trace-evidence" open={open}>
@@ -202,7 +202,7 @@ function Evidence({ items, open }) {
 
 // NextSteps: links to a page of Opscope, and read-only kubectl commands to
 // copy. The backend only ever suggests get, describe and logs.
-function NextSteps({ steps, ctx }) {
+export function NextSteps({ steps, ctx }) {
   if (steps.length === 0) return null;
   return (
     <div className="trace-next">
@@ -261,10 +261,6 @@ function Impact({ trace, ctx, label }) {
 function detailPathFor(ctx, id) {
   const { resource, namespace, name } = objectParts(id);
   return detailPath(ctx.clusterId, resource, namespace, name);
-}
-
-export function pluralKind(kind) {
-  return kind.endsWith("s") ? `${kind}es` : `${kind}s`;
 }
 
 // diagnosisCommands: what the palette offers on a page with a diagnosis.

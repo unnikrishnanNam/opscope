@@ -53,6 +53,7 @@ func TestWorkloadStates(t *testing.T) {
 	half := meta("a", "half")
 	blocked := meta("a", "blocked")
 	stuck := meta("a", "stuck")
+	stuckDown := meta("a", "stuck-down")
 
 	blockedRS := replicaSet(ownedBy(meta("a", "blocked-1"), "Deployment", blocked), 2, 0)
 	blockedRS.Status.Conditions = []appsv1.ReplicaSetCondition{{Type: appsv1.ReplicaSetReplicaFailure, Status: corev1.ConditionTrue,
@@ -60,6 +61,8 @@ func TestWorkloadStates(t *testing.T) {
 	stuckDeploy := deployment(stuck, 2, 1)
 	stuckDeploy.Status.Conditions = []appsv1.DeploymentCondition{{Type: appsv1.DeploymentProgressing, Status: corev1.ConditionFalse,
 		Reason: "ProgressDeadlineExceeded", Message: `ReplicaSet "stuck-2" has timed out progressing.`}}
+	stuckDownDeploy := deployment(stuckDown, 2, 0)
+	stuckDownDeploy.Status.Conditions = stuckDeploy.Status.Conditions
 
 	brokenRS := ownedBy(meta("a", "broken-1"), "Deployment", broken)
 	halfRS := ownedBy(meta("a", "half-1"), "Deployment", half)
@@ -73,6 +76,7 @@ func TestWorkloadStates(t *testing.T) {
 			deployment(half, 2, 1),
 			deployment(blocked, 2, 0),
 			stuckDeploy,
+			stuckDownDeploy,
 		},
 		ReplicaSets: []appsv1.ReplicaSet{
 			replicaSet(brokenRS, 2, 0), replicaSet(halfRS, 2, 1), replicaSet(rollingRS, 2, 1), blockedRS,
@@ -92,7 +96,8 @@ func TestWorkloadStates(t *testing.T) {
 	wantState(t, g, "deployments/a/broken", Failing)      // pods failing, none ready
 	wantState(t, g, "deployments/a/half", Degraded)       // one ready, one failing
 	wantState(t, g, "deployments/a/blocked", Failing)     // its ReplicaSet can't create pods
-	wantState(t, g, "deployments/a/stuck", Failing)
+	wantState(t, g, "deployments/a/stuck", Degraded)      // a stuck rollout, the old pods still serving
+	wantState(t, g, "deployments/a/stuck-down", Failing)  // stuck, and nothing serving
 	if n := node(t, g, "deployments/a/blocked"); n.Message != `pods "blocked-1-x" is forbidden: exceeded quota: compute` {
 		t.Errorf("the ReplicaSet's reason should explain the Deployment, got %q", n.Message)
 	}

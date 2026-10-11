@@ -102,6 +102,8 @@ frontend/                 React app (Vite, plain JavaScript)
   src/commands/           the command registry behind the palette and the shortcuts (sources/ has
                           the commands available on every page)
   src/components/         shared components, each with its own CSS file
+  src/graph/              laying out a topology map (columns by kind, rows ordered to uncross
+                          edges) and following findings along it to their root causes
   src/pages/              one file per page
   src/styles/             design tokens (both themes) and page-wide base styles
   src/kit/                the component kit at /kit (development only)

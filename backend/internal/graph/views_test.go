@@ -270,6 +270,22 @@ func TestNeighbourhood(t *testing.T) {
 		}
 	})
 
+	t.Run("it doesn't go on through a machine", func(t *testing.T) {
+		s := prepared(&snapshot.Snapshot{
+			Nodes: []corev1.Node{readyNode("worker-1")},
+			Pods:  []corev1.Pod{readyPod(meta("a", "one"), "worker-1"), readyPod(meta("b", "other"), "worker-1")},
+		})
+		g := Of(s)
+		v, _ := g.Neighbourhood("pods/a/one", 2, Options{})
+		if !hasID(v.Nodes, "nodes/worker-1") || hasID(v.Nodes, "pods/b/other") {
+			t.Errorf("from a pod: %v", ids(v.Nodes))
+		}
+		v, _ = g.Neighbourhood("nodes/worker-1", 2, Options{})
+		if !hasID(v.Nodes, "pods/a/one") || !hasID(v.Nodes, "pods/b/other") {
+			t.Errorf("from the machine: %v", ids(v.Nodes))
+		}
+	})
+
 	t.Run("the cause of a problem is never cut off", func(t *testing.T) {
 		v, _ := g.Neighbourhood("services/shop/api", 1, Options{})
 		// The pods are one step away; what they need, which is failing, is two.

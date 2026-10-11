@@ -216,7 +216,7 @@ several requests in a row read the cluster only once.
 | ----------- | --------------------------------------------------------------------------------------- |
 | `namespace` | A namespace: everything in it, what points at it from elsewhere, and what all of that needs |
 | `app`       | With `namespace`, one app of that namespace                                             |
-| `focus`     | One object's ID (`pods/shop/web-1`, `nodes/worker-1`) and everything within `depth` edges of it |
+| `focus`     | One object's ID (`pods/shop/web-1`, `nodes/worker-1`) and everything within `depth` edges of it, not going on through a node, a namespace or a class that many objects share |
 | `depth`     | With `focus`, from 1 to 5; default 2                                                    |
 | `expand`    | Workloads whose pods are shown one by one, as comma-separated IDs, or `all`             |
 | `problems`  | `true`: only objects that aren't `ok`, and what points at them                          |
@@ -243,6 +243,12 @@ several requests in a row read the cluster only once.
       "via": ["container api: env STRIPE_KEY"] }
   ],
   "apps": [{ "name": "api", "state": "failing", "workloads": 1 }],
+  "findings": [
+    { "id": "pod.config|pods/shop/api-7d9f-a|secrets/shop/stripe", "rule": "pod.config",
+      "object": "pods/shop/api-7d9f-a", "severity": "failing", "confidence": "certain",
+      "title": "Container api can't start: it needs Secret stripe", "blames": ["secrets/shop/stripe"],
+      "related": [], "evidence": [], "next": [] }
+  ],
   "snapshot": { "taken": "2026-10-11T10:00:00Z", "skipped": [{ "resource": "secrets", "code": "forbidden" }] }
 }
 ```
@@ -251,7 +257,11 @@ A node's `id` is its resource type, namespace and name, as in the detail page's 
 workload are grouped into one node whose `id` starts with `pods:` and which has `pods` set, unless
 `expand` asks for them. `apps` is returned for a namespace only. `snapshot` says when the cluster
 was read and which resource types couldn't be (as in `/names`); objects of those types are
-`unknown` rather than `missing`.
+`unknown` rather than `missing`. `findings` are the diagnosis's findings about every object shown,
+the pods in a group included, as in the [diagnosis](#get-apiclustersiddiagnosisresourcenamespacename)
+steps but without nesting; following `blames` from one leads to its root causes. What a finding
+blames is always in the view: when nothing else would put it there (a ResourceQuota that stops a
+ReplicaSet), it's added with a `blames` edge.
 
 | `state`       | Meaning                                                                           |
 | ------------- | --------------------------------------------------------------------------------- |
@@ -276,6 +286,7 @@ target breaks nothing.
 | `attaches`  | HTTPRoute → Gateway → GatewayClass                                          |
 | `permits`   | HTTPRoute → the ReferenceGrant that lets it reach a Service in another namespace; a missing one is named `(none)` |
 | `scales`    | HorizontalPodAutoscaler → what it scales                                    |
+| `blames`    | Only in views: a finding about the first object blames the second, and no other edge joins them |
 
 ### `GET /api/clusters/{id}/diagnosis/{resource}/{namespace}/{name}`
 ### `GET /api/clusters/{id}/diagnosis/{resource}/{name}`

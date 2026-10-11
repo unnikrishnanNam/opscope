@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"opscope/internal/clusters"
+	"opscope/internal/diagnose"
 	"opscope/internal/graph"
 	"opscope/internal/kube"
 	"opscope/internal/snapshot"
@@ -26,7 +27,8 @@ type snapshotInfo struct {
 
 type topologyResponse struct {
 	*graph.View
-	Snapshot snapshotInfo `json:"snapshot"`
+	Findings []*diagnose.Finding `json:"findings"` // about the objects shown, the pods in groups included
+	Snapshot snapshotInfo        `json:"snapshot"`
 }
 
 // GET /api/clusters/{id}/topology?namespace=&app=&focus=&depth=&expand=&problems=
@@ -37,7 +39,8 @@ type topologyResponse struct {
 //   - namespace=shop&app=storefront: one app of a namespace
 //
 // expand lists workloads whose pods are shown one by one (comma-separated
-// IDs, or "all"), and problems=true keeps only what isn't OK.
+// IDs, or "all"), and problems=true keeps only what isn't OK. The findings
+// about what's shown come with it, and what they blame is added to the view.
 func getTopology(manager *clusters.Manager, store *snapshot.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cluster, ok := findCluster(w, r, manager)
@@ -95,7 +98,8 @@ func getTopology(manager *clusters.Manager, store *snapshot.Store) http.HandlerF
 		default:
 			view = g.Namespace(namespace, options)
 		}
-		writeJSON(w, http.StatusOK, topologyResponse{View: view, Snapshot: infoOf(s)})
+		findings := diagnose.Of(s).ForView(view)
+		writeJSON(w, http.StatusOK, topologyResponse{View: view, Findings: findings, Snapshot: infoOf(s)})
 	}
 }
 

@@ -30,3 +30,8 @@ export function problemSummary(problems) {
   const what = problems.length === 1 ? "1 problem" : `${problems.length} problems`;
   return `${what}, affecting ${ids.size === 1 ? "1 object" : `${ids.size} objects`}`;
 }
+
+// pluralKind: "Pods", "Ingresses", "GatewayClasses".
+export function pluralKind(kind) {
+  return kind.endsWith("s") ? `${kind}es` : `${kind}s`;
+}
