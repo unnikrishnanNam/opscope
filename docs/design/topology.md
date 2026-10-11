@@ -26,7 +26,7 @@ Phases are numbered **G0–G7** so they don't mix with the build phases 0–8 or
 R, P and D. All work happens on the `feature/topology` branch, and each phase is committed there
 once it works, its tests pass and its notes are written. This feature has no issue of its own.
 
-**Status (2026-10-11):** G0 (the snapshot) and G1 (the graph and `GET /topology`) done. G2 is next.
+**Status (2026-10-11):** G0 (the snapshot), G1 (the graph and `GET /topology`) and G2 (the diagnosis on detail pages) done. G3 is next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -283,17 +283,17 @@ The first set (G2) covers the failures people hit most. The second (G3) complete
 
 | Rule                         | Phase | Looks at          | Detects                                                                                                      | Blames                                         |
 | ---------------------------- | ----- | ----------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
-| `pod.config-missing`         | G2    | Pod               | `CreateContainerConfigError`: a ConfigMap, Secret or key that doesn't exist                                  | the missing object (or key)                    |
-| `pod.mount-failed`           | G2    | Pod               | stuck in `ContainerCreating` with `FailedMount`: a volume's ConfigMap, Secret or PVC                         | the missing or unbound object                  |
-| `pod.image-pull`             | G2    | Pod               | `ErrImagePull`, `ImagePullBackOff`, `InvalidImageName`, split into not found, unauthorized, unreachable      | the pull Secret when unauthorized; else itself |
-| `pod.crash-loop`             | G2    | Pod               | `CrashLoopBackOff`, with the last exit: `OOMKilled` (the memory limit), an exit code, a failed liveness probe | itself (root), with a link to previous logs    |
+| `pod.config`                 | G2    | Pod               | `CreateContainerConfigError`: a ConfigMap, Secret or key that doesn't exist                                  | the missing object (or key)                    |
+| `pod.mount`                  | G2    | Pod               | stuck in `ContainerCreating` with `FailedMount`: a volume's ConfigMap, Secret or PVC                         | the missing or unbound object                  |
+| `pod.image`                  | G2    | Pod               | `ErrImagePull`, `ImagePullBackOff`, `InvalidImageName`, split into not found, unauthorized, unreachable      | the pull Secret when unauthorized; else itself |
+| `pod.crash`                  | G2    | Pod               | `CrashLoopBackOff`, with the last exit: `OOMKilled` (the memory limit), an exit code, a failed liveness probe | itself (root), with a link to previous logs    |
 | `pod.unschedulable`          | G2    | Pod               | `PodScheduled=False`: not enough CPU or memory, taints, node selector or affinity matching no node, unbound PVC | the nodes, the PVC                             |
-| `pod.node-down`              | G2    | Pod               | its node is NotReady or unreachable, so the pod is `Unknown` or stuck `Terminating`                          | the node                                       |
+| `pod.node`                   | G2    | Pod               | its node is NotReady or unreachable, so the pod is `Unknown` or stuck `Terminating`                          | the node                                       |
 | `node.not-ready`             | G2    | Node              | `Ready` is False or Unknown; when the kubelet last reported                                                  | itself (root)                                  |
 | `workload.unavailable`       | G2    | Deployment, StatefulSet, DaemonSet | fewer replicas ready than wanted                                                            | its pods that aren't ready, grouped            |
-| `replicaset.create-failed`   | G2    | ReplicaSet        | `ReplicaFailure` or `FailedCreate`: a ResourceQuota, Pod Security admission, a missing ServiceAccount        | the quota, the namespace, the ServiceAccount   |
-| `service.no-endpoints`       | G2    | Service           | the selector matches no pods                                                                                 | itself (root)                                  |
-| `service.no-ready-endpoints` | G2    | Service           | pods match, but none are ready                                                                               | those pods                                     |
+| `create-failed`              | G2    | ReplicaSet, StatefulSet, DaemonSet, Job | `ReplicaFailure` or `FailedCreate`: a ResourceQuota, Pod Security admission, a missing ServiceAccount        | the quota, the namespace, the ServiceAccount   |
+| `service.selector`           | G2    | Service           | the selector matches no pods                                                                                 | itself (root)                                  |
+| `service.endpoints`          | G2    | Service           | pods match, but none are ready                                                                               | those pods                                     |
 | `route.backend`              | G2    | HTTPRoute, Ingress | a backend Service missing, without a ReferenceGrant, or with no ready endpoints                             | the Service or the missing grant               |
 | `pod.not-ready`              | G3    | Pod               | running but not ready: a failing readiness probe                                                             | itself (root)                                  |
 | `pod.evicted`                | G3    | Pod               | evicted for memory or disk pressure                                                                          | the node                                       |
@@ -436,18 +436,20 @@ Goal: `GET /topology` returns a correct graph for a namespace and a neighbourhoo
 
 Goal: a broken object's detail page explains why, down to the root cause.
 
-- [ ] `internal/diagnose`: `Rule`, `Finding`, `Context`, the engine, traces, grouping, impact
-- [ ] The G2 rules from the table
-- [ ] Scenarios in `diagnose/testdata/`: each one's objects (with status) as YAML, and its expected root causes; a test runs them all
-- [ ] Broken-app manifests in `test/scenarios/` (missing Secret, bad image, OOM, crash loop,
+- [x] `internal/diagnose`: `Rule`, `Finding`, `Context`, the engine, traces, grouping, impact
+- [x] The G2 rules from the table
+- [~] Scenarios in `diagnose/testdata/`: objects captured from the kind cluster, and the root
+      causes expected for each (one capture for all scenarios, expectations in `scenario_test.go`; see notes)
+- [x] Broken-app manifests in `test/scenarios/` (missing Secret, bad image, OOM, crash loop,
       unschedulable, selector matching nothing, route to a missing Service, quota), applied to the
       `opscope-test` kind cluster in the `opscope-scenarios` namespace to reproduce each scenario and
       capture its objects as test data, then deleted
-- [ ] `GET /api/clusters/{id}/diagnosis/...`, both forms
-- [ ] The diagnosis at the top of the Summary tab: trace, evidence, next steps, impact, "as of"
-- [ ] Palette: "Show diagnosis", "Copy root cause"
-- [ ] `docs/api.md`: the diagnosis endpoint
-- [ ] Checked in the browser against the scenarios: light and dark, keyboard only, a screen reader, 375 px
+- [x] `GET /api/clusters/{id}/diagnosis/...`, both forms
+- [x] The diagnosis at the top of the Summary tab: trace, evidence, next steps, impact, "as of"
+- [x] Palette: "Show diagnosis", "Copy root cause"
+- [x] `docs/api.md`: the diagnosis endpoint
+- [~] Checked in the browser against the scenarios: light and dark, keyboard only, 375 px; not yet
+      with a screen reader (see notes)
 
 ## Phase G3: Complete rules and problems
 
@@ -621,3 +623,59 @@ snapshots are taken every 30 seconds, and problems sit at the top of the "Recent
   the four Gateway API kinds are reported as skipped.
 - Not done: the cluster-wide view (`Cluster()`) stays in G6 as planned; `/topology` without a
   namespace or focus answers `400` until then.
+
+### G2
+
+- **The engine.** Rules run once per snapshot (`diagnose.Of`, kept with the snapshot like the
+  graph). A missing object gets a built-in finding that is always a root cause; an unknown one gets
+  an `info` finding that says Opscope can't check it. A trace merges alike findings (same rule,
+  title and culprits), so the crash-loop scenario's two pods are one step. The response carries
+  every object the steps name (`nodes`), so the page can show "Pod web-1 · CrashLoopBackOff" and
+  link it without another request, and every list is a JSON list, never `null` (a test checks).
+- **Rules as built,** with the IDs in the table above: `pod.config`, `pod.mount`, `pod.image`,
+  `pod.crash`, `pod.unschedulable`, `pod.node`, `node.not-ready`, `workload.unavailable`,
+  `create-failed`, `service.selector`, `service.endpoints`, `route.backend`. Changed from the plan:
+  - `create-failed` covers StatefulSets, DaemonSets and Jobs as well as ReplicaSets: they all
+    report `FailedCreate` events the same way.
+  - `pod.crash` already covers init containers, a failing liveness probe and a container that
+    exits with code 0, which the plan left for G3's `pod.init-failed`; they read from the same
+    status. G3 still adds init containers that fail without restarting.
+  - `workload.unavailable` reports a rollout or a scale-up that is still under way as `info`, not
+    as a fault, so its pods' problems show up during the first five minutes too.
+- **Scenarios.** Thirteen manifests in `test/scenarios/` were applied to the kind cluster, left
+  for seven minutes, captured (119 objects, 75 of them events) with `test/scenarios/capture.sh`,
+  and deleted. Instead of a folder per scenario, one capture holds them all, since they share a
+  namespace and a quota, and `scenario_test.go` lists the root cause each object must reach. A
+  second capture 15 minutes later passed the same tests. Every failure reached the expected root
+  cause on the first run; the wording was then polished ("Its only replica isn't ready", a
+  quota's amounts said once, a missing object's users listed by workload rather than pod by pod).
+- **What the real cluster showed:** the exact formats of the scheduler's message
+  (`0/1 nodes are available: 1 Insufficient cpu.`), the quota and service account admission
+  errors, the kubelet's `couldn't find key` message, and image pull errors for a tag that doesn't
+  exist (`code = NotFound`) and a registry that doesn't (`no such host`). Crash-looping pods are
+  often caught between restarts with a terminated container rather than `CrashLoopBackOff`; the
+  rule reads both. The wrong-selector Service finds its near miss: "Did you mean
+  app=crash-loop? 2 pods have that label."
+- Branches a one-node cluster without Gateway API can't show have unit tests: a node that
+  stopped reporting, a registry refusing credentials, an invalid image name, exit codes, an
+  unbound claim and a taint at scheduling, Pod Security, a quota requiring limits, a LimitRange,
+  a route's missing backend and missing ReferenceGrant, a partly ready Service, a Secret Opscope
+  isn't allowed to read, and a cycle in a trace. `TestCommandsAreReadOnly` checks that every
+  suggested command is `kubectl get`, `describe` or `logs`.
+- **Fixed on the way:** `Snapshot.Derived` held its lock while building, and the diagnosis builds
+  the graph through it: a deadlock, found by the server test. Each derived value now builds once on
+  its own (`TestDerived`).
+- **The page.** `Diagnosis` sits at the top of the Summary tab and was built on `/kit` first,
+  with sample traces in both themes. The edge takes the colour of the worst problem, evidence
+  opens by itself only on root causes, and an object with nothing wrong gets one quiet line, or
+  "It's part of a problem in …" when another object's trace leads to it. "Previous logs" opens
+  the Logs tab on the crashing container's previous run (`?container=…&previous=true`, which the
+  log viewer now reads). The overview's `focusCard` moved to `focus.js` as `focusSection`, used by
+  "Show diagnosis" too; `focusSectionSoon` waits for the Summary tab with timers, since browsers
+  pause animation frames in a tab that isn't on screen.
+- **Checked in the browser** against the kind scenarios and the multipass cluster, in both themes,
+  at 375 px, and with the palette from the keyboard. On multipass the diagnosis explains the two
+  problems G1 found: `default/app-frontend` waits on ConfigMap `app-config`, which doesn't exist,
+  and `argocd-server` exits with code 20 after 1,103 restarts. A pass with a real screen reader is
+  still to do; the structure is there (a heading, nested lists, each step's severity as hidden
+  text, labelled copy buttons).

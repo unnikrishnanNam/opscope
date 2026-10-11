@@ -67,7 +67,13 @@ type Snapshot struct {
 	index
 
 	derivedMu sync.Mutex
-	derived   map[string]any
+	derived   map[string]*derived
+}
+
+// derived is one value computed from a snapshot, built once.
+type derived struct {
+	once  sync.Once
+	value any
 }
 
 // ConfigMap is a ConfigMap without its values: its metadata and the names
@@ -147,18 +153,23 @@ func (s *Snapshot) Skip(resource string) (kube.Skipped, bool) {
 // the first time it's asked for. The graph and the diagnosis are kept this
 // way: computed once per snapshot, shared by every request that uses it,
 // and gone when the snapshot is.
+//
+// One value may be built from another (the diagnosis from the graph): the
+// lock covers only finding the entry, and each entry builds once on its own.
 func (s *Snapshot) Derived(name string, build func() any) any {
 	s.derivedMu.Lock()
-	defer s.derivedMu.Unlock()
-	if value, ok := s.derived[name]; ok {
-		return value
-	}
 	if s.derived == nil {
-		s.derived = map[string]any{}
+		s.derived = map[string]*derived{}
 	}
-	value := build()
-	s.derived[name] = value
-	return value
+	d, ok := s.derived[name]
+	if !ok {
+		d = &derived{}
+		s.derived[name] = d
+	}
+	s.derivedMu.Unlock()
+
+	d.once.Do(func() { d.value = build() })
+	return d.value
 }
 
 // Size is how many objects the snapshot holds, not counting events.

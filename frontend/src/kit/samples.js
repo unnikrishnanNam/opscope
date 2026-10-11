@@ -158,3 +158,120 @@ export function logLine(i) {
 }
 
 export const logText = Array.from({ length: 120 }, (_, i) => logLine(i)).join("\n") + "\n";
+
+// Diagnoses, shaped like GET /api/clusters/{id}/diagnosis/...
+const node = (id, kind, state, status) => {
+  const parts = id.split("/");
+  const [resource, namespace, name] = parts.length === 2 ? [parts[0], "", parts[1]] : parts;
+  return { id, resource, kind, namespace, name, state, status };
+};
+
+const missingSecret = {
+  id: "missing|secrets/shop/stripe-key|",
+  rule: "missing",
+  object: "secrets/shop/stripe-key",
+  severity: "failing",
+  confidence: "certain",
+  title: "Secret shop/stripe-key doesn't exist",
+  detail: "It's needed by Deployment checkout (container api: env STRIPE_KEY).",
+  evidence: [{ source: "reference", text: "Opscope read every Secret in the cluster and found no shop/stripe-key." }],
+  blames: [],
+  next: [{ label: "kubectl get", command: "kubectl get secrets -n shop" }],
+  objects: ["secrets/shop/stripe-key"],
+  root: true,
+  causes: [],
+};
+
+export const diagnoses = {
+  failing: {
+    object: node("deployments/shop/checkout", "Deployment", "failing", "0/3"),
+    steps: [
+      {
+        id: "workload.unavailable|deployments/shop/checkout|",
+        rule: "workload.unavailable",
+        object: "deployments/shop/checkout",
+        severity: "failing",
+        confidence: "certain",
+        title: "None of its 3 replicas are ready",
+        evidence: [],
+        blames: ["pods/shop/checkout-7d9f-a", "pods/shop/checkout-7d9f-b", "pods/shop/checkout-7d9f-c"],
+        next: [{ label: "Events", object: "deployments/shop/checkout", tab: "events" }],
+        objects: ["deployments/shop/checkout"],
+        root: false,
+        causes: [
+          {
+            id: "pod.config|pods/shop/checkout-7d9f-a|secrets/shop/stripe-key",
+            rule: "pod.config",
+            object: "pods/shop/checkout-7d9f-a",
+            severity: "failing",
+            confidence: "certain",
+            title: "Container api can't start: it needs Secret stripe-key",
+            detail: "Kubernetes can't find it, so the container isn't created.",
+            evidence: [
+              { source: "container", text: 'api: CreateContainerConfigError: secret "stripe-key" not found' },
+              { source: "event", text: 'Failed: Error: secret "stripe-key" not found', time: ago(1), count: 42 },
+            ],
+            blames: ["secrets/shop/stripe-key"],
+            next: [{ label: "kubectl describe", command: "kubectl describe pods checkout-7d9f-a -n shop" }],
+            objects: ["pods/shop/checkout-7d9f-a", "pods/shop/checkout-7d9f-b", "pods/shop/checkout-7d9f-c"],
+            root: false,
+            causes: [missingSecret],
+          },
+        ],
+      },
+    ],
+    impact: [node("httproutes/shop/storefront", "HTTPRoute", "ok", "Accepted"), node("services/shop/checkout", "Service", "failing", "0/3 ready")],
+    nodes: {
+      "deployments/shop/checkout": node("deployments/shop/checkout", "Deployment", "failing", "0/3"),
+      "pods/shop/checkout-7d9f-a": node("pods/shop/checkout-7d9f-a", "Pod", "failing", "CreateContainerConfigError"),
+      "pods/shop/checkout-7d9f-b": node("pods/shop/checkout-7d9f-b", "Pod", "failing", "CreateContainerConfigError"),
+      "pods/shop/checkout-7d9f-c": node("pods/shop/checkout-7d9f-c", "Pod", "failing", "CreateContainerConfigError"),
+      "secrets/shop/stripe-key": node("secrets/shop/stripe-key", "Secret", "missing", "Missing"),
+    },
+    snapshot: { taken: ago(0.2), skipped: [] },
+  },
+  degraded: {
+    object: node("pods/shop/api-5c8d-x", "Pod", "degraded", "Running"),
+    steps: [
+      {
+        id: "pod.crash|pods/shop/api-5c8d-x|",
+        rule: "pod.crash",
+        object: "pods/shop/api-5c8d-x",
+        severity: "degraded",
+        confidence: "likely",
+        title: "Container api fails its liveness probe, so it's restarted",
+        detail:
+          "Kubernetes restarts a container whose liveness probe fails. This one is an HTTP GET of /healthz on port 8080, every 10s after an initial 5s, giving up after 3 failures. Check that the probe matches what the program offers, and that its delay leaves enough time to start.",
+        evidence: [
+          { source: "container", text: "api: restarted 6 times; last stopped: Error (exit 137)", time: ago(3) },
+          { source: "event", text: "Unhealthy: Liveness probe failed: HTTP probe failed with statuscode: 503", time: ago(2), count: 18 },
+        ],
+        blames: [],
+        next: [
+          { label: "Events", object: "pods/shop/api-5c8d-x", tab: "events" },
+          { label: "kubectl describe", command: "kubectl describe pods api-5c8d-x -n shop" },
+        ],
+        objects: ["pods/shop/api-5c8d-x"],
+        root: true,
+        causes: [],
+      },
+    ],
+    impact: [],
+    nodes: { "pods/shop/api-5c8d-x": node("pods/shop/api-5c8d-x", "Pod", "degraded", "Running") },
+    snapshot: { taken: ago(0.1), skipped: [] },
+  },
+  clear: {
+    object: node("deployments/shop/web", "Deployment", "ok", "3/3"),
+    steps: [],
+    impact: [],
+    nodes: {},
+    snapshot: { taken: ago(0.15), skipped: [] },
+  },
+  partOfAProblem: {
+    object: node("resourcequotas/shop/memory", "ResourceQuota", "ok", ""),
+    steps: [],
+    impact: [node("deployments/shop/reports", "Deployment", "failing", "0/1")],
+    nodes: {},
+    snapshot: { taken: ago(0.15), skipped: [] },
+  },
+};

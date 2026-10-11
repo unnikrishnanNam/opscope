@@ -6,6 +6,7 @@ import { detailPath, nsQuery } from "../sections.js";
 import { Callout } from "../components/Callout.jsx";
 import { Card, Section } from "../components/Card.jsx";
 import CodeBlock from "../components/CodeBlock.jsx";
+import Diagnosis, { diagnosisCommands } from "../components/Diagnosis.jsx";
 import { SimpleTable } from "../components/DataTable.jsx";
 import EventList from "../components/EventList.jsx";
 import { Fact, FactGrid, KeyValueList } from "../components/Facts.jsx";
@@ -31,8 +32,13 @@ export default function ResourceDetail({ page }) {
   const tab = searchParams.get("tab") ?? "summary";
 
   const parts = page.clusterScoped ? [name] : [namespace, name];
-  const path = reachable ? `/clusters/${cluster.id}/${page.resource}/${parts.map(encodeURIComponent).join("/")}` : null;
+  const objectPath = `${page.resource}/${parts.map(encodeURIComponent).join("/")}`;
+  const path = reachable ? `/clusters/${cluster.id}/${objectPath}` : null;
   const { data: d, error } = useApi(path, { refreshMs: REFRESH_MS });
+  // Why it's failing, from the whole cluster's graph. Loaded next to the
+  // details so the palette can offer it on every tab.
+  const diagnosisPath = reachable ? `/clusters/${cluster.id}/diagnosis/${objectPath}` : null;
+  const diagnosis = useApi(diagnosisPath, { refreshMs: REFRESH_MS });
 
   function openTab(next) {
     const params = new URLSearchParams(searchParams);
@@ -58,6 +64,7 @@ export default function ResourceDetail({ page }) {
     d ? detailCommands({ d, page, clusterId: cluster.id, tab, tabs, openTab, search }) : [],
     [d, page, cluster.id, tab, search],
   );
+  useCommands("diagnosis", diagnosisCommands({ trace: diagnosis.data, openTab }), [diagnosis.data]);
 
   return (
     <section className="detail-page">
@@ -94,7 +101,7 @@ export default function ResourceDetail({ page }) {
 
       {d && (
         <Tabs label={`${d.kind} details`} value={tab} onChange={openTab} tabs={tabs}>
-          {tab === "summary" && <Summary d={d} cluster={cluster} resource={page.resource} />}
+          {tab === "summary" && <Summary d={d} cluster={cluster} resource={page.resource} diagnosis={diagnosis} />}
           {tab === "yaml" && (
             <CodeBlock
               code={d.yaml}
@@ -111,7 +118,14 @@ export default function ResourceDetail({ page }) {
             />
           )}
           {tab === "logs" && (
-            <LogViewer clusterId={cluster.id} namespace={namespace} pod={name} containers={d.containers} />
+            <LogViewer
+              clusterId={cluster.id}
+              namespace={namespace}
+              pod={name}
+              containers={d.containers}
+              container={searchParams.get("container")}
+              previous={searchParams.get("previous") === "true"}
+            />
           )}
         </Tabs>
       )}
@@ -130,12 +144,19 @@ function DetailSkeleton() {
   );
 }
 
-function Summary({ d, cluster, resource }) {
+function Summary({ d, cluster, resource, diagnosis }) {
   const search = nsQuery(useLocation().search);
   const facts = d.fields.filter((f) => f.label !== "Status"); // already in the header
 
   return (
     <div className="detail-sections">
+      {diagnosis.data && <Diagnosis clusterId={cluster.id} trace={diagnosis.data} />}
+      {diagnosis.error && !diagnosis.data && (
+        <Callout compact tone="warning" title="Opscope couldn't work out what's wrong here" detail={diagnosis.error.detail}>
+          {diagnosis.error.message}
+        </Callout>
+      )}
+
       {(facts.length > 0 || d.owners.length > 0) && (
         <Card>
           <FactGrid>

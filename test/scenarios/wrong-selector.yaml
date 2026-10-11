@@ -1,0 +1,9 @@
+# The pods are labelled app: crash-loop; this Service looks for app: crashloop.
+apiVersion: v1
+kind: Service
+metadata:
+  name: wrong-selector
+  namespace: opscope-scenarios
+spec:
+  selector: {app: crashloop}
+  ports: [{port: 80}]

@@ -204,7 +204,7 @@ A pod's logs as plain text, sent with `Cache-Control: no-store`.
 Without `follow`, a request is cut off after 30 seconds. A request the API server rejects (no
 previous run, a container that doesn't exist) returns `400` with its message.
 
-## Topology
+## Topology and diagnosis
 
 ### `GET /api/clusters/{id}/topology`
 
@@ -276,6 +276,59 @@ target breaks nothing.
 | `attaches`  | HTTPRoute → Gateway → GatewayClass                                          |
 | `permits`   | HTTPRoute → the ReferenceGrant that lets it reach a Service in another namespace; a missing one is named `(none)` |
 | `scales`    | HorizontalPodAutoscaler → what it scales                                    |
+
+### `GET /api/clusters/{id}/diagnosis/{resource}/{namespace}/{name}`
+### `GET /api/clusters/{id}/diagnosis/{resource}/{name}`
+
+Why one object is failing, from the same reading of the cluster as `/topology`. The second form is
+for cluster-wide kinds (`nodes`, `gatewayclasses`). An object Opscope doesn't know answers `404`.
+
+```json
+{
+  "object": { "id": "deployments/shop/api", "kind": "Deployment", "state": "failing", "status": "0/1" },
+  "steps": [
+    {
+      "id": "workload.unavailable|deployments/shop/api|pods/shop/api-7d9f-a",
+      "rule": "workload.unavailable", "object": "deployments/shop/api",
+      "severity": "failing", "confidence": "certain",
+      "title": "Its only replica isn't ready",
+      "evidence": [], "blames": ["pods/shop/api-7d9f-a"],
+      "next": [{ "label": "Events", "object": "deployments/shop/api", "tab": "events" }],
+      "objects": ["deployments/shop/api"], "root": false,
+      "causes": [
+        {
+          "rule": "pod.config", "title": "Container api can't start: it needs Secret stripe",
+          "detail": "Kubernetes can't find it, so the container isn't created.",
+          "evidence": [{ "source": "container", "text": "api: CreateContainerConfigError: secret \"stripe\" not found" }],
+          "blames": ["secrets/shop/stripe"], "objects": ["pods/shop/api-7d9f-a"], "root": false,
+          "causes": [
+            {
+              "rule": "missing", "title": "Secret shop/stripe doesn't exist", "root": true,
+              "next": [{ "label": "kubectl get", "command": "kubectl get secrets -n shop" }]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "impact": [],
+  "nodes": { "pods/shop/api-7d9f-a": { "id": "pods/shop/api-7d9f-a", "kind": "Pod", "status": "CreateContainerConfigError" } },
+  "snapshot": { "taken": "2026-10-11T10:00:00Z", "skipped": [] }
+}
+```
+
+(Some fields are left out above for length; every step has all of them.)
+
+| Field      | Contents                                                                                     |
+| ---------- | -------------------------------------------------------------------------------------------- |
+| `steps`    | The object's findings, worst first. Each has its `causes`: the findings of the objects it `blames`, and so on |
+| `root`     | `true` when nothing a step blames has a finding of its own: a root cause                     |
+| `objects`  | What a step is about. Alike findings are merged: pods failing the same way are one step      |
+| `severity` | `failing`, `degraded`, or `info` for something worth knowing that isn't a fault              |
+| `confidence` | `certain` (from structured status), `likely` (read from event or message text), `possible` |
+| `next`     | Links to an Opscope page (`object`, `tab`, `query`) or a read-only kubectl `command`. Only `get`, `describe` and `logs` are ever suggested |
+| `impact`   | Objects whose problems lead to this one; pods are left out when their workload is listed     |
+| `nodes`    | Every object the steps name, as in `/topology`, to show and link them                        |
 
 ## Usage
 

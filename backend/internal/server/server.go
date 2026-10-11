@@ -48,6 +48,11 @@ func New(cfg Config, manager *clusters.Manager, history *metrics.History, snapsh
 	// The graph of objects and what they need, for one namespace, app or object.
 	mux.HandleFunc("GET /api/clusters/{id}/topology", getTopology(manager, snapshots))
 
+	// Why one object is failing. The fixed "diagnosis" segment beats the
+	// detail routes' {resource} below.
+	mux.HandleFunc("GET /api/clusters/{id}/diagnosis/{resource}/{namespace}/{name}", getDiagnosis(manager, snapshots))
+	mux.HandleFunc("GET /api/clusters/{id}/diagnosis/{resource}/{name}", getDiagnosis(manager, snapshots))
+
 	// Live CPU and memory usage from metrics-server.
 	mux.HandleFunc("GET /api/clusters/{id}/metrics/nodes", getNodeMetrics(manager, history))
 	mux.HandleFunc("GET /api/clusters/{id}/metrics/pods", getPodMetrics(manager))

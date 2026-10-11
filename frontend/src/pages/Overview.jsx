@@ -1,5 +1,6 @@
 import { Link, useLocation, useOutletContext, useSearchParams } from "react-router";
 import { useApi } from "../api.js";
+import { focusSection } from "../focus.js";
 import { useCommands } from "../commands/registry.jsx";
 import { bytes, clock, cpu, percent } from "../format.js";
 import Button from "../components/Button.jsx";
@@ -77,7 +78,7 @@ export default function Overview({ page }) {
             group: "This page",
             icon: WarningIcon,
             keywords: ["events"],
-            run: () => focusCard(WARNINGS_ID),
+            run: () => focusSection(WARNINGS_ID),
           },
         ]
       : [],
@@ -439,24 +440,4 @@ function NodeList({ nodes, usage, clusterId }) {
       })}
     </ul>
   );
-}
-
-// focusCard scrolls a card to the top of the content and moves keyboard
-// focus to it, so the next Tab continues from there rather than from the
-// top of the page.
-//
-// It scrolls only the nearest box that scrolls (the content area, or the
-// whole page on phones). scrollIntoView would also move the boxes around it
-// that hide their overflow, shifting the top bar out of view.
-function focusCard(id) {
-  const card = document.getElementById(id);
-  if (!card) return;
-  card.setAttribute("tabindex", "-1");
-  card.focus({ preventScroll: true });
-
-  let box = card.parentElement;
-  while (box && !/(auto|scroll)/.test(getComputedStyle(box).overflowY)) box = box.parentElement;
-  const gap = 16;
-  if (box) box.scrollTo({ top: box.scrollTop + card.getBoundingClientRect().top - box.getBoundingClientRect().top - gap });
-  else window.scrollTo({ top: window.scrollY + card.getBoundingClientRect().top - gap });
 }

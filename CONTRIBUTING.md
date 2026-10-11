@@ -91,6 +91,7 @@ backend/                  Go server
   internal/metrics/       live usage from metrics-server, and the in-memory history
   internal/snapshot/      the whole cluster read at once, for the topology and diagnosis
   internal/graph/         the snapshot as a graph of objects and what they need, and its views
+  internal/diagnose/      rules that explain why objects fail, and traces down to the root cause
   internal/server/        HTTP routes, middleware, static file serving
 frontend/                 React app (Vite, plain JavaScript)
   src/api.js              fetch helper and the useApi hook
@@ -179,6 +180,20 @@ runs the Go tests and the frontend tests. Before opening a pull request, also ch
    follow from these.
 6. **Docs:** the resource list in the README, the permissions table in
    [`docs/deployment.md`](docs/deployment.md) and the resource table in [`docs/api.md`](docs/api.md).
+
+### Adding a diagnosis rule
+
+A rule (`internal/diagnose/rules_*.go`) looks at one kind of object and returns findings: a title,
+evidence, the objects it blames, and next steps. It goes in the `rules` list in `builtin.go`.
+
+- **Name the culprit.** A finding blames the object that causes it, not every unhealthy neighbour.
+- **Prefer structured status** (container states, conditions, references) over event text. A
+  finding read from text is `Likely`, not `Certain`.
+- **Next steps are read-only:** links to Opscope pages, or `kubectl get`, `describe` or `logs`.
+  A test fails on anything else. Describe a fix in the finding's detail, never as a command.
+- **Test it** with objects built in Go (`rules_test.go`), and where a real cluster can show the
+  failure, with a scenario: a manifest in `test/scenarios/`, applied to a throwaway cluster and
+  captured into `internal/diagnose/testdata/scenarios/` (see `scenario_test.go`).
 
 ### Adding commands
 

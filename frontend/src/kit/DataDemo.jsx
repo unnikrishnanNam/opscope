@@ -6,6 +6,7 @@ import { Card, Section } from "../components/Card.jsx";
 import { Callout, EmptyState } from "../components/Callout.jsx";
 import CodeBlock from "../components/CodeBlock.jsx";
 import DataTable from "../components/DataTable.jsx";
+import Diagnosis from "../components/Diagnosis.jsx";
 import EventList from "../components/EventList.jsx";
 import { Fact, FactGrid, KeyValueList } from "../components/Facts.jsx";
 import LogView from "../components/LogView.jsx";
@@ -317,6 +318,17 @@ function Events() {
   );
 }
 
+function Diagnoses() {
+  return (
+    <div className="kit-stack">
+      <Diagnosis clusterId="lab" trace={sample.diagnoses.failing} />
+      <Diagnosis clusterId="lab" trace={sample.diagnoses.degraded} />
+      <Diagnosis clusterId="lab" trace={sample.diagnoses.clear} />
+      <Diagnosis clusterId="lab" trace={sample.diagnoses.partOfAProblem} />
+    </div>
+  );
+}
+
 function Row({ label, children }) {
   return (
     <div className="kit-row">
@@ -327,6 +339,13 @@ function Row({ label, children }) {
 }
 
 export const dataSections = [
+  {
+    id: "diagnoses",
+    title: "Diagnosis",
+    about:
+      "Why an object is failing: each step down to the root cause, with its evidence and what to look at next. The edge takes the colour of the worst problem; evidence opens by itself only on root causes. With nothing wrong, it's one quiet line.",
+    render: () => <Diagnoses />,
+  },
   {
     id: "cards",
     title: "Cards",
