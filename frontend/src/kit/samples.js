@@ -176,6 +176,7 @@ const missingSecret = {
   detail: "It's needed by Deployment checkout (container api: env STRIPE_KEY).",
   evidence: [{ source: "reference", text: "Opscope read every Secret in the cluster and found no shop/stripe-key." }],
   blames: [],
+  related: [],
   next: [{ label: "kubectl get", command: "kubectl get secrets -n shop" }],
   objects: ["secrets/shop/stripe-key"],
   root: true,
@@ -195,6 +196,7 @@ export const diagnoses = {
         title: "None of its 3 replicas are ready",
         evidence: [],
         blames: ["pods/shop/checkout-7d9f-a", "pods/shop/checkout-7d9f-b", "pods/shop/checkout-7d9f-c"],
+        related: [],
         next: [{ label: "Events", object: "deployments/shop/checkout", tab: "events" }],
         objects: ["deployments/shop/checkout"],
         root: false,
@@ -212,6 +214,7 @@ export const diagnoses = {
               { source: "event", text: 'Failed: Error: secret "stripe-key" not found', time: ago(1), count: 42 },
             ],
             blames: ["secrets/shop/stripe-key"],
+            related: [],
             next: [{ label: "kubectl describe", command: "kubectl describe pods checkout-7d9f-a -n shop" }],
             objects: ["pods/shop/checkout-7d9f-a", "pods/shop/checkout-7d9f-b", "pods/shop/checkout-7d9f-c"],
             root: false,
@@ -247,6 +250,7 @@ export const diagnoses = {
           { source: "event", text: "Unhealthy: Liveness probe failed: HTTP probe failed with statuscode: 503", time: ago(2), count: 18 },
         ],
         blames: [],
+        related: [],
         next: [
           { label: "Events", object: "pods/shop/api-5c8d-x", tab: "events" },
           { label: "kubectl describe", command: "kubectl describe pods api-5c8d-x -n shop" },
@@ -274,4 +278,62 @@ export const diagnoses = {
     nodes: {},
     snapshot: { taken: ago(0.15), skipped: [] },
   },
+};
+
+// Root causes, shaped like GET /api/clusters/{id}/problems
+const problem = (rule, severity, confidence, title, objects, affects) => ({
+  id: `${rule}|${objects[0]}|`, rule, object: objects[0], severity, confidence, title,
+  evidence: [], blames: [], related: [], next: [], objects, affects,
+});
+export const problems = {
+  problems: [
+    problem("missing", "failing", "certain", "Secret shop/stripe-key doesn't exist", ["secrets/shop/stripe-key"], [
+      node("deployments/shop/checkout", "Deployment", "failing", "0/3"),
+      node("httproutes/shop/storefront", "HTTPRoute", "ok", "Accepted"),
+      node("services/shop/checkout", "Service", "failing", "0/3 ready"),
+      node("ingresses/shop/web", "Ingress", "ok", ""),
+    ]),
+    problem("pod.crash", "failing", "certain", "Container app exits with code 1", ["pods/shop/worker-5c8d-a", "pods/shop/worker-5c8d-b"], [
+      node("deployments/shop/worker", "Deployment", "failing", "0/2"),
+    ]),
+    problem("pod.image", "failing", "likely", "Image registry.example.com/billing:2.1 doesn't exist", ["pods/billing/api-7f6d-x"], [
+      node("deployments/billing/api", "Deployment", "degraded", "1/2"),
+    ]),
+    problem("hpa.scaling", "degraded", "certain", "It can't read the metrics it scales by", ["horizontalpodautoscalers/shop/web"], []),
+  ],
+  nodes: {
+    "secrets/shop/stripe-key": node("secrets/shop/stripe-key", "Secret", "missing", "Missing"),
+    "pods/shop/worker-5c8d-a": node("pods/shop/worker-5c8d-a", "Pod", "failing", "CrashLoopBackOff"),
+    "pods/shop/worker-5c8d-b": node("pods/shop/worker-5c8d-b", "Pod", "failing", "CrashLoopBackOff"),
+    "pods/billing/api-7f6d-x": node("pods/billing/api-7f6d-x", "Pod", "failing", "ImagePullBackOff"),
+    "horizontalpodautoscalers/shop/web": node("horizontalpodautoscalers/shop/web", "HorizontalPodAutoscaler", "degraded", "1/0"),
+  },
+};
+
+diagnoses.unexplained = {
+  object: node("pods/shop/legacy", "Pod", "failing", "Shutdown"),
+  steps: [
+    {
+      id: "unexplained|pods/shop/legacy|",
+      rule: "unexplained",
+      object: "pods/shop/legacy",
+      severity: "failing",
+      confidence: "possible",
+      title: "Opscope can't tell why it's failing",
+      detail: "No rule explains this yet. Its status and events may say more.",
+      evidence: [{ source: "status", text: "Shutdown Pod was terminated in response to imminent node shutdown." }],
+      blames: [],
+      related: ["services/shop/legacy"],
+      next: [{ label: "Events", object: "pods/shop/legacy", tab: "events" }],
+      objects: ["pods/shop/legacy"],
+      root: true,
+      causes: [],
+    },
+  ],
+  impact: [],
+  nodes: {
+    "pods/shop/legacy": node("pods/shop/legacy", "Pod", "failing", "Shutdown"),
+    "services/shop/legacy": node("services/shop/legacy", "Service", "failing", "0/1 ready"),
+  },
+  snapshot: { taken: ago(0.1), skipped: [] },
 };

@@ -2,6 +2,7 @@ package diagnose
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"opscope/internal/graph"
@@ -18,9 +19,21 @@ var rules = []Rule{
 	nodeNotReady,
 	workloadUnavailable,
 	createFailed,
+	podNotReady,
+	podEvicted,
+	podInit,
+	nodePressure,
+	deploymentRollout,
+	jobFailed,
+	hpaScaling,
+	pvcPending,
 	serviceSelector,
 	serviceEndpoints,
 	routeBackend,
+	routeAccepted,
+	gatewayProgrammed,
+	gatewayClassAccepted,
+	ingressClass,
 }
 
 // rulesFor finds the rules for a resource type.
@@ -103,4 +116,37 @@ func listCommand(n *graph.Node) string {
 		command += " -n " + n.Namespace
 	}
 	return command
+}
+
+// unexplained is the finding an unhealthy object gets when no rule explains
+// it: what it says about itself, its recent warnings, and its unhealthy
+// neighbours as possibly related. It's a guess, and says so.
+func unexplained(c *Context, n *graph.Node) *Finding {
+	word := map[graph.State]string{graph.Failing: "failing", graph.Degraded: "not fully working"}[n.State]
+	f := &Finding{
+		Rule:       "unexplained",
+		Severity:   graph2severity(n.State),
+		Confidence: Possible,
+		Title:      fmt.Sprintf("Opscope can't tell why it's %s", word),
+		Detail:     "No rule explains this yet. Its status and events may say more.",
+		Evidence:   []Evidence{{Source: "status", Text: strings.TrimSpace(n.Status + " " + n.Message)}},
+		Next:       []Step{eventsOf(n), kubectl("describe", n)},
+	}
+	if obj := c.Object(n); obj != nil {
+		f.Evidence = append(f.Evidence, eventEvidence(c.Events(obj.GetUID()))...)
+	}
+	seen := map[string]bool{}
+	for _, e := range append(append([]*graph.Edge{}, c.G.Out(n.ID)...), c.G.In(n.ID)...) {
+		for _, id := range []string{e.From, e.To} {
+			if other := c.Node(id); id != n.ID && !seen[id] && other.State != graph.OK && other.State != graph.Progressing {
+				seen[id] = true
+				f.Related = append(f.Related, id)
+			}
+		}
+	}
+	sort.Strings(f.Related)
+	if len(f.Related) > 5 {
+		f.Related = f.Related[:5]
+	}
+	return f
 }

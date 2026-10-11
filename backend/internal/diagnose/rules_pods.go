@@ -6,8 +6,10 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	"opscope/internal/graph"
+	"opscope/internal/kube"
 	"opscope/internal/snapshot"
 
 	corev1 "k8s.io/api/core/v1"
@@ -19,6 +21,12 @@ type container struct {
 	spec   corev1.Container
 	status corev1.ContainerStatus
 	init   bool
+}
+
+// sidecar says whether it's a native sidecar: an init container that keeps
+// running next to the others (restartPolicy: Always on the container).
+func (c container) sidecar(pod *corev1.Pod) bool {
+	return c.init && kube.IsSidecar(pod, c.spec.Name)
 }
 
 // name is how a finding refers to it: "Container api", "Init container migrate".
@@ -345,10 +353,15 @@ var exitMeanings = map[int32]string{
 	143: "it was stopped (SIGTERM)",
 }
 
+// recentRestart is how long ago a container that runs fine again may have
+// stopped and still count as restarting. A failing liveness probe restarts
+// a container every few minutes; a node reboot last night doesn't matter now.
+const recentRestart = time.Hour
+
 var podCrash = Rule{ID: "pod.crash", Resources: []string{"pods"}, Check: func(c *Context, n *graph.Node) []*Finding {
 	pod := podOf(c, n)
-	if pod == nil {
-		return nil
+	if pod == nil || pod.Status.Reason == "Evicted" {
+		return nil // its containers were stopped by the eviction; pod.evicted says why
 	}
 	var findings []*Finding
 	for _, ct := range containersOf(pod) {
@@ -358,7 +371,17 @@ var podCrash = Rule{ID: "pod.crash", Resources: []string{"pods"}, Check: func(c 
 		if s.State.Terminated != nil && s.State.Terminated.ExitCode != 0 {
 			last = s.State.Terminated
 		}
-		if last == nil || (!crashLooping && s.RestartCount == 0) {
+		// A container that failed and won't be started again (a Job's pod,
+		// restartPolicy: Never) is as much a problem as one that keeps failing.
+		final := s.RestartCount == 0 && s.State.Terminated != nil && s.State.Terminated.ExitCode != 0 &&
+			pod.Spec.RestartPolicy != corev1.RestartPolicyAlways && !ct.sidecar(pod)
+		if last == nil || (!crashLooping && s.RestartCount == 0 && !final) {
+			continue
+		}
+		// Running again, and the last stop was a while ago: it restarted (a
+		// node reboot, an upgrade) and hasn't stopped since. If it isn't ready,
+		// pod.not-ready says so.
+		if s.State.Running != nil && c.Now.Sub(last.FinishedAt.Time) > recentRestart {
 			continue
 		}
 
@@ -372,10 +395,17 @@ var podCrash = Rule{ID: "pod.crash", Resources: []string{"pods"}, Check: func(c 
 				kubectl("logs", n, "-c", ct.spec.Name, "--previous"),
 			},
 		}
+		if final {
+			f.Evidence[0].Text = fmt.Sprintf("%s: stopped: %s (exit %d); restartPolicy: %s", ct.spec.Name, orElse(last.Reason, "Error"), last.ExitCode, pod.Spec.RestartPolicy)
+			f.Next = []Step{
+				{Label: "Logs", Object: n.ID, Tab: "logs", Query: "container=" + ct.spec.Name},
+				kubectl("logs", n, "-c", ct.spec.Name),
+			}
+		}
 		if last.FinishedAt.Time.After(last.StartedAt.Time) {
 			f.Evidence[0].Time = &last.FinishedAt.Time
 		}
-		if crashLooping || n.State == graph.Failing {
+		if crashLooping || final || n.State == graph.Failing {
 			f.Severity = Failing
 		}
 		if last.Message != "" {
@@ -399,6 +429,12 @@ var podCrash = Rule{ID: "pod.crash", Resources: []string{"pods"}, Check: func(c 
 			f.Confidence = Likely
 			f.Evidence = append(f.Evidence, eventEvidence(probe)...)
 			f.Next = []Step{eventsOf(n), kubectl("describe", n)}
+		case final:
+			f.Title = fmt.Sprintf("%s exited with code %d", ct.name(), last.ExitCode)
+			f.Detail = fmt.Sprintf("It won't be started again (restartPolicy: %s). Its logs usually say why it failed.", pod.Spec.RestartPolicy)
+			if meaning, ok := exitMeanings[last.ExitCode]; ok {
+				f.Detail = fmt.Sprintf("Exit code %d means %s. It won't be started again (restartPolicy: %s).", last.ExitCode, meaning, pod.Spec.RestartPolicy)
+			}
 		case last.ExitCode == 0:
 			f.Title = ct.name() + " exits as soon as it starts"
 			f.Detail = "It finishes with exit code 0, but the pod expects it to keep running, so it's started again and again. Its command may be wrong, or it may be meant for a Job."
@@ -626,3 +662,114 @@ func orElse(value, fallback string) string {
 	}
 	return value
 }
+
+// ---- pod.not-ready: running, but not ready ----
+
+var podNotReady = Rule{ID: "pod.not-ready", Resources: []string{"pods"}, Check: func(c *Context, n *graph.Node) []*Finding {
+	pod := podOf(c, n)
+	if pod == nil || pod.Status.Phase != corev1.PodRunning {
+		return nil
+	}
+	var findings []*Finding
+	for _, ct := range containersOf(pod) {
+		if ct.status.State.Running == nil || ct.status.Ready || (ct.init && !ct.sidecar(pod)) {
+			continue
+		}
+		f := &Finding{
+			Severity:   Info, // just started: give it time
+			Confidence: Certain,
+			Title:      ct.name() + " isn't ready",
+			Detail:     "It runs, but Kubernetes sends it no traffic until it's ready.",
+			Evidence:   []Evidence{{Source: "container", Text: ct.spec.Name + ": running, not ready"}},
+			Next:       []Step{eventsOf(n), kubectl("describe", n)},
+		}
+		if n.State == graph.Degraded || n.State == graph.Failing {
+			f.Severity = Degraded
+		}
+		var probe []*corev1.Event
+		for _, e := range c.Events(pod.UID, "Unhealthy") {
+			if strings.HasPrefix(e.Message, "Readiness probe failed") &&
+				(e.InvolvedObject.FieldPath == "" || strings.Contains(e.InvolvedObject.FieldPath, "{"+ct.spec.Name+"}")) {
+				probe = append(probe, e)
+			}
+		}
+		if ct.spec.ReadinessProbe != nil {
+			f.Title = ct.name() + " fails its readiness probe"
+			f.Detail = "It runs, but Kubernetes sends it no traffic until its readiness probe passes. " + describeProbe(ct.spec.ReadinessProbe)
+			f.Evidence = append(f.Evidence, eventEvidence(probe)...)
+		}
+		findings = append(findings, f)
+	}
+	return findings
+}}
+
+// ---- pod.evicted: the kubelet evicted the pod ----
+
+var podEvicted = Rule{ID: "pod.evicted", Resources: []string{"pods"}, Check: func(c *Context, n *graph.Node) []*Finding {
+	pod := podOf(c, n)
+	if pod == nil || pod.Status.Reason != "Evicted" {
+		return nil
+	}
+	said := strings.TrimSpace(pod.Status.Message)
+	f := &Finding{
+		Severity:   Failing,
+		Confidence: Certain,
+		Title:      "It was evicted",
+		Detail:     said,
+		Evidence:   []Evidence{{Source: "status", Text: "Evicted: " + said}},
+		Next:       []Step{kubectl("describe", n)},
+	}
+	message := strings.ToLower(said)
+	switch {
+	case strings.Contains(message, "the node was low on resource"):
+		resource := "resources"
+		if m := lowOnRE.FindStringSubmatch(pod.Status.Message); m != nil {
+			resource = m[1]
+		}
+		f.Title = fmt.Sprintf("It was evicted: its node ran low on %s", resource)
+		f.Detail = "The kubelet evicts pods to keep a node working when it runs short. " + said
+		if node := c.Node(snapshot.Key{Resource: "nodes", Name: pod.Spec.NodeName}.String()); node != nil {
+			f.Blames = []string{node.ID}
+		}
+	case strings.Contains(message, "ephemeral local storage"):
+		f.Title = "It was evicted for using more disk than its limit"
+		f.Detail = said + " Raise its ephemeral-storage limit, or write less to the container's own disk (use a volume)."
+	}
+	// A workload has made a new pod in its place already; this one is what's
+	// left of the old one.
+	if topOwner(c.G, n.ID) != n.ID {
+		f.Severity = Info
+		f.Detail += " Its workload has replaced it; Kubernetes keeps evicted pods for a while, for their status."
+	}
+	return []*Finding{f}
+}}
+
+var lowOnRE = regexp.MustCompile(`low on resource: ([a-z-]+)`)
+
+// ---- pod.init: an init container doesn't finish ----
+
+var podInit = Rule{ID: "pod.init", Resources: []string{"pods"}, Check: func(c *Context, n *graph.Node) []*Finding {
+	pod := podOf(c, n)
+	if pod == nil || n.State != graph.Failing || !strings.HasPrefix(n.Status, "Init:") {
+		return nil
+	}
+	for _, ct := range containersOf(pod) {
+		if !ct.init || ct.sidecar(pod) || ct.status.State.Running == nil {
+			continue
+		}
+		since := ct.status.State.Running.StartedAt.Time
+		return []*Finding{{
+			Severity:   Failing,
+			Confidence: Certain,
+			Title:      fmt.Sprintf("%s is still running after %s", ct.name(), ago(c.Now.Sub(since))),
+			Detail: "The pod's other containers start only when every init container has finished. " +
+				"An init container that runs this long is usually waiting for something; its logs say what.",
+			Evidence: []Evidence{{Source: "container", Text: fmt.Sprintf("%s: running since %s", ct.spec.Name, since.UTC().Format(time.RFC3339)), Time: &since}},
+			Next: []Step{
+				{Label: "Logs", Object: n.ID, Tab: "logs", Query: "container=" + ct.spec.Name},
+				kubectl("logs", n, "-c", ct.spec.Name),
+			},
+		}}
+	}
+	return nil
+}}

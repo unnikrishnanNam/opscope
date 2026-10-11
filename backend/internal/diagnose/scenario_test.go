@@ -61,19 +61,33 @@ type root struct{ rule, object, title string }
 // scenarioRoots are the root causes of each broken object in
 // test/scenarios/, as captured in testdata/scenarios/.
 var scenarioRoots = map[string][]root{
-	"deployments/opscope-scenarios/missing-secret":       {{"missing", "secrets/opscope-scenarios/stripe-key", "doesn't exist"}},
-	"deployments/opscope-scenarios/missing-configmap":    {{"missing", "configmaps/opscope-scenarios/app-config", "doesn't exist"}},
-	"deployments/opscope-scenarios/missing-key":          {{"pod.config", "pods/opscope-scenarios/missing-key-", "has no key DATABASE_URL"}},
-	"deployments/opscope-scenarios/crash-loop":           {{"pod.crash", "pods/opscope-scenarios/crash-loop-", "exits with code 1"}},
-	"deployments/opscope-scenarios/oom":                  {{"pod.crash", "pods/opscope-scenarios/oom-", "runs out of memory"}},
-	"deployments/opscope-scenarios/liveness":             {{"pod.crash", "pods/opscope-scenarios/liveness-", "fails its liveness probe"}},
-	"deployments/opscope-scenarios/bad-image":            {{"pod.image", "pods/opscope-scenarios/bad-image-", "doesn't exist"}},
-	"deployments/opscope-scenarios/unreachable-registry": {{"pod.image", "pods/opscope-scenarios/unreachable-registry-", "registry.opscope.invalid can't be reached"}},
-	"deployments/opscope-scenarios/unschedulable":        {{"pod.unschedulable", "pods/opscope-scenarios/unschedulable-", "No node can run it"}},
-	"deployments/opscope-scenarios/missing-account":      {{"missing", "serviceaccounts/opscope-scenarios/ghost", "doesn't exist"}},
-	"deployments/opscope-scenarios/over-quota":           {{"create-failed", "replicasets/opscope-scenarios/over-quota-", "ResourceQuota memory"}},
-	"services/opscope-scenarios/wrong-selector":          {{"service.selector", "services/opscope-scenarios/wrong-selector", "matches no pods"}},
-	"services/opscope-scenarios/crash-loop":              {{"pod.crash", "pods/opscope-scenarios/crash-loop-", "exits with code 1"}},
+	"deployments/opscope-scenarios/missing-secret":          {{"missing", "secrets/opscope-scenarios/stripe-key", "doesn't exist"}},
+	"deployments/opscope-scenarios/missing-configmap":       {{"missing", "configmaps/opscope-scenarios/app-config", "doesn't exist"}},
+	"deployments/opscope-scenarios/missing-key":             {{"pod.config", "pods/opscope-scenarios/missing-key-", "has no key DATABASE_URL"}},
+	"deployments/opscope-scenarios/crash-loop":              {{"pod.crash", "pods/opscope-scenarios/crash-loop-", "exits with code 1"}},
+	"deployments/opscope-scenarios/oom":                     {{"pod.crash", "pods/opscope-scenarios/oom-", "runs out of memory"}},
+	"deployments/opscope-scenarios/liveness":                {{"pod.crash", "pods/opscope-scenarios/liveness-", "fails its liveness probe"}},
+	"deployments/opscope-scenarios/bad-image":               {{"pod.image", "pods/opscope-scenarios/bad-image-", "doesn't exist"}},
+	"deployments/opscope-scenarios/unreachable-registry":    {{"pod.image", "pods/opscope-scenarios/unreachable-registry-", "registry.opscope.invalid can't be reached"}},
+	"deployments/opscope-scenarios/unschedulable":           {{"pod.unschedulable", "pods/opscope-scenarios/unschedulable-", "No node can run it"}},
+	"deployments/opscope-scenarios/missing-account":         {{"missing", "serviceaccounts/opscope-scenarios/ghost", "doesn't exist"}},
+	"deployments/opscope-scenarios/over-quota":              {{"create-failed", "replicasets/opscope-scenarios/over-quota-", "ResourceQuota memory"}},
+	"services/opscope-scenarios/wrong-selector":             {{"service.selector", "services/opscope-scenarios/wrong-selector", "matches no pods"}},
+	"services/opscope-scenarios/crash-loop":                 {{"pod.crash", "pods/opscope-scenarios/crash-loop-", "exits with code 1"}},
+	"deployments/opscope-scenarios/readiness":               {{"pod.not-ready", "pods/opscope-scenarios/readiness-", "fails its readiness probe"}},
+	"deployments/opscope-scenarios/init-waits":              {{"pod.init", "pods/opscope-scenarios/init-waits-", "Init container wait-for-database is still running"}},
+	"deployments/opscope-scenarios/rollout":                 {{"pod.image", "pods/opscope-scenarios/rollout-", "doesn't exist"}},
+	"deployments/opscope-scenarios/claim":                   {{"missing", "storageclasses/no-such-class", "doesn't exist"}},
+	"deployments/opscope-scenarios/autoscaled":              {}, // healthy; its autoscaler is the problem
+	"horizontalpodautoscalers/opscope-scenarios/autoscaled": {{"hpa.scaling", "horizontalpodautoscalers/opscope-scenarios/autoscaled", "can't read the metrics"}},
+	"jobs/opscope-scenarios/job-failed":                     {{"pod.crash", "pods/opscope-scenarios/job-failed-", "Container migrate exited with code 3"}},
+	"cronjobs/opscope-scenarios/cronjob-failed":             {{"pod.crash", "pods/opscope-scenarios/cronjob-failed-", "Container report exited with code 1"}},
+	"pods/opscope-scenarios/evicted":                        {{"pod.evicted", "pods/opscope-scenarios/evicted", "evicted for using more disk"}},
+	"ingresses/opscope-scenarios/no-class": {
+		{"missing", "ingressclasses/no-such-class", "doesn't exist"},
+		{"missing", "secrets/opscope-scenarios/secure-tls", "doesn't exist"},
+		{"pod.not-ready", "pods/opscope-scenarios/readiness-", "fails its readiness probe"},
+	},
 	"ingresses/opscope-scenarios/shop": {
 		{"missing", "services/opscope-scenarios/api", "doesn't exist"},
 		{"pod.crash", "pods/opscope-scenarios/crash-loop-", "exits with code 1"},
@@ -88,7 +102,7 @@ func TestScenarios(t *testing.T) {
 			if !ok {
 				t.Fatal("not in the graph")
 			}
-			got := roots(trace.Steps)
+			got := faults(roots(trace.Steps))
 			if len(got) != len(want) {
 				t.Errorf("got %d root causes, want %d:\n%s", len(got), len(want), render(trace.Steps, "  "))
 				return
@@ -131,6 +145,17 @@ func TestScenarioImpact(t *testing.T) {
 	}
 }
 
+// faults leaves out notes (info), such as "it names no IngressClass".
+func faults(steps []*TraceStep) []*TraceStep {
+	var found []*TraceStep
+	for _, step := range steps {
+		if step.Severity != Info {
+			found = append(found, step)
+		}
+	}
+	return found
+}
+
 // roots collects a trace's root causes, sorted by rule then object.
 func roots(steps []*TraceStep) []*TraceStep {
 	var found []*TraceStep
@@ -159,13 +184,22 @@ func TestPrintScenarios(t *testing.T) {
 	}
 	d := Run(loadScenarios(t))
 	for _, n := range d.g.Nodes() {
-		if n.Namespace != "opscope-scenarios" || (n.Resource != "deployments" && n.Resource != "services" && n.Resource != "ingresses") {
-			continue
+		if n.Namespace != "opscope-scenarios" || n.Resource == "replicasets" || n.Resource == "configmaps" || n.Resource == "serviceaccounts" ||
+			(n.Resource == "pods" && topOwner(d.g, n.ID) != n.ID) {
+			continue // what workloads own shows up in their traces
 		}
 		trace, _ := d.Trace(n.ID)
 		fmt.Printf("== %s (%s %s)\n%s", n.ID, n.State, n.Status, render(trace.Steps, "  "))
 		for _, i := range trace.Impact {
 			fmt.Printf("  affects %s\n", i.ID)
 		}
+	}
+	fmt.Println("== problems")
+	for _, p := range d.Problems("opscope-scenarios") {
+		var affects []string
+		for _, n := range p.Affects {
+			affects = append(affects, n.ID)
+		}
+		fmt.Printf("  %s %v: %s (%s)\n    affects %v\n", p.Severity, p.Objects, p.Title, p.Rule, affects)
 	}
 }

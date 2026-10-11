@@ -284,3 +284,17 @@ func TestScalesEdge(t *testing.T) {
 	})
 	findEdge(t, g, "horizontalpodautoscalers/shop/web", "deployments/shop/web", Scales)
 }
+
+// A volume made by hand may name a class no StorageClass has ("manual"),
+// and so may a claim bound to it: that's not a missing object.
+func TestStorageClassNamesWithoutAClass(t *testing.T) {
+	g := build(&snapshot.Snapshot{
+		PersistentVolumes: []corev1.PersistentVolume{{ObjectMeta: meta("", "pv-1"), Spec: corev1.PersistentVolumeSpec{StorageClassName: "manual"}}},
+		PersistentVolumeClaims: []corev1.PersistentVolumeClaim{{ObjectMeta: meta("db", "data"),
+			Spec:   corev1.PersistentVolumeClaimSpec{StorageClassName: ptr("manual"), VolumeName: "pv-1"},
+			Status: corev1.PersistentVolumeClaimStatus{Phase: corev1.ClaimBound}}},
+	})
+	if _, ok := g.Node("storageclasses/manual"); ok {
+		t.Error("no missing StorageClass should be added")
+	}
+}

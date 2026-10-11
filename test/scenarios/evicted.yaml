@@ -1,0 +1,16 @@
+# The pod writes more to its disk than its ephemeral-storage limit, and the
+# kubelet evicts it. A pod of its own, so it's evicted once.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: evicted
+  namespace: opscope-scenarios
+spec:
+  restartPolicy: Never
+  containers:
+    - name: app
+      image: busybox:1.36
+      imagePullPolicy: IfNotPresent
+      command: ["sh", "-c", "dd if=/dev/zero of=/tmp/fill bs=1M count=20; sleep 3600"]
+      resources:
+        limits: {memory: 32Mi, ephemeral-storage: 2Mi}

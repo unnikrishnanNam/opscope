@@ -1,6 +1,7 @@
+import { useEffect, useRef } from "react";
 import { Link, useLocation, useOutletContext, useSearchParams } from "react-router";
 import { useApi } from "../api.js";
-import { focusSection } from "../focus.js";
+import { focusSection, focusSectionSoon } from "../focus.js";
 import { useCommands } from "../commands/registry.jsx";
 import { bytes, clock, cpu, percent } from "../format.js";
 import Button from "../components/Button.jsx";
@@ -10,10 +11,11 @@ import EventList from "../components/EventList.jsx";
 import { Skeleton } from "../components/Loading.jsx";
 import { PageHeader } from "../components/PageHeader.jsx";
 import PodStatusBar from "../components/PodStatusBar.jsx";
+import ProblemList, { PROBLEMS_ID, problemSummary } from "../components/ProblemList.jsx";
 import StatusBadge, { statusTone } from "../components/StatusBadge.jsx";
 import Tooltip from "../components/Tooltip.jsx";
 import { Sparkline, UsageBar } from "../components/Usage.jsx";
-import { CpuIcon, MemoryIcon, NodesIcon, PodsIcon, RefreshIcon, SuccessIcon, WarningIcon } from "../components/icons.jsx";
+import { CpuIcon, ErrorIcon, MemoryIcon, NodesIcon, PodsIcon, RefreshIcon, SuccessIcon, WarningIcon } from "../components/icons.jsx";
 import { allPages, detailPath, nsQuery } from "../sections.js";
 import "./Overview.css";
 
@@ -45,7 +47,8 @@ export default function Overview({ page }) {
   const { cluster, reachable, status } = useOutletContext();
   const [searchParams] = useSearchParams();
   const namespace = searchParams.get("ns") ?? "";
-  const search = nsQuery(useLocation().search);
+  const location = useLocation();
+  const search = nsQuery(location.search);
 
   const query = namespace ? `?namespace=${encodeURIComponent(namespace)}` : "";
   const base = reachable ? `/clusters/${cluster.id}` : null;
@@ -55,6 +58,18 @@ export default function Overview({ page }) {
   const usage = useApi(base && `${base}/metrics/nodes`, { refreshMs: METRICS_REFRESH_MS });
   const warningsQuery = namespace ? `&namespace=${encodeURIComponent(namespace)}` : "";
   const warnings = useApi(base && `${base}/events?type=Warning${warningsQuery}`, { refreshMs: REFRESH_MS });
+  // The root causes of what's wrong, which go at the top of the warnings card.
+  const problems = useApi(base && `${base}/problems${query}`, { refreshMs: REFRESH_MS });
+  const hasProblems = problems.data?.problems.length > 0;
+
+  // The palette's "Problems" links here with #problems: go to them once they're in.
+  const focused = useRef(false);
+  useEffect(() => {
+    if (location.hash === "#problems" && problems.data && !focused.current) {
+      focused.current = true;
+      focusSectionSoon(hasProblems ? PROBLEMS_ID : WARNINGS_ID);
+    }
+  }, [location.hash, problems.data, hasProblems]);
 
   const o = overview.data;
   const error = overview.error ?? nodes.error ?? warnings.error;
@@ -70,7 +85,7 @@ export default function Overview({ page }) {
             title: "Refresh the overview",
             group: "This page",
             icon: RefreshIcon,
-            run: () => [overview, nodes, usage, warnings].forEach((part) => part.reload()),
+            run: () => [overview, nodes, usage, warnings, problems].forEach((part) => part.reload()),
           },
           {
             id: "overview.warnings",
@@ -80,9 +95,22 @@ export default function Overview({ page }) {
             keywords: ["events"],
             run: () => focusSection(WARNINGS_ID),
           },
+          ...(hasProblems
+            ? [
+                {
+                  id: "overview.problems",
+                  title: "Go to problems",
+                  detail: problemSummary(problems.data.problems),
+                  group: "This page",
+                  icon: ErrorIcon,
+                  keywords: ["why", "failing", "root cause"],
+                  run: () => focusSection(PROBLEMS_ID),
+                },
+              ]
+            : []),
         ]
       : [],
-    [base],
+    [base, hasProblems, problems.data],
   );
 
   return (
@@ -162,13 +190,18 @@ export default function Overview({ page }) {
       {warnings.data && (
         <Card
           id={WARNINGS_ID}
-          title="Recent warnings"
-          aside={
-            warnings.data.length > WARNINGS_SHOWN
-              ? `newest ${WARNINGS_SHOWN} of ${warnings.data.length}`
-              : warnings.data.length > 0 && `${warnings.data.length}`
-          }
+          title={hasProblems ? "Problems and recent warnings" : "Recent warnings"}
+          aside={hasProblems ? problemSummary(problems.data.problems) : warningsAside(warnings.data)}
         >
+          {hasProblems && (
+            <>
+              <ProblemList clusterId={cluster.id} search={search} namespace={namespace} data={problems.data} />
+              <h3 className="problems-warnings-title">
+                Recent warnings{" "}
+                {warnings.data.length > 0 && <span className="card-aside">{warningsAside(warnings.data)}</span>}
+              </h3>
+            </>
+          )}
           <EventList
             clusterId={cluster.id}
             events={warnings.data.slice(0, WARNINGS_SHOWN)}
@@ -179,6 +212,11 @@ export default function Overview({ page }) {
       )}
     </section>
   );
+}
+
+function warningsAside(warnings) {
+  if (warnings.length > WARNINGS_SHOWN) return `newest ${WARNINGS_SHOWN} of ${warnings.length}`;
+  return warnings.length > 0 ? `${warnings.length}` : undefined;
 }
 
 // Everything that needs a look, as short phrases: ["3 Pods unhealthy", "2 Deployments not ready"].

@@ -173,3 +173,37 @@ func TestDiagnosisListsAreNeverNull(t *testing.T) {
 		t.Errorf("found null in %s", body)
 	}
 }
+
+func TestProblems(t *testing.T) {
+	server := newTopologyServer(t, shopSnapshot)
+
+	rec := get(server, "/api/clusters/lab/problems?namespace=shop")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Problems []struct {
+			Rule    string
+			Objects []string
+			Affects []struct{ ID string }
+		}
+		Nodes map[string]struct{ Kind string }
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if len(body.Problems) != 1 || body.Problems[0].Rule != "missing" || body.Problems[0].Objects[0] != "configmaps/shop/settings" {
+		t.Fatalf("problems = %+v", body.Problems)
+	}
+	if len(body.Problems[0].Affects) != 1 || body.Problems[0].Affects[0].ID != "pods/shop/web" {
+		t.Errorf("affects = %+v", body.Problems[0].Affects)
+	}
+	if body.Nodes["configmaps/shop/settings"].Kind != "ConfigMap" {
+		t.Errorf("nodes = %+v", body.Nodes)
+	}
+
+	// Another namespace has none: an empty list, not null.
+	if got := get(server, "/api/clusters/lab/problems?namespace=other").Body.String(); !strings.Contains(got, `"problems":[]`) {
+		t.Errorf("got %s", got)
+	}
+}

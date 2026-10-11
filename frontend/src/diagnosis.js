@@ -21,3 +21,12 @@ export function objectParts(id) {
   const parts = id.split("/");
   return parts.length === 2 ? { resource: parts[0], namespace: "", name: parts[1] } : { resource: parts[0], namespace: parts[1], name: parts[2] };
 }
+
+// problemSummary is the overview card's aside: "3 problems, affecting 17
+// objects". The objects are those the problems are about and those they
+// affect, each counted once.
+export function problemSummary(problems) {
+  const ids = new Set(problems.flatMap((p) => [...p.objects, ...p.affects.map((n) => n.id)]));
+  const what = problems.length === 1 ? "1 problem" : `${problems.length} problems`;
+  return `${what}, affecting ${ids.size === 1 ? "1 object" : `${ids.size} objects`}`;
+}

@@ -327,8 +327,34 @@ for cluster-wide kinds (`nodes`, `gatewayclasses`). An object Opscope doesn't kn
 | `severity` | `failing`, `degraded`, or `info` for something worth knowing that isn't a fault              |
 | `confidence` | `certain` (from structured status), `likely` (read from event or message text), `possible` |
 | `next`     | Links to an Opscope page (`object`, `tab`, `query`) or a read-only kubectl `command`. Only `get`, `describe` and `logs` are ever suggested |
+| `related`  | Only on `unexplained` findings, which no rule could explain: unhealthy neighbours that may be involved, a guess |
 | `impact`   | Objects whose problems lead to this one; pods are left out when their workload is listed     |
 | `nodes`    | Every object the steps name, as in `/topology`, to show and link them                        |
+
+### `GET /api/clusters/{id}/problems`
+
+The root causes of what's wrong, in one namespace (`namespace`) or the whole cluster, for the
+overview. Each is a finding, as in the diagnosis, that nothing else explains, with what it affects.
+Alike root causes are one problem: two pods crashing the same way are one, with both in `objects`.
+
+```json
+{
+  "problems": [
+    {
+      "rule": "missing", "severity": "failing", "confidence": "certain",
+      "title": "Secret shop/stripe doesn't exist",
+      "objects": ["secrets/shop/stripe"],
+      "affects": [{ "id": "deployments/shop/api", "kind": "Deployment", "state": "failing", "status": "0/1" }]
+    }
+  ],
+  "nodes": { "secrets/shop/stripe": { "id": "secrets/shop/stripe", "kind": "Secret", "state": "missing" } },
+  "snapshot": { "taken": "2026-10-11T10:00:00Z", "skipped": [] }
+}
+```
+
+(Each problem also has every field of a diagnosis step's finding.) The worst come first, then those
+that affect the most. A problem belongs to a namespace when it, or anything it affects, is in it: a
+node that's down is a problem in every namespace with pods on it. Notes (`info`) aren't problems.
 
 ## Usage
 

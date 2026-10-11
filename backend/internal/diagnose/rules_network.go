@@ -131,10 +131,14 @@ var serviceEndpoints = Rule{ID: "service.endpoints", Resources: []string{"servic
 		Blames:     blames,
 		Next:       []Step{kubectl("describe", n)},
 	}
-	if n.State == graph.Failing {
-		f.Title = fmt.Sprintf("None of the %s it selects are ready", plural(selected, "pod", "pods"))
+	switch {
+	case n.State == graph.Failing && selected == 1:
+		f.Title = "The only pod it selects isn't ready"
 		f.Detail = "It has nowhere to send traffic, so connections to it fail."
-	} else {
+	case n.State == graph.Failing:
+		f.Title = fmt.Sprintf("None of the %d pods it selects are ready", selected)
+		f.Detail = "It has nowhere to send traffic, so connections to it fail."
+	default:
 		f.Title = fmt.Sprintf("%d of the %s it selects aren't ready", len(blames), plural(selected, "pod", "pods"))
 		f.Detail = "It sends traffic only to the ready ones."
 	}
@@ -197,3 +201,152 @@ func backendProblem(n *graph.Node) string {
 	}
 	return "which has no ready pods"
 }
+
+// ---- route.accepted: a Gateway doesn't take an HTTPRoute ----
+
+// rejections explains why a Gateway refuses a route, by the reason it gives.
+var rejections = map[string]string{
+	"NotAllowedByListeners":      "none of its listeners allow routes from this namespace, or of this kind",
+	"NoMatchingListenerHostname": "the route's hostnames match none of its listeners",
+	"NoMatchingParent":           "the listener the route names (sectionName) doesn't exist",
+	"UnsupportedValue":           "the route uses something its controller doesn't support",
+}
+
+var routeAccepted = Rule{ID: "route.accepted", Resources: []string{"httproutes"}, Check: func(c *Context, n *graph.Node) []*Finding {
+	route, _ := c.Object(n).(*kube.HTTPRoute)
+	if route == nil {
+		return nil
+	}
+	var findings []*Finding
+	for _, e := range c.G.Out(n.ID) {
+		if gw := c.Node(e.To); e.Type == graph.Attaches && gw.State == graph.Missing {
+			findings = append(findings, &Finding{Severity: Failing, Confidence: Certain,
+				Title:  fmt.Sprintf("Its Gateway %s doesn't exist", qualified(gw)),
+				Detail: "Nothing serves the route until it attaches to a Gateway.",
+				Blames: []string{gw.ID}})
+		}
+	}
+	for _, parent := range route.Status.Parents {
+		for _, cond := range parent.Conditions {
+			if cond.Type != "Accepted" || cond.Status != "False" {
+				continue
+			}
+			gw := c.Node(key("gateways", refNamespace(parent.ParentRef, route.Namespace), parent.ParentRef.Name))
+			f := &Finding{
+				Severity:   Failing,
+				Confidence: Certain,
+				Title:      fmt.Sprintf("Gateway %s doesn't accept it", parent.ParentRef.Name),
+				Detail:     cond.Message,
+				Evidence:   []Evidence{conditionEvidence("Accepted", "False", cond.Reason, cond.Message, cond.LastTransitionTime)},
+			}
+			if why, ok := rejections[cond.Reason]; ok {
+				f.Detail = "The Gateway says " + why + "."
+			}
+			if gw != nil {
+				f.Blames = []string{gw.ID}
+			}
+			findings = append(findings, f)
+		}
+	}
+	return findings
+}}
+
+func refNamespace(ref kube.ObjectRef, own string) string {
+	if ref.Namespace != nil && *ref.Namespace != "" {
+		return *ref.Namespace
+	}
+	return own
+}
+
+// ---- gateway.programmed: a Gateway isn't serving ----
+
+var gatewayProgrammed = Rule{ID: "gateway.programmed", Resources: []string{"gateways"}, Check: func(c *Context, n *graph.Node) []*Finding {
+	gw, _ := c.Object(n).(*kube.Gateway)
+	if gw == nil || n.Status == "Programmed" {
+		return nil
+	}
+	status, message := gw.Summary()
+	var evidence []Evidence
+	for _, cond := range gw.Status.Conditions {
+		if cond.Status != "True" {
+			evidence = append(evidence, conditionEvidence(cond.Type, string(cond.Status), cond.Reason, cond.Message, cond.LastTransitionTime))
+		}
+	}
+	for _, e := range c.G.Out(n.ID) {
+		class := c.Node(e.To)
+		if e.Type != graph.Attaches || class.State == graph.OK {
+			continue
+		}
+		f := &Finding{Severity: Failing, Confidence: Certain, Evidence: evidence, Blames: []string{class.ID},
+			Title:  fmt.Sprintf("Its GatewayClass %s isn't accepted", class.Name),
+			Detail: "A Gateway is run by the controller of its class; until a controller accepts the class, nothing runs it."}
+		if class.State == graph.Missing {
+			f.Title = fmt.Sprintf("Its GatewayClass %s doesn't exist", class.Name)
+		}
+		if class.State == graph.Progressing {
+			f.Severity = Degraded
+		}
+		return []*Finding{f}
+	}
+	switch status {
+	case "NotAccepted":
+		return []*Finding{{Severity: Failing, Confidence: Certain, Evidence: evidence,
+			Title: "Its controller doesn't accept it", Detail: message}}
+	case "NotProgrammed":
+		return []*Finding{{Severity: Failing, Confidence: Certain, Evidence: evidence,
+			Title: "It isn't serving: its controller couldn't set it up", Detail: message}}
+	}
+	return nil // Pending: no controller has reported yet
+}}
+
+// ---- gatewayclass.accepted: no controller runs a GatewayClass ----
+
+var gatewayClassAccepted = Rule{ID: "gatewayclass.accepted", Resources: []string{"gatewayclasses"}, Check: func(c *Context, n *graph.Node) []*Finding {
+	class, _ := c.Object(n).(*kube.GatewayClass)
+	if class == nil || n.State != graph.Failing {
+		return nil
+	}
+	status, message := class.Summary()
+	if status == "NotAccepted" {
+		return []*Finding{{Severity: Failing, Confidence: Certain, Title: "Its controller doesn't accept it", Detail: message}}
+	}
+	return []*Finding{{
+		Severity:   Failing,
+		Confidence: Likely,
+		Title:      "No controller has accepted it",
+		Detail:     fmt.Sprintf("Its controller is %s. Is it installed and running?", class.Spec.ControllerName),
+		Evidence:   []Evidence{{Source: "status", Text: "No Accepted condition, " + ago(c.Now.Sub(class.CreationTimestamp.Time)) + " after it was created"}},
+	}}
+}}
+
+// ---- ingress.class: an Ingress's class or TLS Secret is missing ----
+
+var ingressClass = Rule{ID: "ingress.class", Resources: []string{"ingresses"}, Check: func(c *Context, n *graph.Node) []*Finding {
+	var findings []*Finding
+	hasClass := false
+	for _, e := range c.G.Out(n.ID) {
+		target := c.Node(e.To)
+		if target.Resource == "ingressclasses" {
+			hasClass = true
+		}
+		if e.Type != graph.Uses || target.State != graph.Missing {
+			continue
+		}
+		switch target.Resource {
+		case "ingressclasses":
+			findings = append(findings, &Finding{Severity: Failing, Confidence: Certain, Blames: []string{target.ID},
+				Title:  fmt.Sprintf("Its IngressClass %s doesn't exist", target.Name),
+				Detail: "No controller serves it, so its rules aren't in effect."})
+		case "secrets":
+			findings = append(findings, &Finding{Severity: Failing, Confidence: Certain, Blames: []string{target.ID},
+				Title:  fmt.Sprintf("Its TLS Secret %s doesn't exist", target.Name),
+				Detail: "Without its certificate, requests over HTTPS fail or get the controller's default certificate."})
+		}
+	}
+	if !hasClass {
+		findings = append(findings, &Finding{Severity: Info, Confidence: Likely,
+			Title:  "It names no IngressClass, and the cluster has no default",
+			Detail: "Some controllers serve Ingresses without a class; others ignore them."})
+	}
+	return findings
+}}

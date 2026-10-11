@@ -213,18 +213,23 @@ func (b *builder) storageEdges() {
 			b.ref(id, snapshot.Key{Resource: "persistentvolumes", Name: pvc.Spec.VolumeName}, Uses, "volumeName", false)
 		}
 		// No class named means the default class; an empty name means none.
+		// Once bound, the class has done its job: a claim and a volume made
+		// by hand can share a class name that no StorageClass has.
 		class := defaultClass
 		if pvc.Spec.StorageClassName != nil {
 			class = *pvc.Spec.StorageClassName
 		}
 		if class != "" {
-			b.ref(id, snapshot.Key{Resource: "storageclasses", Name: class}, Uses, "storageClassName", false)
+			bound := pvc.Status.Phase == corev1.ClaimBound
+			b.ref(id, snapshot.Key{Resource: "storageclasses", Name: class}, Uses, "storageClassName", bound)
 		}
 	}
 	for i := range b.s.PersistentVolumes {
 		pv := &b.s.PersistentVolumes[i]
 		if pv.Spec.StorageClassName != "" {
-			b.ref(key("persistentvolumes", pv), snapshot.Key{Resource: "storageclasses", Name: pv.Spec.StorageClassName}, Uses, "storageClassName", false)
+			// A volume made by hand often names a class only to match claims
+			// ("manual"); it needn't exist.
+			b.ref(key("persistentvolumes", pv), snapshot.Key{Resource: "storageclasses", Name: pv.Spec.StorageClassName}, Uses, "storageClassName", true)
 		}
 	}
 }

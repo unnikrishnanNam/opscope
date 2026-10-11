@@ -104,6 +104,17 @@ function TraceStep({ step, ctx }) {
             ))}
           </p>
         )}
+        {step.related.length > 0 && (
+          <p className="trace-see">
+            Possibly related:{" "}
+            {step.related.map((id, i) => (
+              <span key={id}>
+                {i > 0 && ", "}
+                <ObjectLink id={id} ctx={ctx} showStatus />
+              </span>
+            ))}
+          </p>
+        )}
         <Evidence items={step.evidence} open={step.root} />
         <NextSteps steps={step.next} ctx={ctx} />
       </div>
@@ -141,12 +152,16 @@ function Objects({ ids, ctx }) {
 
 // ObjectLink: "Pod web-1", linked to its page when Opscope has one and it
 // exists. The page's own object is "This Deployment".
-function ObjectLink({ id, ctx, showStatus = false }) {
+//   ctx  { clusterId, search, nodes (by ID, from the API), self (the page's
+//         object, if any), namespace (the one being looked at, if any) }
+// The namespace is written only when it isn't the one being looked at.
+export function ObjectLink({ id, ctx, showStatus = false }) {
   const n = ctx.nodes[id];
   if (!n) return <span className="trace-object">{id}</span>;
   if (id === ctx.self) return <span className="trace-object">This {n.kind}</span>;
 
-  const name = n.namespace && n.namespace !== ctx.nodes[ctx.self]?.namespace ? `${n.namespace}/${n.name}` : n.name;
+  const here = ctx.namespace ?? ctx.nodes[ctx.self]?.namespace;
+  const name = n.namespace && n.namespace !== here ? `${n.namespace}/${n.name}` : n.name;
   const exists = n.state !== "missing" && n.state !== "unknown";
   const link = exists && detailPath(ctx.clusterId, n.resource, n.namespace, n.name);
   const label = `${n.kind} ${name}`;
@@ -248,7 +263,7 @@ function detailPathFor(ctx, id) {
   return detailPath(ctx.clusterId, resource, namespace, name);
 }
 
-function pluralKind(kind) {
+export function pluralKind(kind) {
   return kind.endsWith("s") ? `${kind}es` : `${kind}s`;
 }
 

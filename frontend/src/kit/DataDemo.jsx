@@ -7,6 +7,7 @@ import { Callout, EmptyState } from "../components/Callout.jsx";
 import CodeBlock from "../components/CodeBlock.jsx";
 import DataTable from "../components/DataTable.jsx";
 import Diagnosis from "../components/Diagnosis.jsx";
+import ProblemList, { problemSummary } from "../components/ProblemList.jsx";
 import EventList from "../components/EventList.jsx";
 import { Fact, FactGrid, KeyValueList } from "../components/Facts.jsx";
 import LogView from "../components/LogView.jsx";
@@ -323,9 +324,18 @@ function Diagnoses() {
     <div className="kit-stack">
       <Diagnosis clusterId="lab" trace={sample.diagnoses.failing} />
       <Diagnosis clusterId="lab" trace={sample.diagnoses.degraded} />
+      <Diagnosis clusterId="lab" trace={sample.diagnoses.unexplained} />
       <Diagnosis clusterId="lab" trace={sample.diagnoses.clear} />
       <Diagnosis clusterId="lab" trace={sample.diagnoses.partOfAProblem} />
     </div>
+  );
+}
+
+function Problems() {
+  return (
+    <Card title="Problems and recent warnings" aside={problemSummary(sample.problems.problems)}>
+      <ProblemList clusterId="lab" search="" data={sample.problems} />
+    </Card>
   );
 }
 
@@ -345,6 +355,13 @@ export const dataSections = [
     about:
       "Why an object is failing: each step down to the root cause, with its evidence and what to look at next. The edge takes the colour of the worst problem; evidence opens by itself only on root causes. With nothing wrong, it's one quiet line.",
     render: () => <Diagnoses />,
+  },
+  {
+    id: "problems-demo",
+    title: "Problems",
+    about:
+      "The root causes of what's wrong, at the top of the overview's warnings card: worst and widest first, each with what it affects. The title links to the page whose diagnosis explains it.",
+    render: () => <Problems />,
   },
   {
     id: "cards",

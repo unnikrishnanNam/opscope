@@ -74,7 +74,8 @@ type Finding struct {
 	Title      string     `json:"title"`
 	Detail     string     `json:"detail,omitempty"`
 	Evidence   []Evidence `json:"evidence"`
-	Blames     []string   `json:"blames"` // graph nodes that cause it
+	Blames     []string   `json:"blames"`  // graph nodes that cause it
+	Related    []string   `json:"related"` // unhealthy neighbours that may be involved, when no rule knows the cause
 	Next       []Step     `json:"next"`
 }
 
@@ -111,28 +112,41 @@ func Run(s *snapshot.Snapshot) *Diagnosis {
 				}
 			}
 		}
-		for _, f := range found {
-			f.Object = n.ID
-			sort.Strings(f.Blames)
-			f.ID = f.Rule + "|" + f.Object + "|" + strings.Join(f.Blames, ",")
-			// Lists are always lists in the JSON, never null.
-			if f.Blames == nil {
-				f.Blames = []string{}
-			}
-			if f.Evidence == nil {
-				f.Evidence = []Evidence{}
-			}
-			if f.Next == nil {
-				f.Next = []Step{}
-			}
-			d.byObject[n.ID] = append(d.byObject[n.ID], f)
-			for _, blamed := range f.Blames {
-				d.blamedBy[blamed] = append(d.blamedBy[blamed], f)
-			}
+		d.add(n, found)
+	}
+	// What no rule explains still gets a finding, marked as a guess.
+	for _, n := range g.Nodes() {
+		if (n.State == graph.Failing || n.State == graph.Degraded) && len(d.byObject[n.ID]) == 0 {
+			d.add(n, []*Finding{unexplained(c, n)})
 		}
-		sortFindings(d.byObject[n.ID])
 	}
 	return d
+}
+
+// add files findings under their object, completing what every finding has.
+func (d *Diagnosis) add(n *graph.Node, found []*Finding) {
+	for _, f := range found {
+		f.Object = n.ID
+		sort.Strings(f.Blames)
+		f.ID = f.Rule + "|" + f.Object + "|" + strings.Join(f.Blames, ",")
+		// Lists are always lists in the JSON, never null.
+		for _, list := range []*[]string{&f.Blames, &f.Related} {
+			if *list == nil {
+				*list = []string{}
+			}
+		}
+		if f.Evidence == nil {
+			f.Evidence = []Evidence{}
+		}
+		if f.Next == nil {
+			f.Next = []Step{}
+		}
+		d.byObject[n.ID] = append(d.byObject[n.ID], f)
+		for _, blamed := range f.Blames {
+			d.blamedBy[blamed] = append(d.blamedBy[blamed], f)
+		}
+	}
+	sortFindings(d.byObject[n.ID])
 }
 
 // Findings returns the findings about one object.
@@ -182,7 +196,7 @@ func (d *Diagnosis) Trace(id string) (*Trace, bool) {
 // collectNodes adds every object the steps are about or blame.
 func (d *Diagnosis) collectNodes(steps []*TraceStep, nodes map[string]*graph.Node) {
 	for _, step := range steps {
-		for _, id := range append(append([]string{}, step.Objects...), step.Blames...) {
+		for _, id := range append(append(append([]string{}, step.Objects...), step.Blames...), step.Related...) {
 			if n, ok := d.g.Node(id); ok {
 				nodes[id] = n
 			}

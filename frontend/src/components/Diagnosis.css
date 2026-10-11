@@ -173,12 +173,13 @@
   white-space: nowrap;
 }
 
-.trace-degraded .trace-root {
+/* Only the step's own tag: not those of the causes nested inside it. */
+.trace-degraded > .trace-main .trace-root {
   background: var(--warn-soft);
   color: var(--warn);
 }
 
-.trace-info .trace-root {
+.trace-info > .trace-main .trace-root {
   background: var(--surface-2);
   color: var(--text-muted);
 }

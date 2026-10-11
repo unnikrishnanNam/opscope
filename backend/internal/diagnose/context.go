@@ -151,6 +151,22 @@ func describe(n *graph.Node, from string) string {
 	return n.Kind + " " + n.Name
 }
 
+// ago writes a duration the way people say it: "45s", "12m", "3h20m", "4d".
+func ago(d time.Duration) string {
+	switch {
+	case d < time.Minute:
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	case d < time.Hour:
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	case d < 48*time.Hour:
+		if m := int(d.Minutes()) % 60; m != 0 {
+			return fmt.Sprintf("%dh%dm", int(d.Hours()), m)
+		}
+		return fmt.Sprintf("%dh", int(d.Hours()))
+	}
+	return fmt.Sprintf("%dd", int(d.Hours()/24))
+}
+
 func plural(n int, one, many string) string {
 	if n == 1 {
 		return fmt.Sprintf("%d %s", n, one)

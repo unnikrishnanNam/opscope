@@ -3,57 +3,34 @@ package diagnose
 import (
 	"fmt"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
-	"time"
 
 	"opscope/internal/graph"
 	"opscope/internal/snapshot"
 
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 )
-
-// ---- node.not-ready: a node isn't Ready ----
-
-var nodeNotReady = Rule{ID: "node.not-ready", Resources: []string{"nodes"}, Check: func(c *Context, n *graph.Node) []*Finding {
-	node, _ := c.Object(n).(*corev1.Node)
-	if node == nil || n.State != graph.Failing {
-		return nil
-	}
-	f := &Finding{
-		Severity:   Failing,
-		Confidence: Certain,
-		Title:      fmt.Sprintf("Node %s isn't Ready", n.Name),
-		Detail:     "Its kubelet has never reported that the node is ready.",
-		Next:       []Step{kubectl("describe", n)},
-	}
-	for _, cond := range node.Status.Conditions {
-		if cond.Type != corev1.NodeReady {
-			continue
-		}
-		f.Evidence = append(f.Evidence, conditionEvidence("Ready", string(cond.Status), cond.Reason, cond.Message, cond.LastTransitionTime))
-		since := c.Now.Sub(cond.LastHeartbeatTime.Time).Round(time.Minute)
-		switch cond.Status {
-		case corev1.ConditionUnknown:
-			f.Title = fmt.Sprintf("Node %s stopped reporting", n.Name)
-			f.Detail = fmt.Sprintf("Its kubelet last reported %s ago. The machine may be off, out of the network, or its kubelet stopped.", since)
-		default:
-			f.Detail = fmt.Sprintf("Its kubelet says it isn't ready: %s", orElse(cond.Message, cond.Reason))
-		}
-	}
-	return []*Finding{f}
-}}
 
 // ---- workload.unavailable: fewer replicas ready than wanted ----
 
-var workloadUnavailable = Rule{ID: "workload.unavailable", Resources: []string{"deployments", "statefulsets", "daemonsets"}, Check: func(c *Context, n *graph.Node) []*Finding {
+var workloadUnavailable = Rule{ID: "workload.unavailable", Resources: []string{"deployments", "statefulsets", "daemonsets", "replicasets"}, Check: func(c *Context, n *graph.Node) []*Finding {
 	if n.State == graph.OK {
 		return nil
 	}
 	var ready, desired int32
 	var evidence []Evidence
+	ordered := ""
 	switch w := c.Object(n).(type) {
 	case *appsv1.Deployment:
+		if rolloutOf(c, n, w) != nil {
+			return nil // deployment.rollout says what's going on
+		}
 		ready, desired = w.Status.ReadyReplicas, replicaCount(w.Spec.Replicas)
 		for _, cond := range w.Status.Conditions {
 			if cond.Status != corev1.ConditionTrue || cond.Reason == "ProgressDeadlineExceeded" {
@@ -62,8 +39,14 @@ var workloadUnavailable = Rule{ID: "workload.unavailable", Resources: []string{"
 		}
 	case *appsv1.StatefulSet:
 		ready, desired = w.Status.ReadyReplicas, replicaCount(w.Spec.Replicas)
+		ordered = waitingInOrder(c, n, w)
 	case *appsv1.DaemonSet:
 		ready, desired = w.Status.NumberReady, w.Status.DesiredNumberScheduled
+	case *appsv1.ReplicaSet:
+		if !hasPods(c, n.ID) {
+			return nil // it can't create them: create-failed says why
+		}
+		ready, desired = w.Status.ReadyReplicas, replicaCount(w.Spec.Replicas)
 	default:
 		return nil
 	}
@@ -96,6 +79,8 @@ var workloadUnavailable = Rule{ID: "workload.unavailable", Resources: []string{"
 		f.Title = fmt.Sprintf("%d of its %d replicas aren't ready", desired-ready, desired)
 	}
 	switch {
+	case ordered != "":
+		f.Detail = ordered
 	case f.Severity == Info:
 		f.Detail = "It's still getting there: pods are starting or being replaced."
 	case len(f.Blames) == 0:
@@ -103,6 +88,28 @@ var workloadUnavailable = Rule{ID: "workload.unavailable", Resources: []string{"
 	}
 	return []*Finding{f}
 }}
+
+// waitingInOrder explains why a StatefulSet has fewer pods than it wants,
+// when it starts them one at a time: the last one it started isn't ready,
+// so it doesn't start the next.
+func waitingInOrder(c *Context, n *graph.Node, ss *appsv1.StatefulSet) string {
+	desired := replicaCount(ss.Spec.Replicas)
+	if ss.Spec.PodManagementPolicy == appsv1.ParallelPodManagement || ss.Status.Replicas >= desired {
+		return ""
+	}
+	last, lastOrdinal := (*graph.Node)(nil), -1
+	for _, owned := range ownedTree(c, n.ID) {
+		i := strings.LastIndex(owned.Name, "-")
+		if ordinal, err := strconv.Atoi(owned.Name[i+1:]); err == nil && owned.Resource == "pods" && ordinal > lastOrdinal {
+			last, lastOrdinal = owned, ordinal
+		}
+	}
+	if last == nil || last.State == graph.OK {
+		return ""
+	}
+	return fmt.Sprintf("It starts its pods one at a time, in order, and waits for each to be ready: %s-%d won't be created until %s is.",
+		ss.Name, lastOrdinal+1, last.Name)
+}
 
 // graph2severity is the severity of a finding about an object in a state.
 func graph2severity(s graph.State) Severity {
@@ -230,4 +237,305 @@ func quotaDetail(requested, used, limited string) string {
 	}
 	return fmt.Sprintf("Each pod asks for %s of %s, and the namespace has used %s of the %s its quota allows. Free some up, raise the quota, or ask for less.",
 		asked, name, usedAmount, limit)
+}
+
+// ---- deployment.rollout: a new revision is rolling out, or stuck ----
+
+const revisionAnnotation = "deployment.kubernetes.io/revision"
+
+// rollout is a Deployment changing from one revision to the next.
+type rollout struct {
+	next, previous *appsv1.ReplicaSet // previous is nil when there's none left
+	nextNode       *graph.Node
+	oldServing     int32 // ready pods of every older revision
+}
+
+// rolloutOf returns the rollout a Deployment is in, or nil when it isn't
+// in one: every replica runs the latest revision and no older pods remain.
+// A Deployment that only scales up, or has only ever had one revision,
+// isn't rolling out.
+func rolloutOf(c *Context, n *graph.Node, d *appsv1.Deployment) *rollout {
+	var sets []*appsv1.ReplicaSet
+	for _, e := range c.G.Out(n.ID) {
+		if rs, ok := c.Object(c.Node(e.To)).(*appsv1.ReplicaSet); ok && e.Type == graph.Owns {
+			sets = append(sets, rs)
+		}
+	}
+	if len(sets) < 2 {
+		return nil // only one revision: nothing to roll out from
+	}
+	sort.Slice(sets, func(i, j int) bool { return revision(sets[i]) > revision(sets[j]) })
+
+	r := &rollout{next: sets[0], nextNode: c.Node(key("replicasets", sets[0].Namespace, sets[0].Name))}
+	olderPods := false
+	for _, rs := range sets[1:] {
+		if r.previous == nil {
+			r.previous = rs
+		}
+		if rs.Status.Replicas > 0 {
+			olderPods = true
+			r.oldServing += rs.Status.ReadyReplicas
+		}
+	}
+	if !olderPods && d.Status.UpdatedReplicas >= replicaCount(d.Spec.Replicas) {
+		return nil
+	}
+	return r
+}
+
+func revision(rs *appsv1.ReplicaSet) int {
+	n, _ := strconv.Atoi(rs.Annotations[revisionAnnotation])
+	return n
+}
+
+func key(resource, namespace, name string) string {
+	return snapshot.Key{Resource: resource, Namespace: namespace, Name: name}.String()
+}
+
+var deploymentRollout = Rule{ID: "deployment.rollout", Resources: []string{"deployments"}, Check: func(c *Context, n *graph.Node) []*Finding {
+	d, _ := c.Object(n).(*appsv1.Deployment)
+	if d == nil {
+		return nil
+	}
+	r := rolloutOf(c, n, d)
+	if r == nil {
+		return nil
+	}
+	rev := r.next.Annotations[revisionAnnotation]
+	desired := replicaCount(d.Spec.Replicas)
+
+	f := &Finding{Severity: Info, Confidence: Certain, Next: []Step{eventsOf(n)}}
+	var stuck *appsv1.DeploymentCondition
+	for i, cond := range d.Status.Conditions {
+		if cond.Type == appsv1.DeploymentProgressing {
+			f.Evidence = append(f.Evidence, conditionEvidence(string(cond.Type), string(cond.Status), cond.Reason, cond.Message, cond.LastTransitionTime))
+			if cond.Reason == "ProgressDeadlineExceeded" {
+				stuck = &d.Status.Conditions[i]
+			}
+		}
+	}
+	// What's holding it up: the new revision's pods that aren't OK, or its
+	// ReplicaSet when it can't create pods at all.
+	if r.nextNode != nil {
+		for _, owned := range ownedTree(c, r.nextNode.ID) {
+			if owned.State != graph.OK {
+				f.Blames = append(f.Blames, owned.ID)
+			}
+		}
+		if r.nextNode.State == graph.Failing && !hasPods(c, r.nextNode.ID) {
+			f.Blames = append(f.Blames, r.nextNode.ID)
+		}
+	}
+
+	switch {
+	case stuck != nil:
+		f.Title = fmt.Sprintf("Its rollout to revision %s is stuck", rev)
+	case len(f.Blames) > 0:
+		f.Title = fmt.Sprintf("Revision %s's pods aren't coming up", rev)
+	default:
+		f.Title = fmt.Sprintf("It's rolling out revision %s", rev)
+	}
+	if stuck != nil || len(f.Blames) > 0 {
+		f.Severity = Degraded
+		if r.oldServing == 0 {
+			f.Severity = Failing
+		}
+	}
+
+	if ready := r.next.Status.ReadyReplicas; ready == 0 {
+		f.Detail = fmt.Sprintf("No replica runs revision %s yet", rev)
+	} else {
+		f.Detail = fmt.Sprintf("%d of %d replicas run revision %s", ready, desired, rev)
+	}
+	if r.oldServing > 0 {
+		f.Detail += fmt.Sprintf("; the previous revision still serves with %s", plural(int(r.oldServing), "ready replica", "ready replicas"))
+	}
+	f.Detail += "."
+	if r.previous != nil {
+		if changes := templateChanges(r.previous, r.next); len(changes) > 0 {
+			f.Detail += fmt.Sprintf(" Revision %s changed %s.", rev, list(changes))
+			for _, change := range changes {
+				f.Evidence = append(f.Evidence, Evidence{Source: "change", Text: change})
+			}
+		}
+	}
+	return []*Finding{f}
+}}
+
+// templateChanges says what differs between two revisions' pod templates:
+// "the image of container app (busybox:1.36 → busybox:1.37)". It covers what
+// a rollout usually changes; anything else is "other settings".
+func templateChanges(previous, next *appsv1.ReplicaSet) []string {
+	before, after := previous.Spec.Template.Spec, next.Spec.Template.Spec
+	var changes []string
+	old := map[string]corev1.Container{}
+	for _, c := range append(append([]corev1.Container{}, before.InitContainers...), before.Containers...) {
+		old[c.Name] = c
+	}
+	seen := map[string]bool{}
+	for _, c := range append(append([]corev1.Container{}, after.InitContainers...), after.Containers...) {
+		seen[c.Name] = true
+		o, ok := old[c.Name]
+		if !ok {
+			changes = append(changes, "added container "+c.Name)
+			continue
+		}
+		if o.Image != c.Image {
+			changes = append(changes, fmt.Sprintf("the image of container %s (%s → %s)", c.Name, o.Image, c.Image))
+		}
+		for _, field := range []struct {
+			name         string
+			before, next any
+		}{
+			{"command", []any{o.Command, o.Args}, []any{c.Command, c.Args}},
+			{"environment", []any{o.Env, o.EnvFrom}, []any{c.Env, c.EnvFrom}},
+			{"resources", o.Resources, c.Resources},
+			{"probes", []any{o.LivenessProbe, o.ReadinessProbe, o.StartupProbe}, []any{c.LivenessProbe, c.ReadinessProbe, c.StartupProbe}},
+			{"ports", o.Ports, c.Ports},
+			{"volume mounts", o.VolumeMounts, c.VolumeMounts},
+		} {
+			if !apiequality.Semantic.DeepEqual(field.before, field.next) {
+				changes = append(changes, fmt.Sprintf("the %s of container %s", field.name, c.Name))
+			}
+		}
+	}
+	for _, c := range append(append([]corev1.Container{}, before.InitContainers...), before.Containers...) {
+		if !seen[c.Name] {
+			changes = append(changes, "removed container "+c.Name)
+		}
+	}
+	if !apiequality.Semantic.DeepEqual(before.Volumes, after.Volumes) {
+		changes = append(changes, "its volumes")
+	}
+	if len(changes) == 0 && !apiequality.Semantic.DeepEqual(before, after) {
+		changes = append(changes, "other settings of its pods")
+	}
+	return changes
+}
+
+// ---- job.failed: a Job failed, or a CronJob's latest run did ----
+
+var jobFailed = Rule{ID: "job.failed", Resources: []string{"jobs", "cronjobs"}, Check: func(c *Context, n *graph.Node) []*Finding {
+	switch obj := c.Object(n).(type) {
+	case *batchv1.Job:
+		for _, cond := range obj.Status.Conditions {
+			if cond.Type != batchv1.JobFailed || cond.Status != corev1.ConditionTrue {
+				continue
+			}
+			f := &Finding{
+				Severity:   Failing,
+				Confidence: Certain,
+				Title:      "It failed",
+				Detail:     orElse(cond.Message, cond.Reason),
+				Evidence:   []Evidence{conditionEvidence("Failed", "True", cond.Reason, cond.Message, cond.LastTransitionTime)},
+				Next:       []Step{eventsOf(n)},
+			}
+			switch cond.Reason {
+			case "BackoffLimitExceeded":
+				retries := int32(6)
+				if obj.Spec.BackoffLimit != nil {
+					retries = *obj.Spec.BackoffLimit
+				}
+				f.Title = "It failed: every attempt it was allowed failed"
+				f.Detail = fmt.Sprintf("It may retry %s after its first attempt (backoffLimit), and none succeeded.", plural(int(retries), "time", "times"))
+				if retries == 0 {
+					f.Title = "It failed, and may not retry"
+					f.Detail = "Its only attempt failed, and its backoffLimit of 0 allows no more."
+				}
+			case "DeadlineExceeded":
+				f.Title = "It ran out of time"
+				if obj.Spec.ActiveDeadlineSeconds != nil {
+					f.Detail = fmt.Sprintf("It may run for %ds (activeDeadlineSeconds), and it hadn't finished.", *obj.Spec.ActiveDeadlineSeconds)
+				}
+			}
+			for _, owned := range ownedTree(c, n.ID) {
+				if owned.Resource == "pods" && owned.State != graph.OK {
+					f.Blames = append(f.Blames, owned.ID)
+				}
+			}
+			return []*Finding{f}
+		}
+	case *batchv1.CronJob:
+		if obj.Spec.Suspend != nil && *obj.Spec.Suspend {
+			return []*Finding{{Severity: Info, Confidence: Certain, Title: "It's suspended",
+				Detail: "It won't start new runs until it's resumed (spec.suspend)."}}
+		}
+		if n.State != graph.Degraded {
+			return nil
+		}
+		var latest *batchv1.Job
+		for _, owned := range ownedTree(c, n.ID) {
+			if job, ok := c.Object(owned).(*batchv1.Job); ok && (latest == nil || job.CreationTimestamp.After(latest.CreationTimestamp.Time)) {
+				latest = job
+			}
+		}
+		if latest == nil {
+			return nil
+		}
+		return []*Finding{{
+			Severity:   Degraded,
+			Confidence: Certain,
+			Title:      "Its latest run failed",
+			Detail: fmt.Sprintf("Job %s, started %s ago, failed. It runs on the schedule %q, so the next run may go the same way.",
+				latest.Name, ago(c.Now.Sub(latest.CreationTimestamp.Time)), obj.Spec.Schedule),
+			Blames: []string{key("jobs", latest.Namespace, latest.Name)},
+			Next:   []Step{eventsOf(n)},
+		}}
+	}
+	return nil
+}}
+
+// ---- hpa.scaling: an autoscaler can't scale ----
+
+var hpaScaling = Rule{ID: "hpa.scaling", Resources: []string{"horizontalpodautoscalers"}, Check: func(c *Context, n *graph.Node) []*Finding {
+	hpa, _ := c.Object(n).(*autoscalingv2.HorizontalPodAutoscaler)
+	if hpa == nil {
+		return nil
+	}
+	var findings []*Finding
+	for _, e := range c.G.Out(n.ID) {
+		if target := c.Node(e.To); e.Type == graph.Scales && target.State == graph.Missing {
+			findings = append(findings, &Finding{Severity: Failing, Confidence: Certain,
+				Title:  fmt.Sprintf("What it scales, %s, doesn't exist", describe(target, n.Namespace)),
+				Blames: []string{target.ID}})
+		}
+	}
+	for _, cond := range hpa.Status.Conditions {
+		evidence := []Evidence{conditionEvidence(string(cond.Type), string(cond.Status), cond.Reason, cond.Message, cond.LastTransitionTime)}
+		switch {
+		case cond.Type == autoscalingv2.ScalingActive && cond.Status == corev1.ConditionFalse:
+			f := &Finding{Severity: Degraded, Confidence: Certain, Title: "It can't scale: " + lowerFirst(cond.Message), Evidence: evidence,
+				Next: []Step{kubectl("describe", n)}}
+			if strings.HasPrefix(cond.Reason, "FailedGet") {
+				f.Title = "It can't read the metrics it scales by"
+				f.Detail = upperFirst(cond.Message) + "."
+				if strings.Contains(cond.Message, "metrics.k8s.io") || strings.Contains(cond.Message, "resource metrics API") {
+					f.Detail += " CPU and memory metrics come from metrics-server: is it installed and running?"
+				}
+			}
+			findings = append(findings, f)
+		case cond.Type == autoscalingv2.AbleToScale && cond.Status == corev1.ConditionFalse:
+			findings = append(findings, &Finding{Severity: Degraded, Confidence: Certain, Title: "It can't change its target's size",
+				Detail: cond.Message, Evidence: evidence})
+		case cond.Type == autoscalingv2.ScalingLimited && cond.Status == corev1.ConditionTrue && cond.Reason == "TooManyReplicas":
+			findings = append(findings, &Finding{Severity: Info, Confidence: Certain,
+				Title:  fmt.Sprintf("It's at its maximum of %d replicas", hpa.Spec.MaxReplicas),
+				Detail: "It would scale further if it were allowed to. If the load stays this high, raise maxReplicas.", Evidence: evidence})
+		}
+	}
+	return findings
+}}
+
+func lowerFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToLower(s[:1]) + s[1:]
+}
+
+func upperFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }

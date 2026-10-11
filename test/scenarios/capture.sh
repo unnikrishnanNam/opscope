@@ -17,7 +17,7 @@ taken=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 mkdir -p "$out"
 
 {
-  kubectl get pods,deployments,replicasets,services,endpointslices,ingresses,configmaps,secrets,serviceaccounts,resourcequotas,events -n "$ns" -o json
+  kubectl get pods,deployments,replicasets,statefulsets,daemonsets,jobs,cronjobs,services,endpointslices,ingresses,configmaps,secrets,serviceaccounts,persistentvolumeclaims,resourcequotas,horizontalpodautoscalers,poddisruptionbudgets,events -n "$ns" -o json
   kubectl get nodes,storageclasses,ingressclasses -o json
   kubectl get namespace "$ns" -o json
 } | python3 -c '

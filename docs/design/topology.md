@@ -26,7 +26,7 @@ Phases are numbered **G0–G7** so they don't mix with the build phases 0–8 or
 R, P and D. All work happens on the `feature/topology` branch, and each phase is committed there
 once it works, its tests pass and its notes are written. This feature has no issue of its own.
 
-**Status (2026-10-11):** G0 (the snapshot), G1 (the graph and `GET /topology`) and G2 (the diagnosis on detail pages) done. G3 is next.
+**Status (2026-10-11):** G0 (the snapshot), G1 (the graph and `GET /topology`), G2 (the diagnosis on detail pages) and G3 (the remaining rules and problems on the overview) done. G4 is next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -297,16 +297,16 @@ The first set (G2) covers the failures people hit most. The second (G3) complete
 | `route.backend`              | G2    | HTTPRoute, Ingress | a backend Service missing, without a ReferenceGrant, or with no ready endpoints                             | the Service or the missing grant               |
 | `pod.not-ready`              | G3    | Pod               | running but not ready: a failing readiness probe                                                             | itself (root)                                  |
 | `pod.evicted`                | G3    | Pod               | evicted for memory or disk pressure                                                                          | the node                                       |
-| `pod.init-failed`            | G3    | Pod               | an init container failing (`Init:Error`, `Init:CrashLoopBackOff`), with the same detail as the main containers | itself, or what the init container needs       |
+| `pod.init`                   | G3    | Pod               | an init container failing (`Init:Error`, `Init:CrashLoopBackOff`), with the same detail as the main containers | itself, or what the init container needs       |
 | `node.pressure`              | G3    | Node              | memory, disk or PID pressure; cordoned                                                                       | itself (root)                                  |
-| `deployment.rollout-stuck`   | G3    | Deployment        | `ProgressDeadlineExceeded`: the new revision's pods fail while the old one still serves                      | the new ReplicaSet's pods                      |
+| `deployment.rollout`         | G3    | Deployment        | `ProgressDeadlineExceeded`: the new revision's pods fail while the old one still serves                      | the new ReplicaSet's pods                      |
 | `statefulset.ordered`        | G3    | StatefulSet       | waiting for a lower ordinal to become ready                                                                  | that pod                                       |
 | `job.failed`                 | G3    | Job, CronJob      | `BackoffLimitExceeded`, `DeadlineExceeded`; a CronJob's last run failing                                     | the failed pods, the failed Job                |
 | `pvc.pending`                | G3    | PVC               | no StorageClass, a missing class, `ProvisioningFailed`                                                       | the StorageClass, or itself                    |
-| `hpa.not-scaling`            | G3    | HPA               | `ScalingActive=False` (often missing metrics), at its maximum                                                | the target, or itself                          |
-| `route.not-accepted`         | G3    | HTTPRoute         | `Accepted=False`: no matching listener, hostname, or a missing Gateway                                       | the Gateway                                    |
-| `gateway.not-programmed`     | G3    | Gateway           | `Programmed` or `Accepted` is False                                                                          | the GatewayClass, or itself                    |
-| `gatewayclass.not-accepted`  | G3    | GatewayClass      | no controller accepted it: is its controller installed?                                                      | itself (root)                                  |
+| `hpa.scaling`                | G3    | HPA               | `ScalingActive=False` (often missing metrics), at its maximum                                                | the target, or itself                          |
+| `route.accepted`             | G3    | HTTPRoute         | `Accepted=False`: no matching listener, hostname, or a missing Gateway                                       | the Gateway                                    |
+| `gateway.programmed`         | G3    | Gateway           | `Programmed` or `Accepted` is False                                                                          | the GatewayClass, or itself                    |
+| `gatewayclass.accepted`      | G3    | GatewayClass      | no controller accepted it: is its controller installed?                                                      | itself (root)                                  |
 | `ingress.class`              | G3    | Ingress           | a missing IngressClass, or a missing TLS Secret                                                              | the missing object                             |
 | `unexplained`                | G3    | anything failing  | the fallback above                                                                                           | possibly related neighbours                    |
 
@@ -455,12 +455,13 @@ Goal: a broken object's detail page explains why, down to the root cause.
 
 Goal: every common failure is explained, and the overview lists root causes.
 
-- [ ] The G3 rules from the table, each with a scenario
-- [ ] The `unexplained` fallback and confidence shown in the UI
-- [ ] `GET /api/clusters/{id}/problems`
-- [ ] Problems at the top of the overview's "Recent warnings" card, following the namespace picker
-- [ ] Palette: "Problems"
-- [ ] Checked against both test clusters, including what the multipass cluster already has wrong (argocd-server's crash loop)
+- [x] The G3 rules from the table, each with a scenario where a one-node cluster can show it, and
+      unit tests for the rest (see notes)
+- [x] The `unexplained` fallback and confidence shown in the UI
+- [x] `GET /api/clusters/{id}/problems`
+- [x] Problems at the top of the overview's "Recent warnings" card, following the namespace picker
+- [x] Palette: "Problems"
+- [x] Checked against both test clusters, including what the multipass cluster already has wrong (argocd-server's crash loop)
 
 ## Phase G4: Graph renderer and the Map tab
 
@@ -679,3 +680,60 @@ snapshots are taken every 30 seconds, and problems sit at the top of the "Recent
   and `argocd-server` exits with code 20 after 1,103 restarts. A pass with a real screen reader is
   still to do; the structure is there (a heading, nested lists, each step's severity as hidden
   text, labelled copy buttons).
+
+### G3
+
+- **Rules as built,** with the IDs in the table above. Changed from the plan:
+  - `pod.init` reports an init container that keeps running (waiting for something) for more
+    than 5 minutes. Init containers that fail were already covered by `pod.crash` in G2, which
+    now also reports a container that failed and won't be restarted (a Job's pod).
+  - `deployment.rollout` reports every rollout, not only a stuck one: `info` while it goes well,
+    `degraded` when the new revision's pods fail while the old one serves, `failing` when nothing
+    serves. It also says **what the revision changed**, by comparing the two ReplicaSets' pod
+    templates ("the image of container app (busybox:1.36 → busybox:no-such-tag-opscope)"), which
+    the plan had under Later. `workload.unavailable` leaves Deployments in a rollout to it.
+  - `statefulset.ordered` became part of `workload.unavailable`'s explanation for a StatefulSet
+    ("db-1 won't be created until db-0 is"), since it's the same finding with a better reason.
+  - `node.pressure` also notes a cordoned node (`info`) and a node whose network isn't set up.
+  - `hpa.scaling` also notes an autoscaler at its maximum (`info`).
+  - `unexplained` lists unhealthy neighbours as `related`, a separate field from `blames`, so a
+    guess is never followed as a cause.
+- **Scenarios.** Nine more manifests (readiness probe, init container waiting, eviction, stuck
+  rollout, failed Job, failing CronJob, claim with a missing class, autoscaler without metrics,
+  Ingress with a missing class and TLS Secret) ran on the kind cluster with the G2 ones and were
+  captured together (`capture.sh` now also reads Jobs, CronJobs, claims, autoscalers and
+  disruption budgets). Every one reached its expected root cause, as did a second capture nine
+  minutes later; the namespace was then deleted. The rollout needs a second step (an image
+  update), described in `test/scenarios/README.md`.
+- **What the scenarios showed:** an evicted pod's container is killed with exit code 137, which
+  `pod.crash` reported as well as the eviction; evicted pods are now left to `pod.evicted`. Every
+  ReplicaSet whose pods failed ended up `unexplained`, because no rule looked at ReplicaSets with
+  pods; `workload.unavailable` now covers them. A Deployment created broken has a single revision
+  and isn't a rollout, even though its counts look like one.
+- **What the real cluster showed.** On multipass the first problems list had 37 entries, most of
+  them false: the VMs had rebooted 11 hours earlier and nearly every pod had restarted once with
+  exit code 255. A running container whose last stop was more than an hour ago is no longer a
+  problem; a failing liveness probe still is, since it restarts a container every few minutes.
+  `StorageClass manual doesn't exist` was false too: a PersistentVolume made by hand can name a
+  class only to match claims, so a volume's class, and a bound claim's, are optional references
+  now. What's left are five real problems: argocd-server and argocd-applicationset-controller
+  crash-looping, Argo CD's application controller failing its readiness probe, `default/app-config`
+  missing, and three Services in `default` that select nothing.
+- **Problems.** `Diagnosis.Problems(namespace)` collects the findings that nothing explains, merges
+  alike ones, and lists what each affects (pods left out when their workload is there). A note
+  doesn't make a finding non-root: a pod whose Secret Opscope can't read is still a problem. The
+  overview's card is titled "Problems and recent warnings" when there are any, with
+  "22 problems, affecting 46 objects" beside it, the first six shown and a button for the rest.
+  Each problem shows its subject above its title (several titles say "It …"), and the title links
+  to the page whose diagnosis explains it: the object itself, or, for a missing one, the first
+  thing it affects that has a page.
+- **"Problems" in the palette** links to the overview with `#problems`. The list's id is
+  `problem-list`, not `problems`: with a matching id, the browser jumped to it by itself on page
+  load and scrolled the boxes around it, pushing the top bar out of view, the problem
+  `focusSection` exists to avoid.
+- Object names in the diagnosis and the problems leave out the namespace being looked at, and keep
+  it for others ("Deployment argocd/argocd-server" with all namespaces selected).
+- **Speed.** Building the graph and running every rule for a generated cluster of 5,000 pods, a
+  tenth of them broken, takes 41 ms (`BenchmarkBuildAndDiagnose`), once per snapshot, inside the
+  plan's 200 ms. A problems request for one namespace then takes 0.2 ms (`BenchmarkProblems`).
+- Checked in the browser on both clusters, in both themes, at 375 px.

@@ -12,7 +12,9 @@ import (
 	"opscope/internal/snapshot"
 
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -88,7 +90,7 @@ func TestNodeDown(t *testing.T) {
 		t.Errorf("pod: %+v", f)
 	}
 	n := only(t, d, "nodes/worker-2")
-	if n.Title != "Node worker-2 stopped reporting" || !strings.Contains(n.Detail, "20m0s ago") {
+	if n.Title != "Node worker-2 stopped reporting" || !strings.Contains(n.Detail, "20m ago") {
 		t.Errorf("node: %q %q", n.Title, n.Detail)
 	}
 	trace, _ := d.Trace("pods/a/web")
@@ -363,3 +365,238 @@ func TestCommandsAreReadOnly(t *testing.T) {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+func titles(d *Diagnosis, id string) []string {
+	var out []string
+	for _, f := range d.Findings(id) {
+		out = append(out, f.Title)
+	}
+	return out
+}
+
+func TestNodePressureAndCordon(t *testing.T) {
+	node := ready("worker-1")
+	node.Status.Conditions = append(node.Status.Conditions, corev1.NodeCondition{Type: corev1.NodeDiskPressure, Status: corev1.ConditionTrue, Message: "kubelet has disk pressure"})
+	node.Spec.Unschedulable = true
+	d := run(&snapshot.Snapshot{Nodes: []corev1.Node{node}})
+
+	got := titles(d, "nodes/worker-1")
+	want := []string{"Node worker-1 is low on disk space", "Node worker-1 is cordoned"}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %q", got)
+	}
+	if f := d.Findings("nodes/worker-1")[1]; f.Severity != Info {
+		t.Errorf("cordoned is a note, not a fault: %s", f.Severity)
+	}
+}
+
+func TestTemplateChanges(t *testing.T) {
+	rs := func(image string, env ...corev1.EnvVar) *appsv1.ReplicaSet {
+		r := &appsv1.ReplicaSet{}
+		r.Spec.Template.Spec.Containers = []corev1.Container{{Name: "app", Image: image, Env: env}, {Name: "proxy", Image: "envoy"}}
+		return r
+	}
+	before := rs("api:1.4")
+	after := rs("api:1.5", corev1.EnvVar{Name: "DEBUG", Value: "1"})
+	after.Spec.Template.Spec.Containers = after.Spec.Template.Spec.Containers[:1] // proxy removed
+
+	want := []string{"the image of container app (api:1.4 → api:1.5)", "the environment of container app", "removed container proxy"}
+	if got := templateChanges(before, after); !slices.Equal(got, want) {
+		t.Errorf("got %q", got)
+	}
+	same := rs("api:1.4")
+	same.Spec.Template.Spec.TerminationGracePeriodSeconds = ptr(int64(5))
+	if got := templateChanges(before, same); !slices.Equal(got, []string{"other settings of its pods"}) {
+		t.Errorf("got %q", got)
+	}
+}
+
+// A Deployment created with a broken spec has one revision: it isn't a
+// rollout, whatever its counts say.
+func TestFirstRevisionIsNotARollout(t *testing.T) {
+	d := meta("a", "web")
+	rs := meta("a", "web-1")
+	rs.OwnerReferences = []metav1.OwnerReference{{Kind: "Deployment", Name: "web", UID: d.UID}}
+	rs.Annotations = map[string]string{revisionAnnotation: "1"}
+	diag := run(&snapshot.Snapshot{
+		Deployments: []appsv1.Deployment{{ObjectMeta: d, Spec: appsv1.DeploymentSpec{Replicas: ptr(int32(1))}}},
+		ReplicaSets: []appsv1.ReplicaSet{{ObjectMeta: rs, Spec: appsv1.ReplicaSetSpec{Replicas: ptr(int32(1))}}},
+	})
+	for _, f := range diag.Findings("deployments/a/web") {
+		if f.Rule == "deployment.rollout" {
+			t.Errorf("got %q", f.Title)
+		}
+	}
+}
+
+func TestStatefulSetWaitsInOrder(t *testing.T) {
+	ss := meta("a", "db")
+	pod := waiting(meta("a", "db-0"), "postgres", "CrashLoopBackOff", "")
+	pod.OwnerReferences = []metav1.OwnerReference{{Kind: "StatefulSet", Name: "db", UID: ss.UID}}
+	d := run(&snapshot.Snapshot{
+		StatefulSets: []appsv1.StatefulSet{{ObjectMeta: ss, Spec: appsv1.StatefulSetSpec{Replicas: ptr(int32(3))}, Status: appsv1.StatefulSetStatus{Replicas: 1}}},
+		Pods:         []corev1.Pod{pod},
+	})
+	f := d.Findings("statefulsets/a/db")[0]
+	if !strings.Contains(f.Detail, "db-1 won't be created until db-0 is") {
+		t.Errorf("got %q", f.Detail)
+	}
+}
+
+func TestRouteNotAccepted(t *testing.T) {
+	route := kube.HTTPRoute{ObjectMeta: meta("shop", "web")}
+	route.Spec.ParentRefs = []kube.ObjectRef{{Name: "edge", Namespace: ptr("infra")}, {Name: "gone"}}
+	route.Status.Parents = []kube.RouteParentStatus{{ParentRef: kube.ObjectRef{Name: "edge", Namespace: ptr("infra")},
+		Conditions: []metav1.Condition{{Type: "Accepted", Status: "False", Reason: "NotAllowedByListeners", Message: "no listener allows it"}}}}
+	d := run(&snapshot.Snapshot{HTTPRoutes: []kube.HTTPRoute{route}, Gateways: []kube.Gateway{{ObjectMeta: meta("infra", "edge")}}})
+
+	got := map[string][]string{}
+	for _, f := range d.Findings("httproutes/shop/web") {
+		got[f.Title] = f.Blames
+	}
+	if !slices.Equal(got["Gateway edge doesn't accept it"], []string{"gateways/infra/edge"}) {
+		t.Errorf("got %v", got)
+	}
+	if !slices.Equal(got["Its Gateway shop/gone doesn't exist"], []string{"gateways/shop/gone"}) {
+		t.Errorf("got %v", got)
+	}
+}
+
+func TestGatewayAndClass(t *testing.T) {
+	orphan := kube.Gateway{ObjectMeta: meta("infra", "orphan")}
+	orphan.Spec.GatewayClassName = "nobody"
+	broken := kube.Gateway{ObjectMeta: meta("infra", "broken")}
+	broken.Spec.GatewayClassName = "nginx"
+	broken.Status.Conditions = []metav1.Condition{{Type: "Accepted", Status: "True"}, {Type: "Programmed", Status: "False", Reason: "AddressNotAssigned", Message: "no address"}}
+	accepted := kube.GatewayClass{ObjectMeta: meta("", "nginx")}
+	accepted.Status.Conditions = []metav1.Condition{{Type: "Accepted", Status: "True"}}
+	stale := kube.GatewayClass{ObjectMeta: meta("", "stale")}
+	stale.Spec.ControllerName = "example.com/gateway"
+
+	d := run(&snapshot.Snapshot{Gateways: []kube.Gateway{orphan, broken}, GatewayClasses: []kube.GatewayClass{accepted, stale}})
+	if got := titles(d, "gateways/infra/orphan"); !slices.Equal(got, []string{"Its GatewayClass nobody doesn't exist"}) {
+		t.Errorf("orphan: %q", got)
+	}
+	if got := titles(d, "gateways/infra/broken"); !slices.Equal(got, []string{"It isn't serving: its controller couldn't set it up"}) {
+		t.Errorf("broken: %q", got)
+	}
+	if f := d.Findings("gatewayclasses/stale"); len(f) != 1 || !strings.Contains(f[0].Detail, "example.com/gateway") {
+		t.Errorf("stale: %+v", f)
+	}
+}
+
+func TestClaimProblems(t *testing.T) {
+	pending := func(name string, class *string) corev1.PersistentVolumeClaim {
+		return corev1.PersistentVolumeClaim{ObjectMeta: meta("a", name), Spec: corev1.PersistentVolumeClaimSpec{StorageClassName: class},
+			Status: corev1.PersistentVolumeClaimStatus{Phase: corev1.ClaimPending}}
+	}
+	lost := corev1.PersistentVolumeClaim{ObjectMeta: meta("a", "lost"), Spec: corev1.PersistentVolumeClaimSpec{VolumeName: "pv-9"},
+		Status: corev1.PersistentVolumeClaimStatus{Phase: corev1.ClaimLost}}
+	failing := pending("failing", ptr("fast"))
+	d := run(&snapshot.Snapshot{
+		PersistentVolumeClaims: []corev1.PersistentVolumeClaim{pending("classless", nil), failing, lost},
+		StorageClasses:         []storagev1.StorageClass{{ObjectMeta: meta("", "fast")}},
+		Events:                 []corev1.Event{warning(failing.ObjectMeta, "ProvisioningFailed", "failed to provision volume: quota exceeded")},
+	})
+	if got := titles(d, "persistentvolumeclaims/a/classless"); !slices.Equal(got, []string{"It names no StorageClass, and the cluster has no default"}) {
+		t.Errorf("classless: %q", got)
+	}
+	if f := d.Findings("persistentvolumeclaims/a/failing"); len(f) != 1 || f[0].Title != "Its volume can't be provisioned" || f[0].Confidence != Likely {
+		t.Errorf("failing: %+v", f)
+	}
+	if got := titles(d, "persistentvolumeclaims/a/lost"); !slices.Equal(got, []string{"Its volume pv-9 is gone"}) {
+		t.Errorf("lost: %q", got)
+	}
+}
+
+func TestAutoscalerAtMaximum(t *testing.T) {
+	hpa := autoscalingv2.HorizontalPodAutoscaler{ObjectMeta: meta("a", "web"), Spec: autoscalingv2.HorizontalPodAutoscalerSpec{MaxReplicas: 5,
+		ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{Kind: "Deployment", Name: "web"}},
+		Status: autoscalingv2.HorizontalPodAutoscalerStatus{Conditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+			{Type: autoscalingv2.ScalingLimited, Status: corev1.ConditionTrue, Reason: "TooManyReplicas"}}}}
+	d := run(&snapshot.Snapshot{HorizontalPodAutoscalers: []autoscalingv2.HorizontalPodAutoscaler{hpa}})
+	got := titles(d, "horizontalpodautoscalers/a/web")
+	if !slices.Equal(got, []string{"What it scales, Deployment web, doesn't exist", "It's at its maximum of 5 replicas"}) {
+		t.Errorf("got %q", got)
+	}
+}
+
+// What no rule explains is said so, with its unhealthy neighbours as
+// possibly related, never as causes.
+func TestUnexplained(t *testing.T) {
+	node := ready("worker-1")
+	node.Status.Conditions[0].Status = corev1.ConditionFalse
+	pod := corev1.Pod{ObjectMeta: meta("a", "odd"), Spec: corev1.PodSpec{NodeName: "worker-1"}, Status: corev1.PodStatus{Phase: corev1.PodFailed, Reason: "Shutdown"}}
+	svc := corev1.Service{ObjectMeta: meta("a", "odd", "app", "odd"), Spec: corev1.ServiceSpec{Selector: map[string]string{"app": "odd"}}}
+	pod.Labels = map[string]string{"app": "odd"}
+	s := &snapshot.Snapshot{Nodes: []corev1.Node{node}, Pods: []corev1.Pod{pod}, Services: []corev1.Service{svc}}
+	s.Skipped = []kube.Skipped{{Resource: "endpointslices", Code: "forbidden"}}
+	d := run(s)
+
+	var f *Finding
+	for _, finding := range d.Findings("pods/a/odd") {
+		if finding.Rule == "unexplained" {
+			f = finding
+		}
+	}
+	if f != nil {
+		t.Fatalf("the pod's node is down: pod.node explains it, got %q", f.Title)
+	}
+
+	// Without the node down, nothing explains it.
+	node.Status.Conditions[0].Status = corev1.ConditionTrue
+	s = &snapshot.Snapshot{Nodes: []corev1.Node{node}, Pods: []corev1.Pod{pod}, Services: []corev1.Service{svc}}
+	s.Skipped = []kube.Skipped{{Resource: "endpointslices", Code: "forbidden"}}
+	d = run(s)
+	f = only(t, d, "pods/a/odd")
+	if f.Rule != "unexplained" || f.Confidence != Possible || len(f.Blames) != 0 || !slices.Equal(f.Related, []string{"services/a/odd"}) {
+		t.Errorf("got %+v", f)
+	}
+}
+
+// A node that's down is a problem in every namespace with pods on it.
+func TestProblemsByNamespace(t *testing.T) {
+	node := ready("worker-2")
+	node.Status.Conditions[0].Status = corev1.ConditionFalse
+	running := func(ns, name string) corev1.Pod {
+		return corev1.Pod{ObjectMeta: meta(ns, name), Spec: corev1.PodSpec{NodeName: "worker-2"}, Status: corev1.PodStatus{Phase: corev1.PodRunning}}
+	}
+	unscheduled := waiting(meta("other", "x"), "nope", "InvalidImageName", "")
+	unscheduled.Spec.NodeName = ""
+	d := run(&snapshot.Snapshot{
+		Nodes: []corev1.Node{node},
+		Pods:  []corev1.Pod{running("shop", "web"), running("billing", "api"), unscheduled},
+	})
+
+	shop := d.Problems("shop")
+	if len(shop) != 1 || shop[0].Rule != "node.not-ready" || len(shop[0].Affects) != 2 {
+		t.Fatalf("shop: %+v", shop)
+	}
+	if all := d.Problems(""); len(all) != 2 {
+		t.Errorf("the whole cluster has 2 problems, got %d", len(all))
+	}
+	if other := d.Problems("other"); len(other) != 1 || other[0].Rule != "pod.image" {
+		t.Errorf("other: %+v", other)
+	}
+}
+
+// A container that restarted long ago (a node reboot) and runs fine since
+// isn't a problem; one that restarted minutes ago may be.
+func TestOldRestartsAreIgnored(t *testing.T) {
+	restarted := func(name string, ago time.Duration) corev1.Pod {
+		return corev1.Pod{ObjectMeta: meta("a", name), Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "app"}}},
+			Status: corev1.PodStatus{Phase: corev1.PodRunning,
+				Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+				ContainerStatuses: []corev1.ContainerStatus{{Name: "app", Ready: true, RestartCount: 1,
+					State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}},
+					LastTerminationState: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{
+						ExitCode: 255, Reason: "Unknown", FinishedAt: metav1.NewTime(now.Add(-ago))}}}}}}
+	}
+	d := run(&snapshot.Snapshot{Pods: []corev1.Pod{restarted("rebooted", 11*time.Hour), restarted("flapping", 3*time.Minute)}})
+	if f := d.Findings("pods/a/rebooted"); len(f) != 0 {
+		t.Errorf("rebooted: %q", titles(d, "pods/a/rebooted"))
+	}
+	if got := titles(d, "pods/a/flapping"); !slices.Equal(got, []string{"Container app exits with code 255"}) {
+		t.Errorf("flapping: %q", got)
+	}
+}

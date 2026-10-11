@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { objectParts, rootCauseText, rootSteps } from "./diagnosis.js";
+import { objectParts, problemSummary, rootCauseText, rootSteps } from "./diagnosis.js";
 
 const step = (title, objects, root, causes = []) => ({ title, objects, root, causes });
 
@@ -36,5 +36,16 @@ describe("objectParts", () => {
   it("reads namespaced and cluster-wide IDs", () => {
     expect(objectParts("pods/shop/web-1")).toEqual({ resource: "pods", namespace: "shop", name: "web-1" });
     expect(objectParts("nodes/worker-1")).toEqual({ resource: "nodes", namespace: "", name: "worker-1" });
+  });
+});
+
+describe("problemSummary", () => {
+  it("counts each object once", () => {
+    const problems = [
+      { objects: ["secrets/shop/stripe"], affects: [{ id: "deployments/shop/web" }, { id: "services/shop/web" }] },
+      { objects: ["pods/shop/web-a", "pods/shop/web-b"], affects: [{ id: "deployments/shop/web" }] },
+    ];
+    expect(problemSummary(problems)).toBe("2 problems, affecting 5 objects");
+    expect(problemSummary([{ objects: ["nodes/worker-1"], affects: [] }])).toBe("1 problem, affecting 1 object");
   });
 });
