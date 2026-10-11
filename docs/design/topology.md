@@ -418,7 +418,7 @@ Goal: Opscope can take a snapshot of a whole cluster, with nothing visible chang
 - [x] `podStatus` and the Gateway API structs moved to `internal/kube`, with `resources` using them
 - [x] RBAC: the new kinds added to `deploy/kubernetes/opscope.yaml`, and the list in `docs/deployment.md`
 - [x] Go tests with client-go's fake clients: all kinds, a forbidden kind, Gateway API missing, the store's reuse and single load
-- [~] Benchmark: a generated 5,000-pod snapshot; load time measured on the kind cluster, not multipass (see notes)
+- [x] Benchmark: a generated 5,000-pod snapshot; load time measured on the multipass cluster
 
 ## Phase G1: Graph model
 
@@ -538,7 +538,8 @@ snapshots are taken every 30 seconds, and problems sit at the top of the "Recent
   `GatewayClass.Summary()`), used by the tables, the detail pages and later the graph. They also
   gained the fields the graph needs (listener certificate refs, each parent's ref and
   controller in a route's status) and a `ReferenceGrant` type. ReferenceGrants are read as `v1`,
-  falling back to `v1beta1` on clusters that serve only that.
+  falling back to `v1beta1` on clusters that serve only that. The multipass cluster (Gateway API
+  v1.5.1) serves them as `v1`.
 - Lists are read in pages of 500, so a large cluster never needs one huge answer or runs into the
   client's 10-second timeout on a single call. Events are filtered to Warnings on the API server
   and checked again after, so a proxy or fake that ignores field selectors can't let Normal events
@@ -559,8 +560,9 @@ snapshots are taken every 30 seconds, and problems sit at the top of the "Recent
   Reading the kind cluster (95 objects, 10 pods) takes 27 ms and holds about 0.6 MiB; the four
   Gateway API kinds are skipped as `not_installed` there. `TestLoadLive` measures any cluster when
   `OPSCOPE_TEST_KUBECONFIG` is set, and only reads.
-- The multipass VMs were stopped during G0, so the load time there wasn't measured. G1 is checked
-  against its `topology-test` namespace anyway and will measure it then.
+- Reading the multipass cluster (338 objects, 50 pods, 8 warnings, Gateway API installed) takes
+  33–39 ms and holds about 1.8 MiB, with nothing skipped. It was measured once its VMs were
+  started again, after the rest of G0 was committed.
 - Nothing visible changed. The existing endpoints were checked against the kind cluster after
   the refactor: lists, `/names`, a pod's detail page, the overview, and Gateway API's
   `not_installed` answer.
