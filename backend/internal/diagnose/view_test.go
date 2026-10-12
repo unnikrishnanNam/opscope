@@ -69,3 +69,35 @@ func TestViewAddsWhatFindingsBlame(t *testing.T) {
 		t.Errorf("edges to the quota: %+v", view.Edges)
 	}
 }
+
+// Every problem of the scenarios is on a card of the cluster view: on its
+// own object's card, or for a StorageClass that doesn't exist (no namespace,
+// no app), on the card of the app whose claim needs it.
+func TestClusterViewShowsEveryProblem(t *testing.T) {
+	d := Run(loadScenarios(t))
+	view := d.g.Cluster(graph.Options{})
+	findings := d.ForCluster(view)
+
+	onCard := map[string]string{}
+	for _, n := range view.Nodes {
+		onCard[n.ID] = n.ID
+		for _, m := range n.Members {
+			onCard[m] = n.ID
+		}
+	}
+	for _, p := range d.Problems("") {
+		for _, object := range p.Objects {
+			if onCard[object] == "" {
+				t.Errorf("problem %q about %s is on no card", p.Title, object)
+			}
+		}
+	}
+	for _, f := range findings {
+		if onCard[f.Object] == "" || f.Severity == Info {
+			t.Errorf("finding %s about %s: card %q, severity %s", f.Rule, f.Object, onCard[f.Object], f.Severity)
+		}
+	}
+	if card := onCard["storageclasses/no-such-class"]; card != "apps/opscope-scenarios/claim" {
+		t.Errorf("the missing StorageClass is on %q", card)
+	}
+}

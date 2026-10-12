@@ -34,6 +34,7 @@ import (
 // returns: several requests may use the same snapshot at the same time.
 type Snapshot struct {
 	Taken   time.Time      // when reading started; the data is at most this old
+	Took    time.Duration  // how long reading it took
 	Skipped []kube.Skipped // kinds that couldn't be read, and why
 
 	Namespaces               []corev1.Namespace

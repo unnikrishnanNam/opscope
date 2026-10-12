@@ -66,8 +66,25 @@ export default function TopologyMap({ clusterId, objectId, namespace, label }) {
 //   tools     more controls for the toolbar
 //   empty     what to say when the view is empty
 //   expanded  workloads whose pods are shown one by one, and onExpand(id,
-//             on) to change that; without it, groups stay grouped
-export function TopologyView({ clusterId, view, focus, namespace, label, fitKey, tools, height, empty, expanded, onExpand }) {
+//             on) to change that; without it, groups stay grouped. With
+//             expands="namespaces", the cluster view's open namespaces.
+//   arrange, groupHref  for the cluster view (see TopologyGraph)
+export function TopologyView({
+  clusterId,
+  view,
+  focus,
+  namespace,
+  label,
+  fitKey,
+  tools,
+  height,
+  empty,
+  expanded,
+  onExpand,
+  expands,
+  arrange,
+  groupHref,
+}) {
   const [mode, setMode] = useState(() => (window.matchMedia?.(NARROW).matches ? "list" : "map"));
   const [selected, setSelected] = useState(null);
   const graph = useRef(null);
@@ -124,6 +141,8 @@ export function TopologyView({ clusterId, view, focus, namespace, label, fitKey,
               inset={shown ? PANEL_W : 0}
               fitKey={fitKey}
               empty={empty}
+              arrange={arrange}
+              groupHref={groupHref}
             />
             {shown && (
               <TopologyPanel
@@ -139,11 +158,13 @@ export function TopologyView({ clusterId, view, focus, namespace, label, fitKey,
                 }}
                 onClose={close}
                 expanded={expanded}
+                expands={expands}
                 onExpand={
                   onExpand &&
                   ((id, on) => {
-                    // The group's card goes; its workload's stays, to group them again.
-                    setSelected(id);
+                    // The group's card goes; its workload's stays, to group them
+                    // again. A namespace's card goes for its apps' cards.
+                    setSelected(expands === "namespaces" ? null : id);
                     onExpand(id, on);
                   })
                 }
@@ -153,7 +174,7 @@ export function TopologyView({ clusterId, view, focus, namespace, label, fitKey,
           <Legend />
         </>
       ) : (
-        <TopologyList clusterId={clusterId} view={view} focus={focus} namespace={namespace} empty={empty} />
+        <TopologyList clusterId={clusterId} view={view} focus={focus} namespace={namespace} empty={empty} arrange={arrange} />
       )}
     </div>
   );

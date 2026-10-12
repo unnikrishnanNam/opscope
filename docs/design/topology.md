@@ -26,7 +26,7 @@ Phases are numbered **G0–G7** so they don't mix with the build phases 0–8 or
 R, P and D. All work happens on the `feature/topology` branch, and each phase is committed there
 once it works, its tests pass and its notes are written. This feature has no issue of its own.
 
-**Status (2026-10-11):** G0 (the snapshot), G1 (the graph and `GET /topology`), G2 (the diagnosis on detail pages), G3 (the remaining rules and problems on the overview), G4 (the map) and G5 (the Topology page) done. G6 is next.
+**Status (2026-10-12):** G0 (the snapshot), G1 (the graph and `GET /topology`), G2 (the diagnosis on detail pages), G3 (the remaining rules and problems on the overview), G4 (the map), G5 (the Topology page) and G6 (background snapshots and the cluster's map) done. G7 is next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -224,8 +224,10 @@ are never created (a quota, Pod Security admission) still shows what it needs.
   a pod's problem is its node.
 - `Cluster()`: namespaces as groups, apps as nodes with a summary ("4 workloads, 1 failing"),
   Gateways and GatewayClasses as shared entry points, routes between them as edges, and nodes
-  (machines) as a strip of health underneath. A namespace with nothing wrong in it can collapse to
-  one tile.
+  (machines) as a strip of health underneath. A namespace with nothing wrong in it collapses to
+  one tile. As built (G6): an app's state counts the problems the diagnosis found in it, not only
+  its objects' states, and namespaces no edge joins to anything are laid out as a grid under the
+  columns, the worst first.
 
 Each view can be limited to problems: only nodes that aren't `ok`, the chains between them, and
 their direct parents for context.
@@ -358,11 +360,11 @@ picked without closing it. A List view shows the same content as text, and is wh
 on a phone.
 
 **Topology page (G5, G6).** A new page in the Cluster group (`g t`). It follows the namespace
-picker: a namespace (G5) or the whole cluster (G6; until then, "All namespaces" lists the
-namespaces to choose from, those with problems first). It has an app picker (`?app=`), a "Problems
-only" switch (`?problems=true`), a List view that shows the same content as an outline, and the
-same panel, which can also show a group's pods one by one. On screens narrower than 768 px it
-opens in List view. The overview's problems card links to it ("Show on map").
+picker: a namespace (G5) or, with "All namespaces", the whole cluster (G6). It has an app picker
+(`?app=`, for a namespace), a "Problems only" switch (`?problems=true`), a List view that shows the
+same content as an outline, and the same panel, which can also show a group's pods one by one, or
+in the cluster's map a namespace's apps. On screens narrower than 768 px it opens in List view.
+The overview's problems card links to it ("Show on map").
 
 **Problems on the overview (G3).** At the top of the "Recent warnings" card: the root causes, each
 with how many objects it explains, linking to the root object's diagnosis. The warnings follow
@@ -515,12 +517,12 @@ Goal: a namespace or one app can be seen whole, with its problems.
 
 Goal: the whole cluster can be seen at once, and snapshots are kept fresh for the timeline.
 
-- [ ] `Store.Collect`: every cluster every 30 s, backing off to 5 minutes for clusters that don't answer
-- [ ] `OPSCOPE_SNAPSHOT_INTERVAL` setting, documented in `docs/deployment.md`
-- [ ] The `Cluster()` view: namespaces holding apps, Gateways as entry points, the node strip, healthy namespaces collapsed
-- [ ] The Topology page with "All namespaces" selected shows it
-- [ ] Memory and API load measured on the multipass cluster over an hour; noted below
-- [ ] Checked with several clusters connected, one of them unreachable
+- [x] `Store.Collect`: every cluster every 30 s, backing off to 5 minutes for clusters that don't answer
+- [x] `OPSCOPE_SNAPSHOT_INTERVAL` setting, documented in `docs/deployment.md`
+- [x] The `Cluster()` view: namespaces holding apps, Gateways as entry points, the node strip, healthy namespaces collapsed
+- [x] The Topology page with "All namespaces" selected shows it
+- [x] Memory and API load measured on the multipass cluster over an hour; noted below
+- [x] Checked with several clusters connected, one of them unreachable
 
 ## Phase G7: Documentation and release
 
@@ -830,3 +832,56 @@ snapshots are taken every 30 seconds, and problems sit at the top of the "Recent
   shown one by one and grouped again), and on kind the scenarios namespace (57 objects). In both
   themes, at 375 px (it opens as a list), and with `g t` and the palette. The scenarios namespace
   was deleted afterwards.
+
+### G6
+
+- **Background snapshots.** `Store.Collect` (`snapshot/collect.go`) checks every second which
+  clusters are due and reads each on its own, so one that doesn't answer holds up no other. A
+  cluster is due 30 seconds after its latest snapshot, and one a page asked for counts: while
+  someone looks at a cluster, pages read it up to every 10 seconds and the background adds nothing.
+  A cluster that doesn't answer is tried after 1, 2 and 4 minutes, then every 5, and every 30
+  seconds again once it answers, also when a page's reading is what found it answering. The first
+  failure is logged as a warning and the recovery as information; each retry, and each snapshot
+  with its size and how long it took, at `debug`. Tests run the schedule on a fake clock.
+- **Settings.** `OPSCOPE_SNAPSHOT_INTERVAL` (`30s` by default; `10s` at least, the pages' own
+  interval; `0` or `off` for none) and, added for watching it, `OPSCOPE_LOG_LEVEL`. Both stop
+  Opscope at startup with a clear message when they can't be used, like the other settings.
+- **Measured on multipass** for half an hour rather than the planned hour (cut short on request,
+  the numbers having settled): a built Opscope with only that cluster, nobody looking. It took 55
+  snapshots of its 338 objects in 30 minutes (one every 32 seconds; that build checked for due
+  clusters every 5 seconds, since made every second), each in 12 to 44 ms, 16 ms typically. Each
+  snapshot is 27 `list` calls, one per kind (multipass has no kind with over 500 objects), so about
+  50 calls a minute. The process used 43 MB after two minutes, 46.6 MB after twenty and 46.7 MB
+  after twenty-nine: it settles rather than grows, holding one snapshot. The cluster's map of a
+  generated cluster of 5,000 pods takes 4 ms to build (`BenchmarkClusterView`), 5 ms with its
+  problems (`BenchmarkClusterRequest`).
+- **The cluster's map.** With "All namespaces", the Topology page shows `Cluster()`: each app is a
+  card ("7 workloads, 3 failing") in its namespace's box, a namespace with nothing wrong is one
+  card ("4 apps") that its panel can open ("Show its apps"), Gateways and classes are shared entry
+  points, and the machines are a strip under everything. Edges are the graph's own, merged between
+  cards, with `via` naming what's inside ("HTTPRoute web-route"). Only root causes come with it,
+  and each card lists the objects whose findings it shows; a missing StorageClass, which belongs
+  to no namespace, shows on the app whose claim needs it. A test checks every scenario problem is
+  on a card.
+- **A grid, not one tall column.** Drawn as plain columns, the 17 namespaces of multipass were one
+  column 25 cards tall beside two nearly empty ones. Now only what's joined to an entry point (here
+  `topology-test`, through its routes) stays in the columns; every other namespace is a block in a
+  grid under them, those with problems first, and the machines below that. The whole cluster fits
+  on one screen. `layout()` does both (`grid`, `strip`), with `sections` for their headings, and
+  the keyboard moves through them: arrows along the strip, by column in the grid, and up and down
+  between the parts.
+- **Problems the diagnosis found count.** A container that restarts is running between restarts,
+  so its pod, app and namespace were "ok" and the namespace folded away while its problem was
+  listed (`tigera-operator`, which had exited with code 1). The server now passes the diagnosis's
+  problems in (`Options.Troubled`), and they count toward the app and the namespace.
+- **Restarts from a machine restart aren't crashes.** Multipass had restarted shortly before, so
+  for an hour nearly every container on it counted as having just crashed with exit code 255: 34
+  problems on the overview, and every namespace open on the map. The runtime records such a stop
+  as reason `Unknown` (it never saw the container exit); `pod.crash` now leaves out a running
+  container whose last stop was `Unknown`. The overview went back to its six real problems.
+- **Checked** on multipass (28 cards; with "Problems only", the six apps with problems in their
+  three namespaces), on kind (everything in the grid: no Gateway API), in both themes, at 375 px
+  (the list, with each app's namespace written out), and with three clusters connected, one an
+  address nothing answers at. That one failed at 20:14 and was tried again at 20:15, 20:17, 20:21 and 20:26 (1, 2, 4 and 5
+  minutes apart, the next set for 5 minutes later), while the other two were read every 30 seconds;
+  its pages show the usual "Can't reach" banner.

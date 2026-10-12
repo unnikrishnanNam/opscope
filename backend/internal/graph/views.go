@@ -30,9 +30,12 @@ type PodGroup struct {
 // View is what the topology endpoint returns: nodes and the edges between
 // them, sorted, plus the apps of the namespace for a namespace or app view.
 type View struct {
-	Nodes []*Node `json:"nodes"`
-	Edges []*Edge `json:"edges"`
-	Apps  []App   `json:"apps,omitempty"`
+	Nodes  []*Node `json:"nodes"`
+	Edges  []*Edge `json:"edges"`
+	Apps   []App   `json:"apps,omitempty"`
+	Groups []Group `json:"groups,omitempty"` // the cluster view's namespaces
+
+	members map[string][]string // the cluster view: what each app or folded namespace holds
 }
 
 // App sums up one app of a namespace, for the app picker.
@@ -44,9 +47,15 @@ type App struct {
 
 // Options change what a view shows.
 type Options struct {
-	Expand   map[string]bool // workloads whose pods are shown one by one, by ID
-	All      bool            // expand every workload's pods
+	Expand   map[string]bool // workloads whose pods are shown one by one, by ID; in the cluster view, namespaces
+	All      bool            // expand every workload's pods; in the cluster view, every namespace
 	Problems bool            // only what isn't OK, and what points at it
+
+	// Troubled is, for the cluster view, the objects the diagnosis found a
+	// problem with and how bad it is. They count toward their app and
+	// namespace even when their own state is fine: a container that keeps
+	// restarting is running between restarts.
+	Troubled map[string]State
 }
 
 // Namespace shows everything in a namespace, what points at it from other

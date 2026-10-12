@@ -208,9 +208,10 @@ previous run, a container that doesn't exist) returns `400` with its message.
 
 ### `GET /api/clusters/{id}/topology`
 
-A graph of objects and what they need, for one namespace, one app or one object's neighbourhood.
-Opscope reads the whole cluster at once for it and uses that reading for up to 10 seconds, so
-several requests in a row read the cluster only once.
+A graph of objects and what they need, for the whole cluster, one namespace, one app or one
+object's neighbourhood. Opscope reads the whole cluster at once for it and uses that reading for up
+to 10 seconds, so several requests in a row read the cluster only once. It also reads each cluster
+in the background (see [Background snapshots](deployment.md#background-snapshots)).
 
 | Parameter   | Effect                                                                                  |
 | ----------- | --------------------------------------------------------------------------------------- |
@@ -218,10 +219,11 @@ several requests in a row read the cluster only once.
 | `app`       | With `namespace`, one app of that namespace                                             |
 | `focus`     | One object's ID (`pods/shop/web-1`, `nodes/worker-1`) and everything within `depth` edges of it, not going on through a node, a namespace or a class that many objects share |
 | `depth`     | With `focus`, from 1 to 5; default 2                                                    |
-| `expand`    | Workloads whose pods are shown one by one, as comma-separated IDs, or `all`             |
+| `expand`    | Workloads whose pods are shown one by one, as comma-separated IDs, or `all`; for the whole cluster, namespaces (`namespaces/blog`) shown open although nothing is wrong in them |
 | `problems`  | `true`: only objects that aren't `ok`, and what points at them                          |
 
-`focus` or `namespace` is required. An unknown `focus` answers `404`.
+Without `namespace` or `focus`, the whole cluster (below). An unknown `focus` answers `404`, and
+`app` without `namespace` answers `400`.
 
 ```json
 {
@@ -263,6 +265,37 @@ the pods in a group included, as in the [diagnosis](#get-apiclustersiddiagnosisr
 steps but without nesting; following `blames` from one leads to its root causes. What a finding
 blames is always in the view: when nothing else would put it there (a ResourceQuota that stops a
 ReplicaSet), it's added with a `blames` edge.
+
+**The whole cluster** is drawn by namespace. Each app is one node (`resource` `apps`, `kind`
+`App`, `id` `apps/<namespace>/<app>`) with a summary as its `status` ("3 workloads, 1 failing")
+and its namespace as `group`; `groups` lists those namespaces with their worst state. A namespace
+with nothing wrong in it is one node instead (`resource` `namespaces`, `status` "4 apps") unless
+`expand` names it. Gateways, GatewayClasses and IngressClasses are nodes of their own, shared by
+apps, and every node (machine) is there. The edges join these: an app's routes attach to a
+Gateway, its Ingress uses a class, a Gateway owns the app that runs it, an app routes to another;
+`via` names the objects inside the app. Only root causes come as `findings`, and an app's or a
+folded namespace's `members` lists the objects whose findings it shows, so each finding belongs to
+a node (a missing StorageClass belongs to the apps whose claims need it).
+
+```json
+{
+  "nodes": [
+    { "id": "apps/shop/checkout", "resource": "apps", "kind": "App", "namespace": "shop", "name": "checkout",
+      "app": "checkout", "state": "failing", "status": "1 workload, 1 failing", "group": "namespaces/shop",
+      "members": ["secrets/shop/stripe-key"] },
+    { "id": "namespaces/blog", "resource": "namespaces", "kind": "Namespace", "name": "blog", "state": "ok",
+      "status": "2 apps" },
+    { "id": "gateways/infra/main", "resource": "gateways", "kind": "Gateway", "namespace": "infra",
+      "name": "main", "state": "ok", "status": "Programmed" }
+  ],
+  "edges": [
+    { "from": "namespaces/blog", "to": "gateways/infra/main", "type": "attaches", "via": ["HTTPRoute blog"] }
+  ],
+  "groups": [{ "id": "namespaces/shop", "name": "shop", "state": "failing", "apps": 1 }],
+  "findings": [{ "id": "missing|secrets/shop/stripe-key|", "rule": "missing", "object": "secrets/shop/stripe-key", "...": "..." }],
+  "snapshot": { "taken": "2026-10-12T10:00:00Z", "skipped": [] }
+}
+```
 
 | `state`       | Meaning                                                                           |
 | ------------- | --------------------------------------------------------------------------------- |

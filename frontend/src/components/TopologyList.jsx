@@ -11,9 +11,9 @@ import "./TopologyList.css";
 // object with its status, what's wrong with it and what it connects to.
 // It reads the same with a screen reader or on a phone, so nothing a map
 // shows exists only in the picture.
-export default function TopologyList({ clusterId, view, focus, namespace, empty = "Nothing to show." }) {
+export default function TopologyList({ clusterId, view, focus, namespace, empty = "Nothing to show.", arrange }) {
   const search = nsQuery(useLocation().search);
-  const placed = useMemo(() => layout(view), [view]);
+  const placed = useMemo(() => layout(view, arrange), [view, arrange]);
   const index = useMemo(() => indexFindings(view), [view]);
   const roots = useMemo(() => rootCauses(index), [index]);
   const nodes = Object.fromEntries(view.nodes.map((n) => [n.id, n]));
@@ -21,10 +21,11 @@ export default function TopologyList({ clusterId, view, focus, namespace, empty 
   const columns = placed.columns.map((c, rank) => ({
     ...c,
     ids: Object.values(placed.nodes)
-      .filter((p) => p.rank === rank)
+      .filter((p) => p.rank === rank && !p.section)
       .sort((a, b) => a.y - b.y)
       .map((p) => p.id),
   }));
+  columns.push(...placed.sections);
 
   if (view.nodes.length === 0) return <p className="topo-list-empty">{empty}</p>;
 
@@ -94,6 +95,12 @@ function Name({ clusterId, n, nodes, namespace, search }) {
     const [resource, ns, name] = n.pods.owner.split("/");
     link = detailPath(clusterId, resource, ns, name);
     label = `${kindText(n)} of ${ownerKind(n, nodes)} ${n.name}`;
+  } else if (n.resource === "apps") {
+    // The cluster view's apps: without the boxes, the namespace says where.
+    label = `App ${n.namespace}/${n.name}`;
+    return <Link to={`/c/${clusterId}/topology?${new URLSearchParams({ ns: n.namespace, app: n.name })}`}>{label}</Link>;
+  } else if (n.resource === "namespaces" && exists) {
+    return <Link to={`/c/${clusterId}/topology?${new URLSearchParams({ ns: n.name })}`}>{label}</Link>;
   } else if (exists) {
     link = detailPath(clusterId, n.resource, n.namespace, n.name);
   }

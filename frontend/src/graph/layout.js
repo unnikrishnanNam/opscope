@@ -2,7 +2,8 @@ import { pluralKind } from "../diagnosis.js";
 
 // layout places a view of the graph (from GET /topology) for drawing.
 //
-//   layout(view, { previous }) → { width, height, columns, nodes, edges, order }
+//   layout(view, { previous, grid, strip })
+//     → { width, height, columns, nodes, edges, groups, sections, order }
 //
 // Kubernetes kinds already have a natural left-to-right order, roughly the
 // way traffic flows: a Gateway, its routes, Services, workloads, pods, then
@@ -25,6 +26,14 @@ import { pluralKind } from "../diagnosis.js";
 // edges come in. Given the previous layout's `order`, cards that were there
 // before keep their order in their column: a refresh that adds a pod doesn't
 // shuffle the rest.
+//
+// The cluster view adds three things. Cards with a `group` (an app's
+// namespace) stay together in their column, in a box named after the group
+// (`view.groups`). Cards of the kinds in `grid` (its apps and namespaces)
+// that no edge joins to anything aren't in a column at all: they're laid
+// out under the columns as a grid of blocks (a namespace's box, or a card),
+// the worst first. And the kinds in `strip` (its nodes, the machines) are a
+// row of cards under everything, wrapping to its width.
 
 export const NODE_W = 208;
 export const NODE_H = 64;
@@ -34,6 +43,13 @@ const ROW_GAP = 16;
 const LANE_GAP = 10; // between a lane and anything next to it
 const ORDER_SWEEPS = 12;
 const ROW_SWEEPS = 16;
+// A group's box: around its cards, with its name above them.
+export const BOX_X = 12;
+export const BOX_TOP = 34;
+const BOX_BOTTOM = 12;
+const SECTION_GAP = 72; // between the columns, the grid and the strip, a heading included
+const SECTION_SPACING = 16; // between cards and blocks in the grid and the strip
+const STATE_ORDER = { failing: 0, missing: 1, degraded: 2, unknown: 3, progressing: 4, ok: 5 };
 
 // COLUMNS, left to right. A column's label is used when it holds more than
 // one kind; with one, the kind names it ("Deployments").
@@ -41,6 +57,7 @@ export const COLUMNS = [
   { key: "classes", label: "Classes", resources: ["gatewayclasses", "ingressclasses"] },
   { key: "entry", label: "Entry points", resources: ["gateways", "ingresses"] },
   { key: "routes", label: "Routes", resources: ["httproutes"] },
+  { key: "apps", label: "Apps and namespaces", resources: ["apps", "namespaces"] }, // the cluster view's
   {
     key: "services",
     label: "Services and policies",
@@ -52,7 +69,7 @@ export const COLUMNS = [
   {
     key: "config",
     label: "Config and claims",
-    resources: ["configmaps", "secrets", "persistentvolumeclaims", "serviceaccounts", "resourcequotas", "namespaces"],
+    resources: ["configmaps", "secrets", "persistentvolumeclaims", "serviceaccounts", "resourcequotas"],
   },
   { key: "volumes", label: "Volumes", resources: ["persistentvolumes"] },
   { key: "storage", label: "Storage classes", resources: ["storageclasses"] },
@@ -69,8 +86,18 @@ export function edgeId(e) {
   return `${e.from}>${e.to}>${e.type}`;
 }
 
-export function layout(view, { previous } = {}) {
-  const nodes = [...view.nodes].sort((a, b) => compare(a.id, b.id));
+export function layout(view, { previous, grid = [], strip = [] } = {}) {
+  const all = [...view.nodes].sort((a, b) => compare(a.id, b.id));
+  const stripped = all.filter((n) => strip.includes(n.resource));
+  // What goes in the grid: cards no edge joins to anything, with every card
+  // of their group.
+  const joined = new Set(view.edges.flatMap((e) => [e.from, e.to]));
+  const joinedGroups = new Set(all.filter((n) => n.group && joined.has(n.id)).map((n) => n.group));
+  const gridded = all.filter(
+    (n) => grid.includes(n.resource) && !joined.has(n.id) && !(n.group && joinedGroups.has(n.group)),
+  );
+  const elsewhere = new Set([...stripped, ...gridded]);
+  const nodes = all.filter((n) => !elsewhere.has(n));
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const edges = view.edges
     .filter((e) => byId.has(e.from) && byId.has(e.to) && e.from !== e.to)
@@ -87,7 +114,9 @@ export function layout(view, { previous } = {}) {
 
   // Items are what a column holds: cards, and lanes for edges passing through.
   const items = new Map();
-  for (const n of nodes) items.set(n.id, { id: n.id, node: n, rank: rankOf.get(column(n)), h: NODE_H, left: [], right: [] });
+  for (const n of nodes) {
+    items.set(n.id, { id: n.id, node: n, group: n.group, rank: rankOf.get(column(n)), h: NODE_H, left: [], right: [] });
+  }
 
   // 2. Lanes. Each edge becomes a chain of items from its left end to its
   // right end, whichever way it points. Long edges that share an end share
@@ -135,11 +164,23 @@ export function layout(view, { previous } = {}) {
   const prev = previousOrder(previous, used);
   for (const layer of layers) {
     layer.sort((a, b) => startCompare(items.get(a), items.get(b), prev));
+    keepGroupsTogether(layer, items);
   }
   const { order, crossings: crossed } = orderLayers(layers, items, prev);
 
   // 4. Rows.
   const y = placeRows(order, items);
+
+  // Each group's box in each column it's in, around its cards.
+  const boxes = new Map();
+  for (const item of items.values()) {
+    if (!item.group) continue;
+    const key = `${item.group}|${item.rank}`;
+    const box = boxes.get(key) ?? { group: item.group, rank: item.rank, top: Infinity, bottom: -Infinity };
+    box.top = Math.min(box.top, y.get(item.id) - item.h / 2 - BOX_TOP);
+    box.bottom = Math.max(box.bottom, y.get(item.id) + item.h / 2 + BOX_BOTTOM);
+    boxes.set(key, box);
+  }
 
   // Coordinates: columns side by side, cards below the headings.
   let top = Infinity;
@@ -147,6 +188,10 @@ export function layout(view, { previous } = {}) {
   for (const item of items.values()) {
     top = Math.min(top, y.get(item.id) - item.h / 2);
     bottom = Math.max(bottom, y.get(item.id) + item.h / 2);
+  }
+  for (const box of boxes.values()) {
+    top = Math.min(top, box.top);
+    bottom = Math.max(bottom, box.bottom);
   }
   if (items.size === 0) top = bottom = 0;
   const shift = HEADER_H - top;
@@ -161,19 +206,101 @@ export function layout(view, { previous } = {}) {
     const item = items.get(n.id);
     placed[n.id] = { id: n.id, x: item.x, y: item.y - NODE_H / 2, w: NODE_W, h: NODE_H, rank: item.rank };
   }
+  const groupOf = new Map((view.groups ?? []).map((g) => [g.id, g]));
+  const groups = [...boxes.values()].map((box) => ({
+    id: box.group,
+    label: groupOf.get(box.group)?.name ?? box.group,
+    state: groupOf.get(box.group)?.state ?? "ok",
+    x: x(box.rank) - BOX_X,
+    y: round(box.top + shift),
+    w: NODE_W + 2 * BOX_X,
+    h: round(box.bottom - box.top),
+  }));
+
+  let width = used.length ? x(used.length - 1) + NODE_W : 0;
+  let height = items.size ? round(bottom - top + HEADER_H) : 0;
+  const sections = [];
+  const sectionTop = () => (height ? height + SECTION_GAP - HEADER_H : 0);
+
+  // The grid: blocks (a namespace's box with its apps, or one card) in
+  // columns, each block going to the shortest column, the worst first.
+  if (gridded.length) {
+    const blocks = new Map();
+    for (const n of gridded) {
+      const key = n.group ?? n.id;
+      if (!blocks.has(key)) blocks.set(key, { group: n.group, nodes: [] });
+      blocks.get(key).nodes.push(n);
+    }
+    const worst = (block) => Math.min(...block.nodes.map((n) => STATE_ORDER[n.state] ?? 5));
+    const name = (block) => (block.group ? (groupOf.get(block.group)?.name ?? block.group) : block.nodes[0].name);
+    const ordered = [...blocks.values()].sort((a, b) => worst(a) - worst(b) || compare(name(a), name(b)));
+
+    const blockW = NODE_W + 2 * BOX_X;
+    const pitch = blockW + SECTION_SPACING;
+    const count = Math.min(ordered.length, Math.max(4, Math.floor((width + SECTION_SPACING) / pitch)));
+    const headingY = sectionTop();
+    const tops = new Array(count).fill(headingY + HEADER_H);
+    for (const block of ordered) {
+      const col = tops.indexOf(Math.min(...tops));
+      const left = col * pitch;
+      let y = tops[col];
+      if (block.group) {
+        block.nodes.sort((a, b) => (STATE_ORDER[a.state] ?? 5) - (STATE_ORDER[b.state] ?? 5) || compare(a.name, b.name));
+        const h = BOX_TOP + block.nodes.length * (NODE_H + ROW_GAP) - ROW_GAP + BOX_BOTTOM;
+        const info = groupOf.get(block.group);
+        groups.push({ id: block.group, label: info?.name ?? block.group, state: info?.state ?? "ok", x: left, y, w: blockW, h });
+        y += BOX_TOP;
+      }
+      for (const n of block.nodes) {
+        placed[n.id] = { id: n.id, x: left + BOX_X, y, w: NODE_W, h: NODE_H, rank: used.length, section: "grid", col };
+        y += NODE_H + ROW_GAP;
+      }
+      tops[col] = y - ROW_GAP + (block.group ? BOX_BOTTOM : 0) + SECTION_SPACING;
+    }
+    // "Other namespaces" when some are up in the columns too.
+    const label = nodes.some((n) => grid.includes(n.resource)) ? "Other namespaces" : "Namespaces";
+    sections.push({ key: "grid", label, y: headingY, ids: ordered.flatMap((b) => b.nodes.map((n) => n.id)) });
+    width = Math.max(width, count * pitch - SECTION_SPACING);
+    height = Math.max(...tops) - SECTION_SPACING;
+  }
+
+  // The strip: a row of cards under the rest, wrapping to its width.
+  if (stripped.length) {
+    const pitch = NODE_W + SECTION_SPACING;
+    const perRow = Math.max(4, Math.floor((width + SECTION_SPACING) / pitch));
+    const headingY = sectionTop();
+    stripped.forEach((n, i) => {
+      placed[n.id] = {
+        id: n.id,
+        x: (i % perRow) * pitch,
+        y: headingY + HEADER_H + Math.floor(i / perRow) * (NODE_H + SECTION_SPACING),
+        w: NODE_W,
+        h: NODE_H,
+        rank: used.length + 1,
+        section: "strip",
+      };
+    });
+    const rows = Math.ceil(stripped.length / perRow);
+    sections.push({ key: "strip", label: pluralKind(stripped[0].kind), y: headingY, ids: stripped.map((n) => n.id) });
+    width = Math.max(width, Math.min(stripped.length, perRow) * pitch - SECTION_SPACING);
+    height = headingY + HEADER_H + rows * (NODE_H + SECTION_SPACING) - SECTION_SPACING;
+  }
 
   return {
-    width: used.length ? x(used.length - 1) + NODE_W : 0,
-    height: round(bottom - top + HEADER_H),
+    width,
+    height,
     columns: used.map((c, rank) => ({ key: COLUMNS[c].key, label: columnLabel(c, layers[rank], items), x: x(rank) })),
     nodes: placed,
     edges: routeEdges(routes, items),
+    groups,
+    sections, // the grid and the strip: { key, label, y, ids }
     crossings: crossed, // how many times edges cross, between neighbouring columns
-    order: Object.fromEntries(
-      order.flatMap((layer, rank) =>
+    order: Object.fromEntries([
+      ...order.flatMap((layer, rank) =>
         layer.filter((id) => !items.get(id).lane).map((id, index) => [id, { column: COLUMNS[used[rank]].key, index }]),
       ),
-    ),
+      ...sections.flatMap((section) => section.ids.map((id, index) => [id, { column: section.key, index }])),
+    ]),
   };
 }
 
@@ -202,12 +329,37 @@ function startCompare(a, b, prev) {
   if (pa && pb) return pa.index - pb.index;
   if (pa || pb) return pa ? -1 : 1;
   return (
+    compare(namespaceKey(a.node), namespaceKey(b.node)) ||
     compare(a.node.app ?? "", b.node.app ?? "") ||
     (resourceOrder.get(a.node.resource) ?? 99) - (resourceOrder.get(b.node.resource) ?? 99) ||
     compare(a.node.namespace ?? "", b.node.namespace ?? "") ||
     compare(a.node.name, b.node.name) ||
     compare(a.id, b.id)
   );
+}
+
+// namespaceKey orders the cluster view's apps and folded namespaces by
+// namespace, so they start alphabetical; other cards are left to the rest.
+function namespaceKey(n) {
+  if (n.resource === "namespaces") return n.name;
+  return n.group ? (n.namespace ?? "") : "";
+}
+
+// keepGroupsTogether moves the cards of each group next to each other, the
+// groups where their cards are on average, keeping the order inside each.
+function keepGroupsTogether(layer, items) {
+  const blocks = new Map();
+  layer.forEach((id, i) => {
+    const group = items.get(id).group;
+    const key = group ? `group:${group}` : `item:${id}`;
+    if (!blocks.has(key)) blocks.set(key, { sum: 0, ids: [] });
+    const block = blocks.get(key);
+    block.sum += i;
+    block.ids.push(id);
+  });
+  if (blocks.size === layer.length) return; // no groups here
+  const ordered = [...blocks.values()].sort((a, b) => a.sum / a.ids.length - b.sum / b.ids.length);
+  layer.splice(0, layer.length, ...ordered.flatMap((block) => block.ids));
 }
 
 // orderLayers sweeps left to right and back, moving each item to the
@@ -232,6 +384,7 @@ function orderLayers(layers, items, prev) {
       }
       layers[rank].sort((a, b) => bary.get(a) - bary.get(b) || pos.get(a) - pos.get(b));
       keepPrevious(layers[rank], prev);
+      keepGroupsTogether(layers[rank], items);
       index(layers[rank]);
     }
     transpose(layers, items, pos, prev);
@@ -264,6 +417,7 @@ function transpose(layers, items, pos, prev) {
       for (let i = 0; i + 1 < layer.length; i++) {
         const [u, v] = [layer[i], layer[i + 1]];
         if (prev.has(u) && prev.has(v)) continue;
+        if (items.get(u).group !== items.get(v).group) continue; // a group stays in one piece
         if (crossed(v, u) < crossed(u, v)) {
           [layer[i], layer[i + 1]] = [v, u];
           pos.set(v, i);
@@ -357,9 +511,11 @@ function placeRows(layers, items) {
   return y;
 }
 
-// separation is the least distance between two neighbours' middles.
+// separation is the least distance between two neighbours' middles, with
+// room for a group's box where one group ends or another starts.
 function separation(a, b) {
-  const gap = a.lane || b.lane ? LANE_GAP : ROW_GAP;
+  let gap = a.lane || b.lane ? LANE_GAP : ROW_GAP;
+  if (a.group !== b.group) gap += (a.group ? BOX_BOTTOM : 0) + (b.group ? BOX_TOP : 0);
   return a.h / 2 + gap + b.h / 2;
 }
 

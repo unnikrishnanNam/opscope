@@ -99,6 +99,30 @@ func TestTopology(t *testing.T) {
 	}
 }
 
+// With no namespace or focus, the whole cluster: an app's card in its
+// namespace's group, showing its root cause.
+func TestClusterTopology(t *testing.T) {
+	rec := get(newTopologyServer(t, shopSnapshot), "/api/clusters/lab/topology")
+	var body struct {
+		Nodes []struct {
+			ID, State, Group string
+			Members          []string
+		}
+		Groups   []struct{ ID string }
+		Findings []struct{ Object string }
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(rec.Code, err)
+	}
+	if len(body.Nodes) != 1 || body.Nodes[0].ID != "apps/shop/web" || body.Nodes[0].Group != "namespaces/shop" ||
+		len(body.Nodes[0].Members) != 1 || body.Nodes[0].Members[0] != "configmaps/shop/settings" {
+		t.Errorf("nodes = %+v", body.Nodes)
+	}
+	if len(body.Groups) != 1 || len(body.Findings) != 1 || body.Findings[0].Object != "configmaps/shop/settings" {
+		t.Errorf("groups = %+v, findings = %+v", body.Groups, body.Findings)
+	}
+}
+
 func TestTopologyErrors(t *testing.T) {
 	server := newTopologyServer(t, shopSnapshot)
 	tests := []struct {
@@ -106,7 +130,6 @@ func TestTopologyErrors(t *testing.T) {
 		want int
 		text string
 	}{
-		{"/api/clusters/lab/topology", http.StatusBadRequest, "give a namespace"},
 		{"/api/clusters/lab/topology?app=web", http.StatusBadRequest, "within a namespace"},
 		{"/api/clusters/lab/topology?focus=pods/shop/web&depth=9", http.StatusBadRequest, "depth"},
 		{"/api/clusters/lab/topology?focus=pods/shop/nope", http.StatusNotFound, "no object pods/shop/nope"},

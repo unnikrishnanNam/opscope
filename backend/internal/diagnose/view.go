@@ -1,6 +1,7 @@
 package diagnose
 
 import (
+	"slices"
 	"sort"
 
 	"opscope/internal/graph"
@@ -58,4 +59,82 @@ func (d *Diagnosis) ForView(v *graph.View) []*Finding {
 	}
 	sort.SliceStable(findings, func(i, j int) bool { return findings[i].Object < findings[j].Object })
 	return findings
+}
+
+// ForCluster returns the problems a cluster view shows, as the findings
+// they're made of, and names on each card the objects whose findings it
+// shows (Node.Members). A problem is shown on the card of the object it's
+// about, or, when no card holds that object (a missing StorageClass), on the
+// cards of the apps it affects. Only root causes are sent: a card says
+// what's wrong at its root, and its own map has the rest.
+func (d *Diagnosis) ForCluster(v *graph.View) []*Finding {
+	cardOf := map[string]string{}
+	for _, n := range v.Nodes {
+		cardOf[n.ID] = n.ID
+		for _, member := range v.Members(n.ID) {
+			cardOf[member] = n.ID
+		}
+	}
+	shown := map[string]map[string]bool{} // card → objects whose findings it shows
+	show := func(card, object string) {
+		if shown[card] == nil {
+			shown[card] = map[string]bool{}
+		}
+		shown[card][object] = true
+	}
+
+	findings := []*Finding{}
+	for _, p := range d.Problems("") {
+		// The cards of what it affects, for objects that have none.
+		var affected []string
+		for _, n := range p.Affects {
+			if card := cardOf[n.ID]; card != "" && v.Members(card) != nil && !slices.Contains(affected, card) {
+				affected = append(affected, card)
+			}
+		}
+		for _, object := range p.Objects {
+			cards := []string{cardOf[object]}
+			if cards[0] == "" {
+				cards = affected
+			}
+			if len(cards) == 0 {
+				continue // about nothing this view shows
+			}
+			for _, f := range d.byObject[object] {
+				if f.Rule == p.Rule && f.Title == p.Title {
+					findings = append(findings, f)
+				}
+			}
+			for _, card := range cards {
+				if card != object {
+					show(card, object)
+				}
+			}
+		}
+	}
+	// The cards that list members are the view's own, made for it; the
+	// shared ones (a Gateway, a node) are their own objects already.
+	for _, n := range v.Nodes {
+		if objects := shown[n.ID]; objects != nil && v.Members(n.ID) != nil {
+			n.Members = make([]string, 0, len(objects))
+			for object := range objects {
+				n.Members = append(n.Members, object)
+			}
+			sort.Strings(n.Members)
+		}
+	}
+	sort.SliceStable(findings, func(i, j int) bool { return findings[i].Object < findings[j].Object })
+	return findings
+}
+
+// Troubled lists the objects with a problem (a root cause that isn't a
+// note) and how bad it is, for the cluster view to count toward their apps.
+func (d *Diagnosis) Troubled() map[string]graph.State {
+	troubled := map[string]graph.State{}
+	for _, p := range d.Problems("") {
+		for _, object := range p.Objects {
+			troubled[object] = graph.Worse(troubled[object], graph.State(p.Severity))
+		}
+	}
+	return troubled
 }

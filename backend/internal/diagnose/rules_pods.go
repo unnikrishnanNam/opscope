@@ -384,6 +384,13 @@ var podCrash = Rule{ID: "pod.crash", Resources: []string{"pods"}, Check: func(c 
 		if s.State.Running != nil && c.Now.Sub(last.FinishedAt.Time) > recentRestart {
 			continue
 		}
+		// Running again after a stop the runtime didn't see the end of
+		// (reason Unknown, exit 255): its machine or container runtime
+		// restarted under it. It didn't fail; every container on that
+		// machine shows the same.
+		if s.State.Running != nil && last.Reason == "Unknown" {
+			continue
+		}
 
 		f := &Finding{
 			Severity:   Degraded,

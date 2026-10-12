@@ -19,9 +19,12 @@ export function indexFindings(view) {
   const drawnAs = new Map();
   const objects = new Map(); // card → the objects it stands for
   for (const n of view.nodes) {
+    // A group of pods, or in the cluster view an app or a namespace,
+    // stands for the objects it lists.
+    const members = n.pods?.members ?? n.members ?? [];
     drawnAs.set(n.id, n.id);
-    objects.set(n.id, [n.id, ...(n.pods?.members ?? [])]);
-    for (const member of n.pods?.members ?? []) drawnAs.set(member, n.id);
+    objects.set(n.id, [n.id, ...members]);
+    for (const member of members) drawnAs.set(member, n.id);
   }
   const byObject = new Map();
   const byNode = new Map();

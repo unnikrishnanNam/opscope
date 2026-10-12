@@ -27,6 +27,7 @@ const ICONS = {
   horizontalpodautoscalers: icons.AutoscalersIcon,
   poddisruptionbudgets: icons.DisruptionBudgetsIcon,
   namespaces: icons.NamespaceIcon,
+  apps: icons.AppsIcon,
 };
 
 export function kindIcon(resource) {

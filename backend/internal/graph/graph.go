@@ -58,6 +58,8 @@ type Node struct {
 	Status    string    `json:"status"`            // what its list page shows: "CrashLoopBackOff", "2/3"
 	Message   string    `json:"message,omitempty"` // why, when something is wrong
 	Pods      *PodGroup `json:"pods,omitempty"`    // set when this node stands for several pods (views only)
+	Group     string    `json:"group,omitempty"`   // the cluster view's namespace group the card is in
+	Members   []string  `json:"members,omitempty"` // cluster view: the objects whose findings the card shows
 
 	labels map[string]string
 }

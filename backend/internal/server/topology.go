@@ -34,13 +34,16 @@ type topologyResponse struct {
 // GET /api/clusters/{id}/topology?namespace=&app=&focus=&depth=&expand=&problems=
 //
 // One view of the cluster's graph:
+//   - nothing: the whole cluster, as namespaces holding apps
 //   - focus=pods/shop/web-1 (depth=1–5, default 2): one object and its neighbourhood
 //   - namespace=shop: a namespace, and what it needs elsewhere
 //   - namespace=shop&app=storefront: one app of a namespace
 //
-// expand lists workloads whose pods are shown one by one (comma-separated
+// expand lists workloads whose pods are shown one by one, or in the cluster
+// view namespaces shown although nothing is wrong in them (comma-separated
 // IDs, or "all"), and problems=true keeps only what isn't OK. The findings
-// about what's shown come with it, and what they blame is added to the view.
+// about what's shown come with it (in the cluster view, its root causes),
+// and what they blame is added to the view.
 func getTopology(manager *clusters.Manager, store *snapshot.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cluster, ok := findCluster(w, r, manager)
@@ -73,10 +76,6 @@ func getTopology(manager *clusters.Manager, store *snapshot.Store) http.HandlerF
 			writeError(w, http.StatusBadRequest, "an app is named within a namespace: add ?namespace=")
 			return
 		}
-		if focus == "" && namespace == "" {
-			writeError(w, http.StatusBadRequest, "give a namespace, or an object to focus on")
-			return
-		}
 
 		s, err := store.Get(r.Context(), cluster)
 		if err != nil {
@@ -86,7 +85,11 @@ func getTopology(manager *clusters.Manager, store *snapshot.Store) http.HandlerF
 		g := graph.Of(s)
 
 		var view *graph.View
+		wholeCluster := focus == "" && namespace == ""
 		switch {
+		case wholeCluster:
+			options.Troubled = diagnose.Of(s).Troubled()
+			view = g.Cluster(options)
 		case focus != "":
 			var found bool
 			if view, found = g.Neighbourhood(focus, depth, options); !found {
@@ -98,7 +101,12 @@ func getTopology(manager *clusters.Manager, store *snapshot.Store) http.HandlerF
 		default:
 			view = g.Namespace(namespace, options)
 		}
-		findings := diagnose.Of(s).ForView(view)
+		var findings []*diagnose.Finding
+		if wholeCluster {
+			findings = diagnose.Of(s).ForCluster(view)
+		} else {
+			findings = diagnose.Of(s).ForView(view)
+		}
 		writeJSON(w, http.StatusOK, topologyResponse{View: view, Findings: findings, Snapshot: infoOf(s)})
 	}
 }

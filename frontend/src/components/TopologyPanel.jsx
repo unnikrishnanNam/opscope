@@ -24,8 +24,21 @@ const CONFIDENCE = {
 //   id           the selected card; focus, the map's own object
 //   onSelect(id) picks another card; onClose() closes the panel
 //   expanded, onExpand(id, on)  workloads whose pods are shown one by one,
-//                and how to change that (optional)
-export default function TopologyPanel({ clusterId, view, index, id, focus, namespace, onSelect, onClose, expanded, onExpand }) {
+//                and how to change that (optional); with expands="namespaces",
+//                the cluster view's namespaces shown open
+export default function TopologyPanel({
+  clusterId,
+  view,
+  index,
+  id,
+  focus,
+  namespace,
+  onSelect,
+  onClose,
+  expanded,
+  onExpand,
+  expands = "pods",
+}) {
   const titleId = useId();
   const titleRef = useRef(null);
   const search = nsQuery(useLocation().search);
@@ -43,6 +56,9 @@ export default function TopologyPanel({ clusterId, view, index, id, focus, names
   const ctx = { clusterId, search, nodes, namespace };
   const here = Boolean(focus) && (id === focus || n.pods?.owner === focus); // its page is this one
   const page = here ? null : pageOf(clusterId, n, nodes);
+  const map = mapOf(clusterId, n);
+  const pods = onExpand && expands === "pods";
+  const namespaces = onExpand && expands === "namespaces";
   const findings = merge(index.byNode.get(id) ?? [], index);
 
   return (
@@ -73,31 +89,44 @@ export default function TopologyPanel({ clusterId, view, index, id, focus, names
       {n.message && n.state !== "missing" && <p className="topo-panel-message">{n.message}</p>}
 
       {/* Links to its page and its own map (there are none for the page's
-          own object), and showing a group's pods one by one. */}
-      {(page || (onExpand && (n.pods || expanded?.includes(id)))) && (
-        <div className="topo-panel-actions">
-          {page && (
-            <Button size="sm" to={page.path + search}>
-              Open {page.label}
-            </Button>
-          )}
-          {page && (
-            <Button size="sm" variant="quiet" icon={MapIcon} to={`${page.path}?${mapQuery(search)}`}>
-              Its map
-            </Button>
-          )}
-          {onExpand && n.pods && n.pods.total > 1 && (
-            <Button size="sm" variant="quiet" onClick={() => onExpand(n.pods.owner, true)}>
-              Show each pod
-            </Button>
-          )}
-          {onExpand && expanded?.includes(id) && (
-            <Button size="sm" variant="quiet" onClick={() => onExpand(id, false)}>
-              Group its pods
-            </Button>
-          )}
-        </div>
-      )}
+          own object), and showing a group's pods or a namespace's apps. */}
+      <div className="topo-panel-actions">
+        {page && (
+          <Button size="sm" to={page.path + search}>
+            Open {page.label}
+          </Button>
+        )}
+        {page && (
+          <Button size="sm" variant="quiet" icon={MapIcon} to={`${page.path}?${mapQuery(search)}`}>
+            Its map
+          </Button>
+        )}
+        {map && (
+          <Button size="sm" icon={MapIcon} to={map}>
+            Open its map
+          </Button>
+        )}
+        {pods && n.pods && n.pods.total > 1 && (
+          <Button size="sm" variant="quiet" onClick={() => onExpand(n.pods.owner, true)}>
+            Show each pod
+          </Button>
+        )}
+        {pods && expanded?.includes(id) && (
+          <Button size="sm" variant="quiet" onClick={() => onExpand(id, false)}>
+            Group its pods
+          </Button>
+        )}
+        {namespaces && n.resource === "namespaces" && (
+          <Button size="sm" variant="quiet" onClick={() => onExpand(id, true)}>
+            Show its apps
+          </Button>
+        )}
+        {namespaces && n.group && expanded?.includes(n.group) && (
+          <Button size="sm" variant="quiet" onClick={() => onExpand(n.group, false)}>
+            Fold {n.namespace} up
+          </Button>
+        )}
+      </div>
 
       <section className="topo-panel-section" aria-label="Findings">
         {findings.length === 0 ? (
@@ -227,6 +256,21 @@ function pageOf(clusterId, n, nodes) {
   }
   const path = detailPath(clusterId, n.resource, n.namespace, n.name);
   return path && { path, label: n.kind };
+}
+
+// mapOf is the Topology page's map of a cluster view's app or namespace
+// (or of a Namespace on any map).
+function mapOf(clusterId, n) {
+  const params = new URLSearchParams();
+  if (n.resource === "apps") {
+    params.set("ns", n.namespace);
+    params.set("app", n.name);
+  } else if (n.resource === "namespaces" && n.state !== "missing") {
+    params.set("ns", n.name);
+  } else {
+    return null;
+  }
+  return `/c/${clusterId}/topology?${params}`;
 }
 
 function mapQuery(search) {

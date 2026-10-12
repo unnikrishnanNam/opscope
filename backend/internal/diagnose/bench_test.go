@@ -81,3 +81,16 @@ func BenchmarkProblems(b *testing.B) {
 		d.Problems("team-1")
 	}
 }
+
+// BenchmarkClusterRequest is what one request for the cluster's map does
+// once the snapshot is read: the view, and the problems on its cards.
+func BenchmarkClusterRequest(b *testing.B) {
+	s := large()
+	d := Run(s)
+	g := graph.Of(s)
+	b.ReportAllocs()
+	for b.Loop() {
+		view := g.Cluster(graph.Options{Troubled: d.Troubled()})
+		d.ForCluster(view)
+	}
+}

@@ -59,6 +59,67 @@
   text-overflow: ellipsis;
 }
 
+/* The cluster view's namespaces: a box around their apps, named at the top. */
+.topo-box {
+  position: absolute;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-2) 55%, transparent);
+  pointer-events: none;
+}
+
+.topo-box-failing {
+  border-color: color-mix(in srgb, var(--bad-mark) 45%, var(--border));
+}
+
+.topo-box-degraded {
+  border-color: color-mix(in srgb, var(--warn-mark) 45%, var(--border));
+}
+
+.topo-box-label {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-strong);
+  color: var(--text-muted);
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+.topo-box-label svg {
+  flex-shrink: 0;
+  color: var(--text-subtle);
+}
+
+.topo-box-label a {
+  overflow: hidden;
+  color: inherit;
+  text-overflow: ellipsis;
+  text-decoration: none;
+}
+
+.topo-box-label a:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+/* The headings over the grid of namespaces and the strip of machines. */
+.topo-section-heading {
+  position: absolute;
+  left: 2px;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-strong);
+  line-height: 24px;
+  color: var(--text-subtle);
+}
+
 /* Edges */
 
 .topo-edges {

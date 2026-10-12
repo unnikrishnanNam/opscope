@@ -25,6 +25,7 @@ const (
 type Store struct {
 	maxAge time.Duration
 	load   func(context.Context, *clusters.Cluster) (*Snapshot, error)
+	now    func() time.Time // the clock; tests set their own
 
 	mu      sync.Mutex
 	entries map[string]*entry // by cluster ID
@@ -56,6 +57,7 @@ func NewStoreReading(load func(context.Context, *clusters.Cluster) (*Snapshot, e
 	return &Store{
 		maxAge:  MaxAge,
 		load:    load,
+		now:     time.Now,
 		entries: map[string]*entry{},
 	}
 }
@@ -71,13 +73,18 @@ func loadCluster(ctx context.Context, c *clusters.Cluster) (*Snapshot, error) {
 // caller gives up (the browser navigates away), others waiting for the same
 // load still get it, and the next caller can use it.
 func (s *Store) Get(ctx context.Context, cluster *clusters.Cluster) (*Snapshot, error) {
+	return s.get(ctx, cluster, s.maxAge)
+}
+
+// get returns a snapshot no older than maxAge, taking a new one if needed.
+func (s *Store) get(ctx context.Context, cluster *clusters.Cluster, maxAge time.Duration) (*Snapshot, error) {
 	s.mu.Lock()
 	e := s.entries[cluster.ID]
 	if e == nil || e.cluster != cluster {
 		e = &entry{cluster: cluster}
 		s.entries[cluster.ID] = e
 	}
-	if e.latest != nil && time.Since(e.latest.Taken) < s.maxAge {
+	if e.latest != nil && s.now().Sub(e.latest.Taken) < maxAge {
 		latest := e.latest
 		s.mu.Unlock()
 		return latest, nil
@@ -112,6 +119,16 @@ func (s *Store) run(e *entry, p *pending) {
 	}
 	s.mu.Unlock()
 	close(p.done)
+}
+
+// latest is the cluster's latest snapshot, if there is one.
+func (s *Store) latest(cluster *clusters.Cluster) *Snapshot {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if e := s.entries[cluster.ID]; e != nil && e.cluster == cluster {
+		return e.latest
+	}
+	return nil
 }
 
 // Forget drops the snapshots of clusters that are no longer known.

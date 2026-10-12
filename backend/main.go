@@ -33,7 +33,12 @@ var version = "dev"
 const shutdownTimeout = 10 * time.Second
 
 func main() {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	level, err := logLevel(os.Getenv("OPSCOPE_LOG_LEVEL"))
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
+	if err != nil {
+		logger.Error("can't use OPSCOPE_LOG_LEVEL", "error", err)
+		os.Exit(1)
+	}
 
 	cfg := server.Config{
 		Version:   version,
@@ -41,6 +46,11 @@ func main() {
 	}
 	addr := ":" + getEnv("PORT", "8080")
 	dataDir := getEnv("DATA_DIR", "../data")
+	interval, err := snapshot.ParseInterval(os.Getenv("OPSCOPE_SNAPSHOT_INTERVAL"))
+	if err != nil {
+		logger.Error("can't use OPSCOPE_SNAPSHOT_INTERVAL", "error", err)
+		os.Exit(1)
+	}
 
 	logger.Info("starting opscope", "addr", addr, "version", version, "static_dir", cfg.StaticDir, "data_dir", dataDir)
 
@@ -84,9 +94,18 @@ func main() {
 	history := metrics.NewHistory()
 	go history.Collect(ctx, manager, logger)
 
+	// Read every cluster in the background too, so the cluster view is
+	// ready and the timeline has snapshots to compare.
+	snapshots := snapshot.NewStore()
+	if interval > 0 {
+		go snapshots.Collect(ctx, manager, interval, logger)
+	} else {
+		logger.Info("background snapshots are off; clusters are read when a page asks")
+	}
+
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           server.New(cfg, manager, history, snapshot.NewStore(), logger),
+		Handler:           server.New(cfg, manager, history, snapshots, logger),
 		ReadHeaderTimeout: 10 * time.Second, // don't let a slow client hold a connection open forever
 	}
 
@@ -116,6 +135,18 @@ func main() {
 		logger.Error("server error during shutdown", "error", err)
 	}
 	logger.Info("stopped")
+}
+
+// logLevel reads OPSCOPE_LOG_LEVEL: debug, info (the default), warn or error.
+func logLevel(value string) (slog.Level, error) {
+	if value == "" {
+		return slog.LevelInfo, nil
+	}
+	var level slog.Level
+	if err := level.UnmarshalText([]byte(value)); err != nil {
+		return slog.LevelInfo, errors.New(`use debug, info, warn or error, not "` + value + `"`)
+	}
+	return level, nil
 }
 
 // getEnv returns the value of an environment variable, or a fallback if it is empty.

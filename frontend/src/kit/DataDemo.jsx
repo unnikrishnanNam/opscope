@@ -337,6 +337,7 @@ const TOPOLOGIES = {
   healthy: { label: "Healthy", view: sample.topologyHealthy, focus: "deployments/blog/blog", namespace: "blog" },
   missing: { label: "Missing and unknown", view: sample.topologyMissing, focus: "ingresses/lab/secure", namespace: "lab" },
   large: { label: "Large", view: sample.topologyLarge, namespace: "shop" },
+  cluster: { label: "Cluster", view: sample.topologyCluster, arrange: { grid: ["apps", "namespaces"], strip: ["nodes"] } },
 };
 
 function Topology() {
@@ -360,6 +361,7 @@ function Topology() {
         label={`Map: ${t.label.toLowerCase()} sample`}
         fitKey={which}
         height={460}
+        arrange={t.arrange}
       />
     </div>
   );
@@ -387,7 +389,7 @@ export const dataSections = [
     id: "topology",
     title: "Topology map",
     about:
-      "An object's neighbourhood: kinds in columns, roughly the way traffic flows. The way from the focused card (or the selected one) to its root causes is drawn in the problem's colour. Drag or scroll to pan, ⌘/Ctrl and scroll to zoom; arrow keys move along edges, Enter opens a card's details.",
+      "An object's neighbourhood, or the whole cluster: kinds in columns, roughly the way traffic flows. The way from the focused card (or the selected one) to its root causes is drawn in the problem's colour. Drag or scroll to pan, ⌘/Ctrl and scroll to zoom; arrow keys move along edges, Enter opens a card's details.",
     render: () => <Topology />,
   },
   {

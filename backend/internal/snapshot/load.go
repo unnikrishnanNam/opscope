@@ -199,6 +199,7 @@ func Load(ctx context.Context, clients kube.Clients) (*Snapshot, error) {
 	}
 
 	s.BuildIndex()
+	s.Took = time.Since(s.Taken)
 	return s, nil
 }
 

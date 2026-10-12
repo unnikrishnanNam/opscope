@@ -583,20 +583,28 @@ func TestProblemsByNamespace(t *testing.T) {
 // A container that restarted long ago (a node reboot) and runs fine since
 // isn't a problem; one that restarted minutes ago may be.
 func TestOldRestartsAreIgnored(t *testing.T) {
-	restarted := func(name string, ago time.Duration) corev1.Pod {
+	restarted := func(name string, ago time.Duration, reason string, code int32) corev1.Pod {
 		return corev1.Pod{ObjectMeta: meta("a", name), Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "app"}}},
 			Status: corev1.PodStatus{Phase: corev1.PodRunning,
 				Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
 				ContainerStatuses: []corev1.ContainerStatus{{Name: "app", Ready: true, RestartCount: 1,
 					State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}},
 					LastTerminationState: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{
-						ExitCode: 255, Reason: "Unknown", FinishedAt: metav1.NewTime(now.Add(-ago))}}}}}}
+						ExitCode: code, Reason: reason, FinishedAt: metav1.NewTime(now.Add(-ago))}}}}}}
 	}
-	d := run(&snapshot.Snapshot{Pods: []corev1.Pod{restarted("rebooted", 11*time.Hour), restarted("flapping", 3*time.Minute)}})
-	if f := d.Findings("pods/a/rebooted"); len(f) != 0 {
-		t.Errorf("rebooted: %q", titles(d, "pods/a/rebooted"))
+	d := run(&snapshot.Snapshot{Pods: []corev1.Pod{
+		restarted("long-ago", 11*time.Hour, "Error", 1),
+		// The machine restarted three minutes ago: the runtime never saw
+		// the container stop, so it says Unknown, 255. Not a crash.
+		restarted("rebooted", 3*time.Minute, "Unknown", 255),
+		restarted("flapping", 3*time.Minute, "Error", 1),
+	}})
+	for _, name := range []string{"long-ago", "rebooted"} {
+		if f := d.Findings("pods/a/" + name); len(f) != 0 {
+			t.Errorf("%s: %q", name, titles(d, "pods/a/"+name))
+		}
 	}
-	if got := titles(d, "pods/a/flapping"); !slices.Equal(got, []string{"Container app exits with code 255"}) {
+	if got := titles(d, "pods/a/flapping"); !slices.Equal(got, []string{"Container app exits with code 1"}) {
 		t.Errorf("flapping: %q", got)
 	}
 }

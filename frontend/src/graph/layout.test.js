@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HEADER_H, NODE_H, NODE_W, layout } from "./layout.js";
+import { BOX_TOP, BOX_X, HEADER_H, NODE_H, NODE_W, layout } from "./layout.js";
 
 const KINDS = {
   gatewayclasses: "GatewayClass",
@@ -16,6 +16,8 @@ const KINDS = {
   configmaps: "ConfigMap",
   secrets: "Secret",
   nodes: "Node",
+  apps: "App",
+  namespaces: "Namespace",
 };
 
 // node("deployments/shop/web") → a node as the API sends it.
@@ -222,5 +224,107 @@ describe("layout", () => {
 
   it("draws an empty view as nothing", () => {
     expect(layout({ nodes: [], edges: [] })).toMatchObject({ width: 0, columns: [], nodes: {}, edges: [] });
+  });
+});
+
+describe("the cluster view", () => {
+  // Apps in their namespaces, folded namespaces, a Gateway two apps use,
+  // and three machines.
+  const app = (ns, name, extra = {}) => node(`apps/${ns}/${name}`, { group: `namespaces/${ns}`, namespace: ns, ...extra });
+  const cluster = {
+    nodes: [
+      node("gateways/infra/main"),
+      app("shop", "web"),
+      app("shop", "api", { state: "failing" }),
+      app("blog", "blog"),
+      app("blog", "db"),
+      node("namespaces/calm"),
+      node("namespaces/quiet"),
+      node("nodes/worker-1"),
+      node("nodes/worker-2", { state: "failing" }),
+      node("nodes/worker-3"),
+    ],
+    edges: [edge("apps/shop/web", "gateways/infra/main", "attaches"), edge("apps/blog/blog", "gateways/infra/main", "attaches")],
+    groups: [
+      { id: "namespaces/blog", name: "blog", state: "ok" },
+      { id: "namespaces/shop", name: "shop", state: "failing" },
+    ],
+  };
+
+  it("keeps each namespace's apps together, in a box around them", () => {
+    const result = layout(cluster);
+    const apps = Object.values(result.nodes)
+      .filter((n) => n.id.startsWith("apps/") || n.id.startsWith("namespaces/"))
+      .sort((a, b) => a.y - b.y)
+      .map((n) => n.id.split("/")[1]);
+    // Each namespace's apps are next to each other.
+    expect(apps.join(",")).toMatch(/^(?:(?!shop).)*shop,shop(?:(?!shop).)*$/);
+    expect(apps.join(",")).toMatch(/^(?:(?!blog).)*blog,blog(?:(?!blog).)*$/);
+
+    expect(result.groups.map((g) => g.label).sort()).toEqual(["blog", "shop"]);
+    for (const group of result.groups) {
+      for (const n of Object.values(result.nodes).filter((n) => !n.section)) {
+        const inside = n.x >= group.x && n.x + n.w <= group.x + group.w && n.y >= group.y && n.y + n.h <= group.y + group.h;
+        const member = n.id.startsWith(`apps/${group.label}/`);
+        expect(inside).toBe(member);
+      }
+      expect(group.x).toBe(result.nodes[`apps/${group.label}/${group.label === "shop" ? "web" : "db"}`].x - BOX_X);
+    }
+    const shop = result.groups.find((g) => g.label === "shop");
+    expect(shop.state).toBe("failing");
+    const firstShop = Math.min(result.nodes["apps/shop/web"].y, result.nodes["apps/shop/api"].y);
+    expect(firstShop - shop.y).toBe(BOX_TOP);
+  });
+
+  it("lays out what nothing joins as a grid, the worst first, and the machines in a strip under it", () => {
+    const result = layout(cluster, { grid: ["apps", "namespaces"], strip: ["nodes"] });
+    // The apps joined to the Gateway stay in the columns, with their whole
+    // namespace; the rest are in the grid.
+    expect(result.columns.map((c) => c.key)).toEqual(["entry", "apps"]);
+    for (const id of ["apps/shop/web", "apps/shop/api", "apps/blog/blog", "apps/blog/db"]) {
+      expect(result.nodes[id].section).toBeUndefined();
+    }
+    const grid = result.sections.find((s) => s.key === "grid");
+    expect(grid.ids).toEqual(["namespaces/calm", "namespaces/quiet"]);
+    const strip = result.sections.find((s) => s.key === "strip");
+    expect(strip).toMatchObject({ label: "Nodes", ids: ["nodes/worker-1", "nodes/worker-2", "nodes/worker-3"] });
+
+    const columnsBottom = Math.max(...Object.values(result.nodes).filter((n) => !n.section).map((n) => n.y + n.h));
+    const gridBottom = Math.max(...grid.ids.map((id) => result.nodes[id].y + NODE_H));
+    expect(grid.y).toBeGreaterThan(columnsBottom);
+    expect(strip.y).toBeGreaterThan(gridBottom);
+    const machines = strip.ids.map((id) => result.nodes[id]);
+    for (const m of machines) expect(m.y).toBe(strip.y + HEADER_H);
+    expect(machines[1].x).toBeGreaterThanOrEqual(machines[0].x + NODE_W);
+    expect(result.height).toBe(machines[0].y + NODE_H);
+  });
+
+  it("puts a namespace in the grid as its box, the worst first", () => {
+    const quiet = { ...cluster, edges: [] }; // nothing joined: everything in the grid
+    const result = layout(quiet, { grid: ["apps", "namespaces"], strip: ["nodes"] });
+    expect(result.columns.map((c) => c.key)).toEqual(["entry"]); // the Gateway, on its own
+    const grid = result.sections.find((s) => s.key === "grid");
+    expect(grid.ids.slice(0, 2)).toEqual(["apps/shop/api", "apps/shop/web"]); // shop is failing: first, its failing app on top
+    const shop = result.groups.find((g) => g.label === "shop");
+    for (const id of ["apps/shop/api", "apps/shop/web"]) {
+      const n = result.nodes[id];
+      expect(n.x).toBe(shop.x + BOX_X);
+      expect(n.y).toBeGreaterThanOrEqual(shop.y + BOX_TOP);
+      expect(n.y + NODE_H).toBeLessThanOrEqual(shop.y + shop.h);
+    }
+    // Blocks never overlap.
+    const cards = grid.ids.map((id) => result.nodes[id]);
+    for (const a of cards) {
+      for (const b of cards) {
+        if (a === b) continue;
+        expect(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y).toBe(true);
+      }
+    }
+  });
+
+  it("is columns like any other map without the grid and the strip", () => {
+    const result = layout(cluster);
+    expect(result.sections).toEqual([]);
+    expect(result.columns.map((c) => c.key)).toEqual(["entry", "apps", "nodes"]);
   });
 });

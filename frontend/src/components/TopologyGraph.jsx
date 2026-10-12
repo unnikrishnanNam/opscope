@@ -1,9 +1,10 @@
 import { useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router";
 import { HEADER_H, NODE_H, NODE_W, layout } from "../graph/layout.js";
 import { STATE_WORDS, kindIcon } from "../graph/kinds.js";
 import { causeChain, chainEdges, indexFindings, rootCauses, shownState } from "../graph/trace.js";
 import Button from "./Button.jsx";
-import { CrosshairIcon, ErrorIcon, FitIcon, MinusIcon, PlusIcon, WarningIcon } from "./icons.jsx";
+import { CrosshairIcon, ErrorIcon, FitIcon, MinusIcon, NamespaceIcon, PlusIcon, WarningIcon } from "./icons.jsx";
 import "./TopologyGraph.css";
 
 const MIN_ZOOM = 0.2;
@@ -24,6 +25,9 @@ const DRAG = 4; // px a press must move before it pans instead of clicking
 //   inset      px on the right covered by a panel, kept clear when showing a card
 //   fitKey     the view is fitted on screen again when this changes
 //   empty      what to say when there's nothing to draw
+//   arrange    { grid, strip }: kinds laid out under the columns rather than
+//              in them, for the cluster view; see layout()
+//   groupHref  (group id) → where a group's name links to, if anywhere
 //   ref        { showCard(id), focusCard(id), fit() }
 //
 // Drag or scroll to pan; zoom with ⌘/Ctrl and the wheel, a pinch, the
@@ -38,6 +42,8 @@ export default function TopologyGraph({
   inset = 0,
   fitKey,
   empty = "Nothing to show.",
+  arrange,
+  groupHref,
   ref,
 }) {
   const hintId = useId();
@@ -46,7 +52,7 @@ export default function TopologyGraph({
 
   // Cards keep their order from one refresh to the next.
   const previous = useRef(null);
-  const placed = useMemo(() => layout(view, { previous: previous.current?.order }), [view]);
+  const placed = useMemo(() => layout(view, { previous: previous.current?.order, ...arrange }), [view, arrange]);
   useEffect(() => {
     previous.current = placed;
   }, [placed]);
@@ -261,6 +267,29 @@ export default function TopologyGraph({
       </p>
       {view.nodes.length === 0 && <p className="topo-empty">{empty}</p>}
       <div className="topo-canvas" style={{ transform, visibility: t ? "visible" : "hidden" }}>
+        {placed.groups.map((g) => (
+          <div
+            key={`${g.id}|${g.x}`}
+            className={`topo-box topo-box-${g.state}`}
+            style={{ left: g.x, top: g.y, width: g.w, height: g.h }}
+          >
+            <span className="topo-box-label">
+              <NamespaceIcon size={13} />
+              {groupHref ? (
+                <Link to={groupHref(g.id)} title={`Open the map of ${g.label}`}>
+                  {g.label}
+                </Link>
+              ) : (
+                g.label
+              )}
+            </span>
+          </div>
+        ))}
+        {placed.sections.map((section) => (
+          <div key={section.key} className="topo-section-heading" style={{ top: section.y }} aria-hidden="true">
+            {section.label}
+          </div>
+        ))}
         <svg className="topo-edges" width={placed.width} height={placed.height} aria-hidden="true" focusable="false">
           {placed.edges.map((e) => (
             <path
@@ -413,9 +442,10 @@ export function kindText(n) {
 }
 
 // cardName is the name on a card, with the namespace when it isn't the one
-// being looked at.
+// being looked at (with none, always), unless the card sits in its
+// namespace's box.
 export function cardName(n, namespace) {
-  return n.namespace && namespace && n.namespace !== namespace ? `${n.namespace}/${n.name}` : n.name;
+  return n.namespace && n.namespace !== namespace && !n.group ? `${n.namespace}/${n.name}` : n.name;
 }
 
 // statusText is what a card says about its state: its status, or the
@@ -432,18 +462,46 @@ export function statusText(n, state = n.state) {
 export function neighbour(placed, id, key) {
   const here = placed.nodes[id];
   const all = Object.values(placed.nodes);
-  if (key === "ArrowUp" || key === "ArrowDown") {
-    const column = all.filter((n) => n.rank === here.rank).sort((a, b) => a.y - b.y);
+  const nearest = (pool) =>
+    pool.sort((a, b) => Math.hypot(a.x - here.x, a.y - here.y) - Math.hypot(b.x - here.x, b.y - here.y))[0]?.id;
+  // Under the columns: the grid moves by its columns, the strip along its
+  // row; up and down cross from one part to the next.
+  const columns = all.filter((n) => !n.section);
+  const grid = all.filter((n) => n.section === "grid");
+  const strip = all.filter((n) => n.section === "strip");
+  const below = (n) => (n.section === "grid" ? strip : n.section === "strip" ? [] : grid.length ? grid : strip);
+  const above = (n) => (n.section === "strip" ? (grid.length ? grid : columns) : n.section === "grid" ? columns : []);
+  if (here.section === "strip") {
+    const row = strip.sort((a, b) => a.y - b.y || a.x - b.x);
+    const i = row.findIndex((n) => n.id === id);
+    if (key === "ArrowLeft") return row[i - 1]?.id;
+    if (key === "ArrowRight") return row[i + 1]?.id;
+    return key === "ArrowUp" ? nearest(above(here)) : undefined;
+  }
+  if (here.section === "grid") {
+    if (key === "ArrowLeft" || key === "ArrowRight") {
+      const col = here.col + (key === "ArrowRight" ? 1 : -1);
+      return nearest(grid.filter((n) => n.col === col));
+    }
+    const column = grid.filter((n) => n.col === here.col).sort((a, b) => a.y - b.y);
     const i = column.findIndex((n) => n.id === id);
-    return column[i + (key === "ArrowDown" ? 1 : -1)]?.id;
+    const next = column[i + (key === "ArrowDown" ? 1 : -1)]?.id;
+    return next ?? nearest(key === "ArrowDown" ? below(here) : above(here));
+  }
+  if (key === "ArrowUp" || key === "ArrowDown") {
+    const column = columns.filter((n) => n.rank === here.rank).sort((a, b) => a.y - b.y);
+    const i = column.findIndex((n) => n.id === id);
+    const next = column[i + (key === "ArrowDown" ? 1 : -1)]?.id;
+    // Down from the bottom of a column, into what's under the columns.
+    return next ?? (key === "ArrowDown" ? nearest(below(here)) : undefined);
   }
   const right = key === "ArrowRight";
-  const ahead = (n) => (right ? n.rank > here.rank : n.rank < here.rank);
+  const ahead = (n) => !n.section && (right ? n.rank > here.rank : n.rank < here.rank);
   const linked = placed.edges
     .flatMap((e) => (e.from === id ? [e.to] : e.to === id ? [e.from] : []))
     .map((other) => placed.nodes[other])
     .filter(ahead);
-  const pool = linked.length ? linked : all.filter((n) => n.rank === here.rank + (right ? 1 : -1));
+  const pool = linked.length ? linked : columns.filter((n) => n.rank === here.rank + (right ? 1 : -1));
   pool.sort(
     (a, b) =>
       Math.abs(a.rank - here.rank) - Math.abs(b.rank - here.rank) ||

@@ -42,6 +42,19 @@ describe("indexFindings", () => {
   });
 });
 
+describe("indexFindings in the cluster view", () => {
+  it("files a finding under the app whose members name its object", () => {
+    const v = {
+      nodes: [{ id: "apps/shop/checkout", members: ["secrets/shop/stripe-key"] }, { id: "nodes/worker-2" }],
+      edges: [],
+      findings: [finding("secrets/shop/stripe-key", "failing"), finding("nodes/worker-2", "failing")],
+    };
+    const index = indexFindings(v);
+    expect(index.byNode.get("apps/shop/checkout")).toHaveLength(1);
+    expect([...rootCauses(index).keys()].sort()).toEqual(["apps/shop/checkout", "nodes/worker-2"]);
+  });
+});
+
 describe("rootCauses", () => {
   it("finds the cards whose problems nothing else explains, leaving out notes", () => {
     expect([...rootCauses(indexFindings(view))]).toEqual([["secrets/shop/stripe", "failing"]]);

@@ -55,3 +55,12 @@ func BenchmarkNamespaceView(b *testing.B) {
 		g.Namespace("team-1", Options{})
 	}
 }
+
+// BenchmarkClusterView is the cluster's map of the generated cluster.
+func BenchmarkClusterView(b *testing.B) {
+	g := Build(large())
+	b.ReportAllocs()
+	for b.Loop() {
+		g.Cluster(Options{})
+	}
+}

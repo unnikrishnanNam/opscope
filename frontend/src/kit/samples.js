@@ -577,3 +577,55 @@ export const topologyLarge = (() => {
   nodes.push(card("secrets/shop/db-credentials", "ok", "2 keys"), card("secrets/shop/queue-credentials", "ok", "2 keys"));
   return { snapshot, nodes, edges, findings };
 })();
+
+// The whole cluster: a Gateway two namespaces use, a namespace with a
+// problem shown open, folded healthy ones, and three machines, one down.
+const appCard = (ns, name, state, status, members) => ({
+  id: `apps/${ns}/${name}`,
+  resource: "apps",
+  kind: "App",
+  namespace: ns,
+  name,
+  app: name,
+  state,
+  status,
+  group: `namespaces/${ns}`,
+  ...(members ? { members } : {}),
+});
+const namespaceCard = (name, apps, state = "ok") => ({
+  id: `namespaces/${name}`,
+  resource: "namespaces",
+  kind: "Namespace",
+  name,
+  state,
+  status: `${apps} ${apps === 1 ? "app" : "apps"}`,
+});
+export const topologyCluster = {
+  snapshot,
+  nodes: [
+    card("gatewayclasses/nginx", "ok", "Accepted"),
+    card("gateways/infra/main", "ok", "Programmed"),
+    appCard("shop", "storefront", "ok", "2 workloads"),
+    appCard("shop", "checkout", "failing", "1 workload, 1 failing", ["secrets/shop/stripe-key"]),
+    namespaceCard("blog", 2),
+    namespaceCard("monitoring", 4),
+    namespaceCard("kube-system", 7),
+    namespaceCard("cert-manager", 1),
+    card("nodes/worker-1", "ok", "Ready"),
+    card("nodes/worker-2", "failing", "NotReady", { message: "Kubelet stopped posting node status." }),
+    card("nodes/worker-3", "ok", "Ready"),
+  ],
+  edges: [
+    link("gateways/infra/main", "gatewayclasses/nginx", "attaches"),
+    link("apps/shop/storefront", "gateways/infra/main", "attaches", ["HTTPRoute storefront"]),
+    link("apps/shop/storefront", "apps/shop/checkout", "routes-to", ["HTTPRoute storefront"]),
+    link("namespaces/blog", "gateways/infra/main", "attaches", ["HTTPRoute blog"]),
+  ],
+  groups: [{ id: "namespaces/shop", name: "shop", state: "failing", apps: 2 }],
+  findings: [
+    finding("secrets/shop/stripe-key", "missing", "failing", "Secret shop/stripe-key doesn't exist", [], {
+      detail: "It's needed by Deployment checkout (container api: env STRIPE_KEY).",
+    }),
+    finding("nodes/worker-2", "node.not-ready", "failing", "The node stopped reporting"),
+  ],
+};
