@@ -192,6 +192,11 @@
   overflow-wrap: anywhere;
 }
 
+.trace-again {
+  font-weight: var(--weight-body);
+  color: var(--text-subtle);
+}
+
 .trace-detail,
 .trace-see {
   margin-top: 2px;

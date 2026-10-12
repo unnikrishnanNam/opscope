@@ -15,7 +15,13 @@ import (
 // test/scenarios/, as they were at the time in testdata/scenarios/taken.
 func loadScenarios(t *testing.T) *snapshot.Snapshot {
 	t.Helper()
-	data, err := os.ReadFile("testdata/scenarios/objects.json")
+	return loadCapture(t, "testdata/scenarios")
+}
+
+// loadCapture reads one capture made by test/scenarios/capture.sh.
+func loadCapture(t *testing.T, dir string) *snapshot.Snapshot {
+	t.Helper()
+	data, err := os.ReadFile(dir + "/objects.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -23,7 +29,7 @@ func loadScenarios(t *testing.T) *snapshot.Snapshot {
 	if err != nil {
 		t.Fatal(err)
 	}
-	taken, err := os.ReadFile("testdata/scenarios/taken")
+	taken, err := os.ReadFile(dir + "/taken")
 	if err != nil {
 		t.Fatal(err)
 	}

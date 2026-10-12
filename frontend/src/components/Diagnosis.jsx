@@ -25,7 +25,7 @@ const CONFIDENCE = {
 export default function Diagnosis({ clusterId, trace }) {
   const search = nsQuery(useLocation().search);
   const nodes = { ...trace.nodes, [trace.object.id]: trace.object };
-  const ctx = { clusterId, search, nodes, self: trace.object.id };
+  const ctx = { clusterId, search, nodes, self: trace.object.id, repeats: repeatedSteps(trace.steps) };
   const taken = trace.snapshot?.taken;
   const asOf = taken && (
     <time dateTime={taken} title={new Date(taken).toLocaleString()}>
@@ -72,6 +72,27 @@ export default function Diagnosis({ clusterId, trace }) {
 
 function TraceStep({ step, ctx }) {
   const Mark = MARKS[step.severity];
+  // Shown in full higher up: one line, so a node that's down isn't
+  // explained again under each of its pods.
+  if (ctx.repeats?.has(step)) {
+    return (
+      <li className={`trace-step trace-${step.severity}`}>
+        <span className="trace-mark" aria-hidden="true">
+          <Mark size={16} />
+        </span>
+        <div className="trace-main">
+          <div className="trace-head">
+            <Objects ids={step.objects} ctx={ctx} />
+            {step.root && <span className="trace-root">Root cause</span>}
+          </div>
+          <p className="trace-title">
+            <span className="visually-hidden">{SEVERITY_WORDS[step.severity]}: </span>
+            {step.title} <span className="trace-again">(as above)</span>
+          </p>
+        </div>
+      </li>
+    );
+  }
   // Culprits that have no problem of their own aren't in the causes below
   // (a ResourceQuota, a ConfigMap missing a key); link to them here.
   const shown = new Set([...step.objects, ...step.causes.flatMap((c) => c.objects)]);
@@ -255,6 +276,25 @@ function Impact({ trace, ctx, label }) {
       ))}
     </p>
   );
+}
+
+// repeatedSteps finds the steps that are the same finding as one before
+// them in reading order: a root reached along two paths.
+function repeatedSteps(steps) {
+  const seen = new Set();
+  const repeats = new Set();
+  const walk = (list) => {
+    for (const step of list) {
+      if (seen.has(step.id)) {
+        repeats.add(step);
+        continue;
+      }
+      seen.add(step.id);
+      walk(step.causes);
+    }
+  };
+  walk(steps);
+  return repeats;
 }
 
 // detailPathFor builds an object's page from its ID.

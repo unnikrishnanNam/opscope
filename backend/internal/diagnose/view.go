@@ -128,12 +128,18 @@ func (d *Diagnosis) ForCluster(v *graph.View) []*Finding {
 }
 
 // Troubled lists the objects with a problem (a root cause that isn't a
-// note) and how bad it is, for the cluster view to count toward their apps.
+// note), and those it affects, with how bad it is, for the cluster view to
+// count toward their apps: the pods on a node that stopped reporting still
+// say Running, but their apps don't work.
 func (d *Diagnosis) Troubled() map[string]graph.State {
 	troubled := map[string]graph.State{}
 	for _, p := range d.Problems("") {
+		state := graph.State(p.Severity)
 		for _, object := range p.Objects {
-			troubled[object] = graph.Worse(troubled[object], graph.State(p.Severity))
+			troubled[object] = graph.Worse(troubled[object], state)
+		}
+		for _, n := range p.Affects {
+			troubled[n.ID] = graph.Worse(troubled[n.ID], state)
 		}
 	}
 	return troubled

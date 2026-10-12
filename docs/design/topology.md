@@ -26,7 +26,7 @@ Phases are numbered **G0–G7** so they don't mix with the build phases 0–8 or
 R, P and D. All work happens on the `feature/topology` branch, and each phase is committed there
 once it works, its tests pass and its notes are written. This feature has no issue of its own.
 
-**Status (2026-10-12):** G0 (the snapshot), G1 (the graph and `GET /topology`), G2 (the diagnosis on detail pages), G3 (the remaining rules and problems on the overview), G4 (the map), G5 (the Topology page) and G6 (background snapshots and the cluster's map) done. G7 is next.
+**Status (2026-10-12):** done, all phases G0–G7, for the next release. The feature is on the `feature/topology` branch until it's merged.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -289,8 +289,8 @@ The first set (G2) covers the failures people hit most. The second (G3) complete
 | `pod.config`                 | G2    | Pod               | `CreateContainerConfigError`: a ConfigMap, Secret or key that doesn't exist                                  | the missing object (or key)                    |
 | `pod.mount`                  | G2    | Pod               | stuck in `ContainerCreating` with `FailedMount`: a volume's ConfigMap, Secret or PVC                         | the missing or unbound object                  |
 | `pod.image`                  | G2    | Pod               | `ErrImagePull`, `ImagePullBackOff`, `InvalidImageName`, split into not found, unauthorized, unreachable      | the pull Secret when unauthorized; else itself |
-| `pod.crash`                  | G2    | Pod               | `CrashLoopBackOff`, with the last exit: `OOMKilled` (the memory limit), an exit code, a failed liveness probe | itself (root), with a link to previous logs    |
-| `pod.unschedulable`          | G2    | Pod               | `PodScheduled=False`: not enough CPU or memory, taints, node selector or affinity matching no node, unbound PVC | the nodes, the PVC                             |
+| `pod.crash`                  | G2    | Pod               | `CrashLoopBackOff`, with the last exit: `OOMKilled` (the memory limit), an exit code, a failed liveness probe; not a stop the runtime never saw (`Unknown`, a machine restarting) | itself (root), with a link to previous logs |
+| `pod.unschedulable`          | G2    | Pod               | `PodScheduled=False`: not enough CPU or memory, taints (named from the nodes: newer schedulers don't), node selector or affinity matching no node, unbound PVC | a node whose taint says it's down, the PVC |
 | `pod.node`                   | G2    | Pod               | its node is NotReady or unreachable, so the pod is `Unknown` or stuck `Terminating`                          | the node                                       |
 | `node.not-ready`             | G2    | Node              | `Ready` is False or Unknown; when the kubelet last reported                                                  | itself (root)                                  |
 | `workload.unavailable`       | G2    | Deployment, StatefulSet, DaemonSet | fewer replicas ready than wanted                                                            | its pods that aren't ready, grouped            |
@@ -528,10 +528,10 @@ Goal: the whole cluster can be seen at once, and snapshots are kept fresh for th
 
 Goal: the feature is documented and ready to release.
 
-- [ ] README: features, a screenshot of a diagnosis and of a topology, the new shortcut
-- [ ] `docs/api.md`: topology and problems endpoints; `docs/deployment.md`: permissions and the setting
-- [ ] Screenshots in light and dark
-- [ ] A final pass over this record; the status line updated; the record added to `docs/design/README.md` once released
+- [x] README: features, a screenshot of a diagnosis and of a topology, the new shortcut
+- [x] `docs/api.md`: topology and problems endpoints; `docs/deployment.md`: permissions and the setting
+- [x] Screenshots in light and dark
+- [~] A final pass over this record; the status line updated; the record added to `docs/design/README.md` once released: added now as "Next release", as `repositioning.md` is
 
 ---
 
@@ -885,3 +885,42 @@ snapshots are taken every 30 seconds, and problems sit at the top of the "Recent
   address nothing answers at. That one failed at 20:14 and was tried again at 20:15, 20:17, 20:21 and 20:26 (1, 2, 4 and 5
   minutes apart, the next set for 5 minutes later), while the other two were read every 30 seconds;
   its pages show the usual "Can't reach" banner.
+
+### G7
+
+- **Edge cases on a cluster of their own.** A two-node kind cluster, made for this and deleted
+  afterwards, with the Gateway API CRDs (copied from multipass, which was only read) and no
+  controller, ran two new sets of scenarios (`test/scenarios/gateway-api/` and `node-down/`): a
+  GatewayClass whose controller doesn't exist, a route to a missing Service, one to a Service in
+  another namespace without a ReferenceGrant and one with, and pods pinned to the worker, which was
+  then stopped. They're captured into `testdata/edge-cases/` and checked by `edge_test.go`;
+  `capture.sh` takes `NAMESPACES` and reads Gateway API kinds where they're installed. They found
+  five things, all fixed with tests:
+  - Pods on a node that stopped reporting still say Running, so they, their Deployment and its
+    trace said "still getting there" (a note) for five minutes. A pod on a node that isn't Ready is
+    now failing in the graph, and the trace goes Deployment → pods → node from the first minute.
+  - Once Kubernetes evicted them, their replacements couldn't be scheduled: Kubernetes 1.35 says
+    only "2 node(s) had untolerated taint(s)", which `pod.unschedulable` turned into
+    "a taint it doesn't tolerate:(s)", and it blamed nothing. It now works the taints out from the
+    nodes and names them, and blames a node whose taint says it's down, so the replacements lead
+    to the node too.
+  - Reached along both paths, the node was "2 root causes", and its step was shown twice in full.
+    Root causes are counted once, and a step seen higher up is one line, "(as above)".
+  - A missing ReferenceGrant said "No ReferenceGrant in opscope-backends allows it". It now names
+    the route and the Service: "… lets HTTPRoute opscope-edge/catalog reach Service catalog".
+  - In the cluster's map, namespaces whose pods were stranded on the node folded away as fine:
+    only the node had the problem. What a problem affects now counts toward its app and namespace
+    too, so they open; the "root cause" tag stays on the node.
+- **README:** the opening says what Opscope adds (why, and how things depend on each other), the
+  features list the diagnosis and the topology, the security section says what's read in the
+  background, and the shortcut table has `g t` and `5`. The screenshots are the overview, the
+  crash-looping Argo CD pod's diagnosis, the cluster's map, a Deployment's Map
+  tab and the pods list, light and dark, on multipass, from a server built as `v1.3.0`. Headless
+  Chrome's `--screenshot` fires before the pages' data arrive; they were taken over the DevTools
+  protocol instead, waiting for the data, at 1440 × 900 and 2× and scaled to 1600 × 1000.
+- **The map measures its height again once the fonts have loaded,** found in those screenshots:
+  measured before, it kept its starting 480 px with empty space under it.
+- **Docs:** the API notes repeated roots; the deployment guide's permissions point to the
+  background reading and say what happens to Secrets; CONTRIBUTING points to the edge cases; this
+  record is in `docs/design/README.md`. Releasing is the maintainer's: the manifest's image tag
+  and the README's manifest links change to the new version when it's tagged.

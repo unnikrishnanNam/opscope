@@ -11,6 +11,7 @@ describe how Opscope got there.
 | [ui-redesign.md](ui-redesign.md)          | The interface: brand, light and dark themes, every page rebuilt | v1.1.0   |
 | [command-palette.md](command-palette.md)  | The command palette, the command registry, keyboard shortcuts | v1.2.0   |
 | [repositioning.md](repositioning.md)      | Opscope as an operations tool: licence, documentation, positioning | Next release |
+| [topology.md](topology.md)                | Why things fail: the cluster as a graph, a diagnosis on every page, maps of an object, a namespace and the cluster, background snapshots | Next release |
 
 ## When to write one
 

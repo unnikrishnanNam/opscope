@@ -581,8 +581,23 @@ func (c *Context) schedulingReason(pod *corev1.Pod, n *graph.Node, part string, 
 		}
 		return sentence
 	case strings.Contains(phrase, "untolerated taint"):
-		taint := phrase[strings.Index(phrase, "taint")+len("taint"):]
-		return fmt.Sprintf("%s %s a taint it doesn't tolerate:%s.", nodes, verb("has", "have"), taint)
+		// Newer schedulers don't say which taint ("had untolerated
+		// taint(s)"), so look: and a node whose taint says it's down is
+		// to blame, since the pod would run there otherwise.
+		var named []string
+		for _, t := range untoleratedTaints(c.S.Nodes, pod) {
+			named = append(named, fmt.Sprintf("%s (%s)", t.node, strings.Join(t.keys, ", ")))
+			if t.down {
+				f.Blames = append(f.Blames, snapshot.Key{Resource: "nodes", Name: t.node}.String())
+			}
+		}
+		if len(named) > 0 {
+			return fmt.Sprintf("%s %s a taint it doesn't tolerate: %s.", nodes, verb("has", "have"), list(named))
+		}
+		if taint := phrase[strings.Index(phrase, "taint")+len("taint"):]; strings.HasPrefix(taint, " {") {
+			return fmt.Sprintf("%s %s a taint it doesn't tolerate:%s.", nodes, verb("has", "have"), taint)
+		}
+		return fmt.Sprintf("%s %s a taint it doesn't tolerate.", nodes, verb("has", "have"))
 	case strings.Contains(phrase, "didn't match Pod's node affinity/selector"):
 		return fmt.Sprintf("%s %s match its node selector or affinity.", nodes, verb("doesn't", "don't"))
 	case strings.Contains(phrase, "were unschedulable") || strings.Contains(phrase, "was unschedulable"):
@@ -600,6 +615,55 @@ func (c *Context) schedulingReason(pod *corev1.Pod, n *graph.Node, part string, 
 		return "Its PersistentVolumeClaims aren't bound to volumes yet."
 	}
 	return nodes + ": " + phrase + "."
+}
+
+// taintedNode is a node with taints a pod doesn't tolerate.
+type taintedNode struct {
+	node string
+	keys []string // "node.kubernetes.io/unreachable (it's down)"
+	down bool     // a taint the node controller sets on a node that isn't Ready
+}
+
+// untoleratedTaints lists the nodes whose taints keep a pod off them
+// (NoSchedule and NoExecute ones it doesn't tolerate).
+func untoleratedTaints(nodes []corev1.Node, pod *corev1.Pod) []taintedNode {
+	var found []taintedNode
+	for _, node := range nodes {
+		t := taintedNode{node: node.Name}
+		for _, taint := range node.Spec.Taints {
+			if taint.Effect == corev1.TaintEffectPreferNoSchedule || tolerates(pod.Spec.Tolerations, taint) {
+				continue
+			}
+			key := taint.Key
+			if taint.Key == corev1.TaintNodeUnreachable || taint.Key == corev1.TaintNodeNotReady {
+				t.down = true
+				key += ": it's down"
+			}
+			if !slices.Contains(t.keys, key) { // the same key often has both effects
+				t.keys = append(t.keys, key)
+			}
+		}
+		if len(t.keys) > 0 {
+			found = append(found, t)
+		}
+	}
+	return found
+}
+
+// tolerates says whether any of a pod's tolerations lets it on despite a taint.
+func tolerates(tolerations []corev1.Toleration, taint corev1.Taint) bool {
+	for _, t := range tolerations {
+		if t.Effect != "" && t.Effect != taint.Effect {
+			continue
+		}
+		if t.Operator == corev1.TolerationOpExists && (t.Key == "" || t.Key == taint.Key) {
+			return true
+		}
+		if t.Key == taint.Key && t.Value == taint.Value {
+			return true
+		}
+	}
+	return false
 }
 
 func resourceName(name string) string {

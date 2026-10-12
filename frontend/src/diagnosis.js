@@ -1,9 +1,12 @@
 // Plain helpers for a diagnosis (the trace the diagnosis endpoint returns),
 // kept apart from the component so they're easy to test.
 
-// rootSteps lists every root cause in a trace, in the order they appear.
+// rootSteps lists every root cause in a trace, in the order they appear,
+// each once: one can be reached along several paths (a node that's down,
+// through the pods on it and through their replacements it won't take).
 export function rootSteps(steps) {
-  return steps.flatMap((step) => (step.root ? [step, ...rootSteps(step.causes)] : rootSteps(step.causes)));
+  const all = steps.flatMap((step) => (step.root ? [step, ...rootSteps(step.causes)] : rootSteps(step.causes)));
+  return all.filter((step, i) => all.findIndex((other) => other.id === step.id) === i);
 }
 
 // rootCauseText is what "Copy root cause" puts on the clipboard: one line

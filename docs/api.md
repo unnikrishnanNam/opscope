@@ -367,7 +367,7 @@ for cluster-wide kinds (`nodes`, `gatewayclasses`). An object Opscope doesn't kn
 | Field      | Contents                                                                                     |
 | ---------- | -------------------------------------------------------------------------------------------- |
 | `steps`    | The object's findings, worst first. Each has its `causes`: the findings of the objects it `blames`, and so on |
-| `root`     | `true` when nothing a step blames has a finding of its own: a root cause                     |
+| `root`     | `true` when nothing a step blames has a finding of its own: a root cause. One reached along two paths (a node that's down, through its pods and through their replacements) is under both, with the same `id` |
 | `objects`  | What a step is about. Alike findings are merged: pods failing the same way are one step      |
 | `severity` | `failing`, `degraded`, or `info` for something worth knowing that isn't a fault              |
 | `confidence` | `certain` (from structured status), `likely` (read from event or message text), `possible` |

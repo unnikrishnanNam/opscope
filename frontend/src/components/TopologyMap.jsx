@@ -182,7 +182,8 @@ export function TopologyView({
 
 // useFillHeight is how tall the map can be to fill the rest of the screen
 // below where it starts, with the page scrolled to the top. It's measured
-// when the map appears and when the window changes size.
+// when the map appears, once the fonts have loaded, and when the window
+// changes size.
 function useFillHeight(ref, enabled) {
   const [height, setHeight] = useState(undefined);
   useLayoutEffect(() => {
@@ -199,6 +200,8 @@ function useFillHeight(ref, enabled) {
       setHeight(Math.max(MIN_HEIGHT, Math.floor(room - top - BELOW)));
     }
     measure();
+    // The page above can change height once the web fonts arrive.
+    document.fonts?.ready.then(measure);
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
   }, [ref, enabled]);

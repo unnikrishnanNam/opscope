@@ -264,3 +264,21 @@ func TestWorkloadWithPodNotReadyForLong(t *testing.T) {
 	})
 	wantState(t, g, "statefulsets/a/db", Failing)
 }
+
+// A pod on a node that stopped reporting still says Running; it isn't.
+func TestPodOnANodeThatIsDown(t *testing.T) {
+	down := readyNode("worker-2")
+	down.Status.Conditions[0].Status = corev1.ConditionUnknown
+	g := build(&snapshot.Snapshot{
+		Nodes: []corev1.Node{readyNode("worker-1"), down},
+		Pods: []corev1.Pod{
+			readyPod(meta("a", "fine"), "worker-1"),
+			readyPod(meta("a", "stranded"), "worker-2"),
+		},
+	})
+	wantState(t, g, "pods/a/fine", OK)
+	wantState(t, g, "pods/a/stranded", Failing)
+	if n := node(t, g, "pods/a/stranded"); n.Status != "Running" || n.Message != "Its node worker-2 isn't Ready." {
+		t.Errorf("stranded: %q, %q", n.Status, n.Message)
+	}
+}

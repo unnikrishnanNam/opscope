@@ -101,3 +101,14 @@ func TestClusterViewShowsEveryProblem(t *testing.T) {
 		t.Errorf("the missing StorageClass is on %q", card)
 	}
 }
+
+// What a problem affects counts in the cluster view too: the missing
+// Service's route makes the ingress app fail, though the Ingress itself
+// says nothing of it.
+func TestTroubledIncludesWhatProblemsAffect(t *testing.T) {
+	d := Run(loadScenarios(t))
+	troubled := d.Troubled()
+	if troubled["services/opscope-scenarios/api"] != graph.Failing || troubled["ingresses/opscope-scenarios/shop"] != graph.Failing {
+		t.Errorf("missing Service %q, its Ingress %q", troubled["services/opscope-scenarios/api"], troubled["ingresses/opscope-scenarios/shop"])
+	}
+}

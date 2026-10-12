@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { objectParts, problemSummary, rootCauseText, rootSteps } from "./diagnosis.js";
 
-const step = (title, objects, root, causes = []) => ({ title, objects, root, causes });
+const step = (title, objects, root, causes = []) => ({ id: title, title, objects, root, causes });
 
 // A Deployment whose pods can't start because a Secret is missing, and an
 // old Service that selects nothing.
@@ -21,6 +21,15 @@ describe("rootSteps", () => {
 
   it("is empty for a healthy object", () => {
     expect(rootSteps([])).toEqual([]);
+  });
+
+  it("lists a root reached along two paths once", () => {
+    const node = { ...step("Node worker stopped reporting", ["nodes/worker"], true), id: "node" };
+    const twice = [step("None of its replicas are ready", ["deployments/a/web"], false, [
+      { ...step("Its node isn't Ready", ["pods/a/web-1"], false, [node]), id: "a" },
+      { ...step("No node can run it", ["pods/a/web-2"], false, [node]), id: "b" },
+    ])];
+    expect(rootSteps(twice).map((s) => s.title)).toEqual(["Node worker stopped reporting"]);
   });
 });
 

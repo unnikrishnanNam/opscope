@@ -195,7 +195,9 @@ evidence, the objects it blames, and next steps. It goes in the `rules` list in 
   A test fails on anything else. Describe a fix in the finding's detail, never as a command.
 - **Test it** with objects built in Go (`rules_test.go`), and where a real cluster can show the
   failure, with a scenario: a manifest in `test/scenarios/`, applied to a throwaway cluster and
-  captured into `internal/diagnose/testdata/scenarios/` (see `scenario_test.go`).
+  captured into `internal/diagnose/testdata/scenarios/` (see `scenario_test.go`). Failures that need
+  more than one cluster can offer (Gateway API, a node going down) are in subfolders, captured
+  into `testdata/edge-cases/` (`edge_test.go`); `test/scenarios/README.md` says how.
 
 ### Adding commands
 

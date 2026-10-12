@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"opscope/internal/kube"
+	"opscope/internal/snapshot"
 
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
@@ -201,6 +202,15 @@ func (b *builder) podState(pod *corev1.Pod) (State, string, string) {
 	status := kube.PodStatus(pod)
 	message := podMessage(pod)
 	age := b.now.Sub(pod.CreationTimestamp.Time)
+
+	// On a node that isn't Ready, a pod doesn't run, whatever it last
+	// reported: its kubelet can't say otherwise. (Nodes get their states
+	// first.)
+	finished := status == "Completed" || status == "Succeeded" || pod.Status.Phase == corev1.PodFailed
+	if node := b.g.nodes[snapshot.Key{Resource: "nodes", Name: pod.Spec.NodeName}.String()]; pod.Spec.NodeName != "" && !finished &&
+		node != nil && node.State == Failing {
+		return Failing, status, "Its node " + pod.Spec.NodeName + " isn't Ready."
+	}
 
 	switch {
 	case status == "Running":

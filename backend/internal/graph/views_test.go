@@ -138,10 +138,12 @@ func TestNamespaceView(t *testing.T) {
 	}
 
 	group := findNode(v.Nodes, "pods:replicasets/shop/api-1")
-	if group.Name != "api" || group.Pods.Owner != "deployments/shop/api" || group.Pods.Total != 2 || group.Pods.Ready != 1 || group.State != Failing {
+	// Both run on worker-2, which is down: the one that last said it was
+	// ready isn't running either.
+	if group.Name != "api" || group.Pods.Owner != "deployments/shop/api" || group.Pods.Total != 2 || group.Pods.Ready != 0 || group.State != Failing {
 		t.Errorf("api pods: %+v %+v", group, group.Pods)
 	}
-	if group.Status != "1/2 ready" || group.Message != `secret "stripe" not found` {
+	if group.Status != "0/2 ready" || group.Message != "Its node worker-2 isn't Ready." {
 		t.Errorf("api pods: status %q, message %q", group.Status, group.Message)
 	}
 	if !slices.Equal(group.Pods.Members, []string{"pods/shop/api-1-a", "pods/shop/api-1-b"}) {

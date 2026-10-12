@@ -78,15 +78,38 @@ func missing(c *Context, n *graph.Node) *Finding {
 		Evidence:   []Evidence{{Source: "reference", Text: "Opscope read every " + n.Kind + " in the cluster and found no " + qualified(n) + "."}},
 	}
 	if n.Resource == "referencegrants" {
-		// The node stands for a grant nobody has created; it has no real name.
-		f.Title = "No ReferenceGrant in " + n.Namespace + " allows it"
-		f.Detail = "A route in another namespace sends traffic to a Service in " + n.Namespace +
-			". Kubernetes allows that only when a ReferenceGrant in " + n.Namespace + " permits routes from that namespace."
-		f.Next = []Step{{Label: "kubectl get", Command: "kubectl get referencegrants.gateway.networking.k8s.io -n " + n.Namespace}}
+		missingGrant(c, n, f)
 		return f
 	}
 	f.Next = []Step{{Label: "kubectl get", Command: listCommand(n)}}
 	return f
+}
+
+// missingGrant explains a ReferenceGrant nobody has created. Its node has
+// no real name: it stands for the grant that routes from other namespaces
+// would need to reach the Services here, so the finding names them.
+func missingGrant(c *Context, n *graph.Node, f *Finding) {
+	var needs []string
+	in := c.G.In(n.ID) // one edge per route that needs it
+	for _, e := range in {
+		route := c.Node(e.From)
+		var services []string
+		for _, out := range c.G.Out(e.From) {
+			if svc := c.Node(out.To); out.Type == graph.RoutesTo && svc.Namespace == n.Namespace {
+				services = append(services, "Service "+svc.Name)
+			}
+		}
+		need := fmt.Sprintf("%s %s/%s sends traffic to %s", route.Kind, route.Namespace, route.Name, list(services))
+		needs = append(needs, need+" ("+strings.Join(e.Via, ", ")+")")
+		f.Title = "No ReferenceGrant in " + n.Namespace + " lets " + strings.Replace(need, "sends traffic to", "reach", 1)
+	}
+	if len(in) > 1 {
+		f.Title = "No ReferenceGrant in " + n.Namespace + " lets routes from other namespaces reach its Services"
+	}
+	f.Detail = strings.Join(needs, "; ") + ". Kubernetes lets a route reach a Service in another namespace only when a " +
+		"ReferenceGrant in that namespace allows routes from the route's namespace."
+	f.Evidence = []Evidence{{Source: "reference", Text: "Opscope read every ReferenceGrant in " + n.Namespace + " and none allows it."}}
+	f.Next = []Step{{Label: "kubectl get", Command: "kubectl get referencegrants.gateway.networking.k8s.io -n " + n.Namespace}}
 }
 
 // unknown is the finding an object of a kind Opscope can't read gets.

@@ -205,6 +205,32 @@ func TestUnschedulable(t *testing.T) {
 	}
 }
 
+// Newer schedulers don't name the taints. Opscope finds them, and blames a
+// node whose taint says it's down: the pod's replacement waits for it.
+func TestUnschedulableOnADownNode(t *testing.T) {
+	control := ready("control-plane")
+	control.Spec.Taints = []corev1.Taint{{Key: "node-role.kubernetes.io/control-plane", Effect: corev1.TaintEffectNoSchedule}}
+	down := ready("worker")
+	down.Status.Conditions[0].Status = corev1.ConditionUnknown
+	down.Spec.Taints = []corev1.Taint{
+		{Key: corev1.TaintNodeUnreachable, Effect: corev1.TaintEffectNoSchedule},
+		{Key: corev1.TaintNodeUnreachable, Effect: corev1.TaintEffectNoExecute},
+	}
+	tolerant := ready("tolerant")
+	tolerant.Spec.Taints = []corev1.Taint{{Key: "dedicated", Value: "batch", Effect: corev1.TaintEffectNoSchedule}}
+	pod := corev1.Pod{ObjectMeta: meta("a", "pinned"), Status: corev1.PodStatus{Phase: corev1.PodPending, Conditions: []corev1.PodCondition{
+		{Type: corev1.PodScheduled, Status: corev1.ConditionFalse, Reason: "Unschedulable",
+			Message: "0/3 nodes are available: 2 node(s) had untolerated taint(s). no new claims to deallocate, preemption: 0/3 nodes are available: 3 Preemption is not helpful for scheduling."}}}}
+	pod.Spec.Tolerations = []corev1.Toleration{{Key: "dedicated", Operator: corev1.TolerationOpEqual, Value: "batch", Effect: corev1.TaintEffectNoSchedule}}
+
+	d := run(&snapshot.Snapshot{Nodes: []corev1.Node{control, down, tolerant}, Pods: []corev1.Pod{pod}})
+	f := only(t, d, "pods/a/pinned")
+	want := "2 nodes have a taint it doesn't tolerate: control-plane (node-role.kubernetes.io/control-plane) and worker (node.kubernetes.io/unreachable: it's down). Until one can, it waits in Pending."
+	if f.Detail != want || !slices.Equal(f.Blames, []string{"nodes/worker"}) {
+		t.Errorf("got %q, blames %v\nwant %q", f.Detail, f.Blames, want)
+	}
+}
+
 func TestMountWaitsForClaim(t *testing.T) {
 	pod := waiting(meta("a", "db"), "postgres", "ContainerCreating", "")
 	pod.Spec.Volumes = []corev1.Volume{{Name: "data", VolumeSource: corev1.VolumeSource{
@@ -281,8 +307,9 @@ func TestRouteBackends(t *testing.T) {
 	if !slices.Equal(titles, want) {
 		t.Errorf("got %q", titles)
 	}
-	if f := only(t, d, "referencegrants/billing/(none)"); f.Title != "No ReferenceGrant in billing allows it" {
-		t.Errorf("grant: %q", f.Title)
+	if f := only(t, d, "referencegrants/billing/(none)"); f.Title != "No ReferenceGrant in billing lets HTTPRoute shop/web reach Service orders" ||
+		!strings.HasPrefix(f.Detail, "HTTPRoute shop/web sends traffic to Service orders (rule 2).") {
+		t.Errorf("grant: %q: %q", f.Title, f.Detail)
 	}
 }
 

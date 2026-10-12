@@ -179,7 +179,8 @@ make docker-build && kind load docker-image opscope:dev --name <cluster>
 ## Permissions
 
 Opscope only ever uses `get` and `list`. It never creates, changes or deletes anything, and it polls
-rather than watching.
+rather than watching. For the topology and the diagnosis it also reads each cluster in the
+background; see [Background snapshots](#background-snapshots).
 
 | API group                   | Resources                                                                  | Used for               |
 | --------------------------- | -------------------------------------------------------------------------- | ---------------------- |
@@ -216,7 +217,9 @@ access:
 kubectl delete -f deploy/kubernetes/secrets-access.yaml
 ```
 
-The Secrets pages then say that this user isn't allowed to read them.
+The Secrets pages then say that this user isn't allowed to read them, and the diagnosis says it
+can't check a Secret a pod needs rather than calling it missing. Even with the role, the topology
+and the diagnosis list Secrets by their metadata only: their values never reach them.
 
 ## Exposing Opscope
 

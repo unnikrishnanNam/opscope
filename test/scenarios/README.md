@@ -64,3 +64,53 @@ kubectl delete namespace opscope-scenarios
 | `ingress-class.yaml`       | an Ingress for a class nobody runs, with a missing TLS Secret | the IngressClass; the Secret    |
 
 Every pod sets a memory limit, since the namespace's quota requires one.
+
+## Edge cases
+
+Two more sets cover what the first one can't, on a cluster of their own. A kind cluster with a
+worker node does, made with its own kubeconfig so `~/.kube/config` is left alone:
+
+```bash
+kind create cluster --name opscope-g7 --kubeconfig /tmp/opscope-g7.kubeconfig --config - <<'YAML'
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes: [{role: control-plane}, {role: worker}]
+YAML
+```
+
+**`gateway-api/`** needs the Gateway API CRDs (`gateways`, `httproutes`, `gatewayclasses`,
+`referencegrants`) and no controller: its GatewayClass names one that doesn't exist.
+
+| File          | What's wrong                                                         | Root cause Opscope should find        |
+| ------------- | -------------------------------------------------------------------- | ------------------------------------- |
+| `gateway.yaml` | the GatewayClass's controller isn't installed, so nothing runs the Gateway | the GatewayClass, after 5 minutes |
+| `routes.yaml` | `shop` sends traffic to a Service that doesn't exist                 | the missing Service                   |
+| `routes.yaml` | `catalog` sends traffic to a Service in another namespace without a ReferenceGrant | the missing grant      |
+| `routes.yaml` | `reviews` does the same with a grant                                 | nothing: it's fine                    |
+
+**`node-down/`** needs a worker node to stop. Label it, apply, wait for the pods to run, then stop
+its container:
+
+```bash
+kubectl label node opscope-g7-worker opscope-scenario=node-down
+```
+
+```bash
+kubectl apply -f test/scenarios/node-down/
+```
+
+```bash
+docker stop opscope-g7-worker
+```
+
+Within a minute the node is NotReady and the pods, which still say Running, are diagnosed as
+failing because of it. After five more minutes Kubernetes evicts them; their replacements can't be
+scheduled, since only that node may run them.
+
+To capture both into the test data:
+
+```bash
+NAMESPACES="opscope-edge opscope-backends opscope-node-down" OUT=backend/internal/diagnose/testdata/edge-cases test/scenarios/capture.sh
+```
+
+To remove everything, delete the cluster: `kind delete cluster --name opscope-g7`.
