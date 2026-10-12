@@ -158,3 +158,474 @@ export function logLine(i) {
 }
 
 export const logText = Array.from({ length: 120 }, (_, i) => logLine(i)).join("\n") + "\n";
+
+// Diagnoses, shaped like GET /api/clusters/{id}/diagnosis/...
+const node = (id, kind, state, status) => {
+  const parts = id.split("/");
+  const [resource, namespace, name] = parts.length === 2 ? [parts[0], "", parts[1]] : parts;
+  return { id, resource, kind, namespace, name, state, status };
+};
+
+const missingSecret = {
+  id: "missing|secrets/shop/stripe-key|",
+  rule: "missing",
+  object: "secrets/shop/stripe-key",
+  severity: "failing",
+  confidence: "certain",
+  title: "Secret shop/stripe-key doesn't exist",
+  detail: "It's needed by Deployment checkout (container api: env STRIPE_KEY).",
+  evidence: [{ source: "reference", text: "Opscope read every Secret in the cluster and found no shop/stripe-key." }],
+  blames: [],
+  related: [],
+  next: [{ label: "kubectl get", command: "kubectl get secrets -n shop" }],
+  objects: ["secrets/shop/stripe-key"],
+  root: true,
+  causes: [],
+};
+
+export const diagnoses = {
+  failing: {
+    object: node("deployments/shop/checkout", "Deployment", "failing", "0/3"),
+    steps: [
+      {
+        id: "workload.unavailable|deployments/shop/checkout|",
+        rule: "workload.unavailable",
+        object: "deployments/shop/checkout",
+        severity: "failing",
+        confidence: "certain",
+        title: "None of its 3 replicas are ready",
+        evidence: [],
+        blames: ["pods/shop/checkout-7d9f-a", "pods/shop/checkout-7d9f-b", "pods/shop/checkout-7d9f-c"],
+        related: [],
+        next: [{ label: "Events", object: "deployments/shop/checkout", tab: "events" }],
+        objects: ["deployments/shop/checkout"],
+        root: false,
+        causes: [
+          {
+            id: "pod.config|pods/shop/checkout-7d9f-a|secrets/shop/stripe-key",
+            rule: "pod.config",
+            object: "pods/shop/checkout-7d9f-a",
+            severity: "failing",
+            confidence: "certain",
+            title: "Container api can't start: it needs Secret stripe-key",
+            detail: "Kubernetes can't find it, so the container isn't created.",
+            evidence: [
+              { source: "container", text: 'api: CreateContainerConfigError: secret "stripe-key" not found' },
+              { source: "event", text: 'Failed: Error: secret "stripe-key" not found', time: ago(1), count: 42 },
+            ],
+            blames: ["secrets/shop/stripe-key"],
+            related: [],
+            next: [{ label: "kubectl describe", command: "kubectl describe pods checkout-7d9f-a -n shop" }],
+            objects: ["pods/shop/checkout-7d9f-a", "pods/shop/checkout-7d9f-b", "pods/shop/checkout-7d9f-c"],
+            root: false,
+            causes: [missingSecret],
+          },
+        ],
+      },
+    ],
+    impact: [node("httproutes/shop/storefront", "HTTPRoute", "ok", "Accepted"), node("services/shop/checkout", "Service", "failing", "0/3 ready")],
+    nodes: {
+      "deployments/shop/checkout": node("deployments/shop/checkout", "Deployment", "failing", "0/3"),
+      "pods/shop/checkout-7d9f-a": node("pods/shop/checkout-7d9f-a", "Pod", "failing", "CreateContainerConfigError"),
+      "pods/shop/checkout-7d9f-b": node("pods/shop/checkout-7d9f-b", "Pod", "failing", "CreateContainerConfigError"),
+      "pods/shop/checkout-7d9f-c": node("pods/shop/checkout-7d9f-c", "Pod", "failing", "CreateContainerConfigError"),
+      "secrets/shop/stripe-key": node("secrets/shop/stripe-key", "Secret", "missing", "Missing"),
+    },
+    snapshot: { taken: ago(0.2), skipped: [] },
+  },
+  degraded: {
+    object: node("pods/shop/api-5c8d-x", "Pod", "degraded", "Running"),
+    steps: [
+      {
+        id: "pod.crash|pods/shop/api-5c8d-x|",
+        rule: "pod.crash",
+        object: "pods/shop/api-5c8d-x",
+        severity: "degraded",
+        confidence: "likely",
+        title: "Container api fails its liveness probe, so it's restarted",
+        detail:
+          "Kubernetes restarts a container whose liveness probe fails. This one is an HTTP GET of /healthz on port 8080, every 10s after an initial 5s, giving up after 3 failures. Check that the probe matches what the program offers, and that its delay leaves enough time to start.",
+        evidence: [
+          { source: "container", text: "api: restarted 6 times; last stopped: Error (exit 137)", time: ago(3) },
+          { source: "event", text: "Unhealthy: Liveness probe failed: HTTP probe failed with statuscode: 503", time: ago(2), count: 18 },
+        ],
+        blames: [],
+        related: [],
+        next: [
+          { label: "Events", object: "pods/shop/api-5c8d-x", tab: "events" },
+          { label: "kubectl describe", command: "kubectl describe pods api-5c8d-x -n shop" },
+        ],
+        objects: ["pods/shop/api-5c8d-x"],
+        root: true,
+        causes: [],
+      },
+    ],
+    impact: [],
+    nodes: { "pods/shop/api-5c8d-x": node("pods/shop/api-5c8d-x", "Pod", "degraded", "Running") },
+    snapshot: { taken: ago(0.1), skipped: [] },
+  },
+  clear: {
+    object: node("deployments/shop/web", "Deployment", "ok", "3/3"),
+    steps: [],
+    impact: [],
+    nodes: {},
+    snapshot: { taken: ago(0.15), skipped: [] },
+  },
+  partOfAProblem: {
+    object: node("resourcequotas/shop/memory", "ResourceQuota", "ok", ""),
+    steps: [],
+    impact: [node("deployments/shop/reports", "Deployment", "failing", "0/1")],
+    nodes: {},
+    snapshot: { taken: ago(0.15), skipped: [] },
+  },
+};
+
+// Root causes, shaped like GET /api/clusters/{id}/problems
+const problem = (rule, severity, confidence, title, objects, affects) => ({
+  id: `${rule}|${objects[0]}|`, rule, object: objects[0], severity, confidence, title,
+  evidence: [], blames: [], related: [], next: [], objects, affects,
+});
+export const problems = {
+  problems: [
+    problem("missing", "failing", "certain", "Secret shop/stripe-key doesn't exist", ["secrets/shop/stripe-key"], [
+      node("deployments/shop/checkout", "Deployment", "failing", "0/3"),
+      node("httproutes/shop/storefront", "HTTPRoute", "ok", "Accepted"),
+      node("services/shop/checkout", "Service", "failing", "0/3 ready"),
+      node("ingresses/shop/web", "Ingress", "ok", ""),
+    ]),
+    problem("pod.crash", "failing", "certain", "Container app exits with code 1", ["pods/shop/worker-5c8d-a", "pods/shop/worker-5c8d-b"], [
+      node("deployments/shop/worker", "Deployment", "failing", "0/2"),
+    ]),
+    problem("pod.image", "failing", "likely", "Image registry.example.com/billing:2.1 doesn't exist", ["pods/billing/api-7f6d-x"], [
+      node("deployments/billing/api", "Deployment", "degraded", "1/2"),
+    ]),
+    problem("hpa.scaling", "degraded", "certain", "It can't read the metrics it scales by", ["horizontalpodautoscalers/shop/web"], []),
+  ],
+  nodes: {
+    "secrets/shop/stripe-key": node("secrets/shop/stripe-key", "Secret", "missing", "Missing"),
+    "pods/shop/worker-5c8d-a": node("pods/shop/worker-5c8d-a", "Pod", "failing", "CrashLoopBackOff"),
+    "pods/shop/worker-5c8d-b": node("pods/shop/worker-5c8d-b", "Pod", "failing", "CrashLoopBackOff"),
+    "pods/billing/api-7f6d-x": node("pods/billing/api-7f6d-x", "Pod", "failing", "ImagePullBackOff"),
+    "horizontalpodautoscalers/shop/web": node("horizontalpodautoscalers/shop/web", "HorizontalPodAutoscaler", "degraded", "1/0"),
+  },
+};
+
+diagnoses.unexplained = {
+  object: node("pods/shop/legacy", "Pod", "failing", "Shutdown"),
+  steps: [
+    {
+      id: "unexplained|pods/shop/legacy|",
+      rule: "unexplained",
+      object: "pods/shop/legacy",
+      severity: "failing",
+      confidence: "possible",
+      title: "Opscope can't tell why it's failing",
+      detail: "No rule explains this yet. Its status and events may say more.",
+      evidence: [{ source: "status", text: "Shutdown Pod was terminated in response to imminent node shutdown." }],
+      blames: [],
+      related: ["services/shop/legacy"],
+      next: [{ label: "Events", object: "pods/shop/legacy", tab: "events" }],
+      objects: ["pods/shop/legacy"],
+      root: true,
+      causes: [],
+    },
+  ],
+  impact: [],
+  nodes: {
+    "pods/shop/legacy": node("pods/shop/legacy", "Pod", "failing", "Shutdown"),
+    "services/shop/legacy": node("services/shop/legacy", "Service", "failing", "0/1 ready"),
+  },
+  snapshot: { taken: ago(0.1), skipped: [] },
+};
+
+// ---- Topology: views as GET /topology returns them ----
+
+const KINDS = {
+  gatewayclasses: "GatewayClass",
+  gateways: "Gateway",
+  httproutes: "HTTPRoute",
+  ingresses: "Ingress",
+  ingressclasses: "IngressClass",
+  services: "Service",
+  horizontalpodautoscalers: "HorizontalPodAutoscaler",
+  deployments: "Deployment",
+  statefulsets: "StatefulSet",
+  replicasets: "ReplicaSet",
+  pods: "Pod",
+  configmaps: "ConfigMap",
+  secrets: "Secret",
+  serviceaccounts: "ServiceAccount",
+  persistentvolumeclaims: "PersistentVolumeClaim",
+  persistentvolumes: "PersistentVolume",
+  storageclasses: "StorageClass",
+  resourcequotas: "ResourceQuota",
+  nodes: "Node",
+};
+
+// card("deployments/shop/web", "ok", "3/3") is a node of a view.
+function card(id, state = "ok", status = "", extra = {}) {
+  const parts = id.split("/");
+  return {
+    id,
+    resource: parts[0],
+    kind: KINDS[parts[0]],
+    namespace: parts.length === 3 ? parts[1] : undefined,
+    name: parts.at(-1),
+    state,
+    status,
+    ...extra,
+  };
+}
+
+// podGroup("deployments/shop/web", 3, 3, "Running") is a workload's pods, as one card.
+function podGroup(owner, ready, total, worst = "Running", state = ready === total ? "ok" : "failing") {
+  const [, namespace, name] = owner.split("/");
+  const members = Array.from({ length: total }, (_, i) => `pods/${namespace}/${name}-7d9f-${"abcdef"[i]}`);
+  return {
+    id: `pods:${owner}`,
+    resource: "pods",
+    kind: "Pod",
+    namespace,
+    name,
+    state,
+    status: `${ready}/${total} ready`,
+    message: state === "ok" ? undefined : worst,
+    pods: { owner, ready, total, members },
+  };
+}
+
+const link = (from, to, type = "uses", via) => ({ from, to, type, ...(via ? { via } : {}) });
+
+const finding = (object, rule, severity, title, blames = [], extra = {}) => ({
+  id: `${rule}|${object}|${blames.join(",")}`,
+  rule,
+  object,
+  severity,
+  confidence: "certain",
+  title,
+  evidence: [],
+  blames,
+  related: [],
+  next: [],
+  ...extra,
+});
+
+const snapshot = { taken: ago(0.2), skipped: [] };
+
+// A shop whose checkout can't start: its pods need a Secret that doesn't
+// exist. The Gateway and the storefront are fine.
+const checkoutPods = podGroup("deployments/shop/checkout", 0, 3, "CreateContainerConfigError");
+export const topologyBroken = {
+  snapshot,
+  nodes: [
+    card("gatewayclasses/nginx", "ok", "Accepted"),
+    card("gateways/infra/main", "ok", "Programmed"),
+    card("httproutes/shop/storefront", "ok", "Accepted"),
+    card("services/shop/web", "ok", "3 endpoints"),
+    card("services/shop/checkout", "failing", "0 ready", { message: "None of the pods it selects are ready" }),
+    card("deployments/shop/web", "ok", "3/3"),
+    card("deployments/shop/checkout", "failing", "0/3"),
+    podGroup("deployments/shop/web", 3, 3),
+    checkoutPods,
+    card("configmaps/shop/settings", "ok", "4 keys"),
+    card("secrets/shop/stripe-key", "missing", ""),
+    card("serviceaccounts/shop/checkout", "ok", ""),
+  ],
+  edges: [
+    link("gateways/infra/main", "gatewayclasses/nginx", "attaches"),
+    link("httproutes/shop/storefront", "gateways/infra/main", "attaches"),
+    link("httproutes/shop/storefront", "services/shop/web", "routes-to", ["rule 1"]),
+    link("httproutes/shop/storefront", "services/shop/checkout", "routes-to", ["rule 2"]),
+    link("services/shop/web", "pods:deployments/shop/web", "selects"),
+    link("services/shop/checkout", "pods:deployments/shop/checkout", "selects"),
+    link("deployments/shop/web", "pods:deployments/shop/web", "owns"),
+    link("deployments/shop/checkout", "pods:deployments/shop/checkout", "owns"),
+    link("pods:deployments/shop/web", "configmaps/shop/settings", "uses", ["container web: envFrom"]),
+    link("pods:deployments/shop/checkout", "configmaps/shop/settings", "uses", ["container api: envFrom"]),
+    link("pods:deployments/shop/checkout", "secrets/shop/stripe-key", "uses", ["container api: env STRIPE_KEY"]),
+    link("pods:deployments/shop/checkout", "serviceaccounts/shop/checkout", "uses", ["serviceAccountName"]),
+  ],
+  findings: [
+    finding("deployments/shop/checkout", "workload.unavailable", "failing", "None of its 3 replicas are ready", checkoutPods.pods.members),
+    finding("services/shop/checkout", "service.endpoints", "failing", "None of the 3 pods it selects are ready", checkoutPods.pods.members),
+    ...checkoutPods.pods.members.map((pod) =>
+      finding(pod, "pod.config", "failing", "Container api can't start: it needs Secret stripe-key", ["secrets/shop/stripe-key"], {
+        detail: "Kubernetes can't find it, so the container isn't created.",
+        evidence: [{ source: "container", text: 'api: CreateContainerConfigError: secret "stripe-key" not found' }],
+        next: [{ label: "kubectl describe", command: `kubectl describe pods ${pod.split("/").at(-1)} -n shop` }],
+      }),
+    ),
+    finding("secrets/shop/stripe-key", "missing", "failing", "Secret shop/stripe-key doesn't exist", [], {
+      detail: "It's needed by Deployment checkout (container api: env STRIPE_KEY).",
+      evidence: [{ source: "reference", text: "Opscope read every Secret in the cluster and found no shop/stripe-key." }],
+      next: [{ label: "kubectl get", command: "kubectl get secrets -n shop" }],
+    }),
+  ],
+};
+
+// A healthy app with storage and an autoscaler.
+export const topologyHealthy = {
+  snapshot,
+  nodes: [
+    card("ingressclasses/nginx", "ok", ""),
+    card("ingresses/blog/blog", "ok", "blog.example.com"),
+    card("services/blog/blog", "ok", "2 endpoints"),
+    card("services/blog/db", "ok", "1 endpoint"),
+    card("horizontalpodautoscalers/blog/blog", "ok", "2/2–6"),
+    card("deployments/blog/blog", "progressing", "2/3", { message: "Rolling out revision 4" }),
+    card("statefulsets/blog/db", "ok", "1/1"),
+    podGroup("deployments/blog/blog", 2, 3, "ContainerCreating", "progressing"),
+    podGroup("statefulsets/blog/db", 1, 1),
+    card("configmaps/blog/blog-config", "ok", "6 keys"),
+    card("secrets/blog/db-password", "ok", "1 key"),
+    card("persistentvolumeclaims/blog/data-db-0", "ok", "Bound"),
+    card("persistentvolumes/pvc-3f2a", "ok", "Bound"),
+    card("storageclasses/standard", "ok", "default"),
+  ],
+  edges: [
+    link("ingresses/blog/blog", "ingressclasses/nginx"),
+    link("ingresses/blog/blog", "services/blog/blog", "routes-to"),
+    link("services/blog/blog", "pods:deployments/blog/blog", "selects"),
+    link("services/blog/db", "pods:statefulsets/blog/db", "selects"),
+    link("horizontalpodautoscalers/blog/blog", "deployments/blog/blog", "scales"),
+    link("deployments/blog/blog", "pods:deployments/blog/blog", "owns"),
+    link("statefulsets/blog/db", "pods:statefulsets/blog/db", "owns"),
+    link("pods:deployments/blog/blog", "configmaps/blog/blog-config"),
+    link("pods:deployments/blog/blog", "secrets/blog/db-password"),
+    link("pods:statefulsets/blog/db", "secrets/blog/db-password"),
+    link("pods:statefulsets/blog/db", "persistentvolumeclaims/blog/data-db-0"),
+    link("persistentvolumeclaims/blog/data-db-0", "persistentvolumes/pvc-3f2a"),
+    link("persistentvolumes/pvc-3f2a", "storageclasses/standard", "uses", undefined),
+  ],
+  findings: [finding("deployments/blog/blog", "deployment.rollout", "info", "It's rolling out revision 4")],
+};
+topologyHealthy.edges.at(-1).optional = true;
+
+// Missing and unknown objects, and a quota no edge leads to.
+export const topologyMissing = {
+  snapshot,
+  nodes: [
+    card("ingressclasses/no-such-class", "missing"),
+    card("ingresses/lab/secure", "failing", "no address"),
+    card("services/lab/api", "missing"),
+    card("deployments/lab/worker", "failing", "0/2"),
+    card("replicasets/lab/worker-5c8d", "failing", "0/2", { message: "exceeded quota: memory" }),
+    card("resourcequotas/lab/memory", "ok", "1Gi of 1Gi"),
+    card("pods/lab/reader", "failing", "CreateContainerConfigError"),
+    card("secrets/lab/secure-tls", "missing"),
+    card("secrets/lab/token", "unknown", "", { message: "Opscope isn't allowed to read Secrets" }),
+  ],
+  edges: [
+    link("ingresses/lab/secure", "ingressclasses/no-such-class"),
+    link("ingresses/lab/secure", "services/lab/api", "routes-to"),
+    link("ingresses/lab/secure", "secrets/lab/secure-tls", "uses", ["tls"]),
+    link("deployments/lab/worker", "replicasets/lab/worker-5c8d", "owns"),
+    link("replicasets/lab/worker-5c8d", "resourcequotas/lab/memory", "blames"),
+    link("pods/lab/reader", "secrets/lab/token"),
+  ],
+  findings: [
+    finding("ingressclasses/no-such-class", "missing", "failing", "IngressClass no-such-class doesn't exist"),
+    finding("services/lab/api", "missing", "failing", "Service lab/api doesn't exist"),
+    finding("secrets/lab/secure-tls", "missing", "failing", "Secret lab/secure-tls doesn't exist"),
+    finding("ingresses/lab/secure", "ingress.class", "failing", "Its IngressClass no-such-class doesn't exist", ["ingressclasses/no-such-class"]),
+    finding("deployments/lab/worker", "workload.unavailable", "failing", "None of its 2 replicas are ready", ["replicasets/lab/worker-5c8d"]),
+    finding("replicasets/lab/worker-5c8d", "create-failed", "failing", "ResourceQuota memory doesn't leave room for its pods", ["resourcequotas/lab/memory"], {
+      detail: "Each pod asks for 512Mi of memory; 1Gi of the quota's 1Gi is in use.",
+    }),
+    finding("pods/lab/reader", "pod.config", "failing", "Container app can't start: it needs Secret token", ["secrets/lab/token"]),
+    finding("secrets/lab/token", "unknown", "info", "Opscope can't check Secret lab/token", [], { confidence: "possible" }),
+  ],
+};
+
+// A busy namespace: eight apps behind two routes, a few of them broken.
+export const topologyLarge = (() => {
+  const apps = ["cart", "catalog", "checkout", "search", "users", "orders", "payments", "reviews"];
+  const broken = { payments: "CrashLoopBackOff", reviews: "ImagePullBackOff" };
+  const nodes = [card("gateways/infra/main", "ok", "Programmed")];
+  const edges = [];
+  const findings = [];
+  for (const route of ["store", "api"]) {
+    nodes.push(card(`httproutes/shop/${route}`, "ok", "Accepted"));
+    edges.push(link(`httproutes/shop/${route}`, "gateways/infra/main", "attaches"));
+  }
+  apps.forEach((app, i) => {
+    const bad = broken[app];
+    const group = podGroup(`deployments/shop/${app}`, bad ? 0 : 2, 2, bad ?? "Running");
+    nodes.push(
+      card(`services/shop/${app}`, bad ? "failing" : "ok", bad ? "0 ready" : "2 endpoints"),
+      card(`deployments/shop/${app}`, bad ? "failing" : "ok", bad ? "0/2" : "2/2"),
+      group,
+      card(`configmaps/shop/${app}-config`, "ok", "3 keys"),
+    );
+    edges.push(
+      link(`httproutes/shop/${i % 2 ? "api" : "store"}`, `services/shop/${app}`, "routes-to"),
+      link(`services/shop/${app}`, group.id, "selects"),
+      link(`deployments/shop/${app}`, group.id, "owns"),
+      link(group.id, `configmaps/shop/${app}-config`),
+      link(group.id, `secrets/shop/${i < 4 ? "db" : "queue"}-credentials`),
+    );
+    if (bad) {
+      findings.push(finding(`deployments/shop/${app}`, "workload.unavailable", "failing", "None of its 2 replicas are ready", group.pods.members));
+      for (const pod of group.pods.members) {
+        findings.push(
+          finding(pod, bad === "CrashLoopBackOff" ? "pod.crash" : "pod.image", "failing",
+            bad === "CrashLoopBackOff" ? "Container app keeps crashing: it exits with code 1" : `Image registry.example.com/${app}:2.4 doesn't exist`),
+        );
+      }
+    }
+  });
+  nodes.push(card("secrets/shop/db-credentials", "ok", "2 keys"), card("secrets/shop/queue-credentials", "ok", "2 keys"));
+  return { snapshot, nodes, edges, findings };
+})();
+
+// The whole cluster: a Gateway two namespaces use, a namespace with a
+// problem shown open, folded healthy ones, and three machines, one down.
+const appCard = (ns, name, state, status, members) => ({
+  id: `apps/${ns}/${name}`,
+  resource: "apps",
+  kind: "App",
+  namespace: ns,
+  name,
+  app: name,
+  state,
+  status,
+  group: `namespaces/${ns}`,
+  ...(members ? { members } : {}),
+});
+const namespaceCard = (name, apps, state = "ok") => ({
+  id: `namespaces/${name}`,
+  resource: "namespaces",
+  kind: "Namespace",
+  name,
+  state,
+  status: `${apps} ${apps === 1 ? "app" : "apps"}`,
+});
+export const topologyCluster = {
+  snapshot,
+  nodes: [
+    card("gatewayclasses/nginx", "ok", "Accepted"),
+    card("gateways/infra/main", "ok", "Programmed"),
+    appCard("shop", "storefront", "ok", "2 workloads"),
+    appCard("shop", "checkout", "failing", "1 workload, 1 failing", ["secrets/shop/stripe-key"]),
+    namespaceCard("blog", 2),
+    namespaceCard("monitoring", 4),
+    namespaceCard("kube-system", 7),
+    namespaceCard("cert-manager", 1),
+    card("nodes/worker-1", "ok", "Ready"),
+    card("nodes/worker-2", "failing", "NotReady", { message: "Kubelet stopped posting node status." }),
+    card("nodes/worker-3", "ok", "Ready"),
+  ],
+  edges: [
+    link("gateways/infra/main", "gatewayclasses/nginx", "attaches"),
+    link("apps/shop/storefront", "gateways/infra/main", "attaches", ["HTTPRoute storefront"]),
+    link("apps/shop/storefront", "apps/shop/checkout", "routes-to", ["HTTPRoute storefront"]),
+    link("namespaces/blog", "gateways/infra/main", "attaches", ["HTTPRoute blog"]),
+  ],
+  groups: [{ id: "namespaces/shop", name: "shop", state: "failing", apps: 2 }],
+  findings: [
+    finding("secrets/shop/stripe-key", "missing", "failing", "Secret shop/stripe-key doesn't exist", [], {
+      detail: "It's needed by Deployment checkout (container api: env STRIPE_KEY).",
+    }),
+    finding("nodes/worker-2", "node.not-ready", "failing", "The node stopped reporting"),
+  ],
+};

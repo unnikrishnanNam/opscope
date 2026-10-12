@@ -1,0 +1,38 @@
+# Scales by CPU, on a cluster without metrics-server: it can't read the
+# metrics it scales by. (On a cluster with metrics-server, it works.)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: autoscaled
+  namespace: opscope-scenarios
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: autoscaled}
+  template:
+    metadata:
+      labels: {app: autoscaled}
+    spec:
+      containers:
+        - name: app
+          image: busybox:1.36
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "sleep 3600"]
+          resources:
+            requests: {cpu: 10m}
+            limits: {memory: 32Mi}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: autoscaled
+  namespace: opscope-scenarios
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: autoscaled}
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {type: Utilization, averageUtilization: 50}

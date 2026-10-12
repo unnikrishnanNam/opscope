@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: liveness
+  namespace: opscope-scenarios
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: liveness}
+  template:
+    metadata:
+      labels: {app: liveness}
+    spec:
+
+      containers:
+        - name: app
+          image: busybox:1.36
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits: {memory: 32Mi}
+          command: ["sh", "-c", "sleep 3600"]
+          livenessProbe:
+            exec: {command: ["sh", "-c", "exit 1"]}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 1

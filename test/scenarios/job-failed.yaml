@@ -1,0 +1,18 @@
+# A Job whose only attempt exits with code 3, and that may not retry.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: job-failed
+  namespace: opscope-scenarios
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: busybox:1.36
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "echo migration failed >&2; exit 3"]
+          resources:
+            limits: {memory: 32Mi}

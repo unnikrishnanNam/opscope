@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bad-image
+  namespace: opscope-scenarios
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: bad-image}
+  template:
+    metadata:
+      labels: {app: bad-image}
+    spec:
+
+      containers:
+        - name: app
+          image: busybox:no-such-tag-opscope
+          imagePullPolicy: Always
+          resources:
+            limits: {memory: 32Mi}
+          command: ["sh", "-c", "sleep 3600"]

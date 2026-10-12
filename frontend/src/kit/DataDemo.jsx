@@ -6,6 +6,8 @@ import { Card, Section } from "../components/Card.jsx";
 import { Callout, EmptyState } from "../components/Callout.jsx";
 import CodeBlock from "../components/CodeBlock.jsx";
 import DataTable from "../components/DataTable.jsx";
+import Diagnosis from "../components/Diagnosis.jsx";
+import ProblemList, { problemSummary } from "../components/ProblemList.jsx";
 import EventList from "../components/EventList.jsx";
 import { Fact, FactGrid, KeyValueList } from "../components/Facts.jsx";
 import LogView from "../components/LogView.jsx";
@@ -13,6 +15,7 @@ import PodStatusBar from "../components/PodStatusBar.jsx";
 import StackBar from "../components/StackBar.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
 import Tabs from "../components/Tabs.jsx";
+import { TopologyView } from "../components/TopologyMap.jsx";
 import { SegmentedControl, Switch } from "../components/Toggle.jsx";
 import { MetricsUnavailable, Sparkline, UsageBar } from "../components/Usage.jsx";
 import { ClustersIcon, PlusIcon, PodsIcon, RefreshIcon } from "../components/icons.jsx";
@@ -317,6 +320,61 @@ function Events() {
   );
 }
 
+function Diagnoses() {
+  return (
+    <div className="kit-stack">
+      <Diagnosis clusterId="lab" trace={sample.diagnoses.failing} />
+      <Diagnosis clusterId="lab" trace={sample.diagnoses.degraded} />
+      <Diagnosis clusterId="lab" trace={sample.diagnoses.unexplained} />
+      <Diagnosis clusterId="lab" trace={sample.diagnoses.clear} />
+      <Diagnosis clusterId="lab" trace={sample.diagnoses.partOfAProblem} />
+    </div>
+  );
+}
+
+const TOPOLOGIES = {
+  broken: { label: "Broken", view: sample.topologyBroken, focus: "deployments/shop/checkout", namespace: "shop" },
+  healthy: { label: "Healthy", view: sample.topologyHealthy, focus: "deployments/blog/blog", namespace: "blog" },
+  missing: { label: "Missing and unknown", view: sample.topologyMissing, focus: "ingresses/lab/secure", namespace: "lab" },
+  large: { label: "Large", view: sample.topologyLarge, namespace: "shop" },
+  cluster: { label: "Cluster", view: sample.topologyCluster, arrange: { grid: ["apps", "namespaces"], strip: ["nodes"] } },
+};
+
+function Topology() {
+  const [which, setWhich] = useState("broken");
+  const t = TOPOLOGIES[which];
+  return (
+    <div className="kit-stack">
+      <SegmentedControl
+        label="Sample"
+        size="sm"
+        value={which}
+        onChange={setWhich}
+        options={Object.entries(TOPOLOGIES).map(([value, { label }]) => ({ value, label }))}
+      />
+      <TopologyView
+        key={which}
+        clusterId="lab"
+        view={t.view}
+        focus={t.focus}
+        namespace={t.namespace}
+        label={`Map: ${t.label.toLowerCase()} sample`}
+        fitKey={which}
+        height={460}
+        arrange={t.arrange}
+      />
+    </div>
+  );
+}
+
+function Problems() {
+  return (
+    <Card title="Problems and recent warnings" aside={problemSummary(sample.problems.problems)}>
+      <ProblemList clusterId="lab" search="" data={sample.problems} />
+    </Card>
+  );
+}
+
 function Row({ label, children }) {
   return (
     <div className="kit-row">
@@ -327,6 +385,27 @@ function Row({ label, children }) {
 }
 
 export const dataSections = [
+  {
+    id: "topology",
+    title: "Topology map",
+    about:
+      "An object's neighbourhood, or the whole cluster: kinds in columns, roughly the way traffic flows. The way from the focused card (or the selected one) to its root causes is drawn in the problem's colour. Drag or scroll to pan, ⌘/Ctrl and scroll to zoom; arrow keys move along edges, Enter opens a card's details.",
+    render: () => <Topology />,
+  },
+  {
+    id: "diagnoses",
+    title: "Diagnosis",
+    about:
+      "Why an object is failing: each step down to the root cause, with its evidence and what to look at next. The edge takes the colour of the worst problem; evidence opens by itself only on root causes. With nothing wrong, it's one quiet line.",
+    render: () => <Diagnoses />,
+  },
+  {
+    id: "problems-demo",
+    title: "Problems",
+    about:
+      "The root causes of what's wrong, at the top of the overview's warnings card: worst and widest first, each with what it affects. The title links to the page whose diagnosis explains it.",
+    render: () => <Problems />,
+  },
   {
     id: "cards",
     title: "Cards",

@@ -8,6 +8,7 @@ import (
 
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -115,6 +116,7 @@ func checkSafeForUpload(config *clientcmdapi.Config) error {
 type clientSet struct {
 	kube   *kubernetes.Clientset  // typed: Go structs for built-in kinds (Pods, Services, ...)
 	dyn    *dynamic.DynamicClient // dynamic: any kind as plain maps, incl. custom resources
+	meta   metadata.Interface     // metadata only: names, labels and owners, without spec, status or data
 	stream *kubernetes.Clientset  // typed, but with no timeout: for long streams like following logs
 }
 
@@ -150,6 +152,9 @@ func clientsFor(restConfig *rest.Config) (clientSet, string, error) {
 		return clientSet{}, "", err
 	}
 	if c.dyn, err = dynamic.NewForConfig(restConfig); err != nil {
+		return clientSet{}, "", err
+	}
+	if c.meta, err = metadata.NewForConfig(restConfig); err != nil {
 		return clientSet{}, "", err
 	}
 	if c.stream, err = kubernetes.NewForConfig(streamConfig); err != nil {

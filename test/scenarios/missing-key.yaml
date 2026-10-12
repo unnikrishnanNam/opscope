@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: settings
+  namespace: opscope-scenarios
+data:
+  LOG_LEVEL: info
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: missing-key
+  namespace: opscope-scenarios
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: missing-key}
+  template:
+    metadata:
+      labels: {app: missing-key}
+    spec:
+
+      containers:
+        - name: app
+          image: busybox:1.36
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits: {memory: 32Mi}
+          command: ["sh", "-c", "sleep 3600"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                configMapKeyRef: {name: settings, key: DATABASE_URL}

@@ -1,0 +1,11 @@
+# The routes and their Gateway live in opscope-edge; some of the Services
+# they send traffic to live in opscope-backends.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: opscope-edge
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: opscope-backends

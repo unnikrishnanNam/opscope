@@ -1,0 +1,27 @@
+# Starts healthy. Then update it to an image that doesn't exist:
+#
+#   kubectl -n opscope-scenarios set image deployment/rollout app=busybox:no-such-tag-opscope
+#
+# The new pod can't start, the old one keeps serving, and after 60 seconds
+# the rollout counts as stuck.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rollout
+  namespace: opscope-scenarios
+spec:
+  replicas: 1
+  progressDeadlineSeconds: 60
+  selector:
+    matchLabels: {app: rollout}
+  template:
+    metadata:
+      labels: {app: rollout}
+    spec:
+      containers:
+        - name: app
+          image: busybox:1.36
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "sleep 3600"]
+          resources:
+            limits: {memory: 32Mi}

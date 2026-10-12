@@ -6,13 +6,13 @@ import (
 	"strings"
 	"testing"
 
+	"opscope/internal/kube"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	clienttesting "k8s.io/client-go/testing"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes/fake"
@@ -34,11 +34,11 @@ var resourceOf = map[string]string{
 func fakeDynamic(objects ...*unstructured.Unstructured) *dynamicfake.FakeDynamicClient {
 	listKinds := map[schema.GroupVersionResource]string{}
 	for kind, resource := range resourceOf {
-		listKinds[gatewayAPI(resource)] = kind + "List"
+		listKinds[kube.GatewayAPI(resource)] = kind + "List"
 	}
 	client := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), listKinds)
 	for _, obj := range objects {
-		gvr := gatewayAPI(resourceOf[obj.GetKind()])
+		gvr := kube.GatewayAPI(resourceOf[obj.GetKind()])
 		if err := client.Tracker().Create(gvr, obj, obj.GetNamespace()); err != nil {
 			panic(err)
 		}
@@ -102,17 +102,6 @@ func TestListGateways(t *testing.T) {
 	}
 }
 
-func TestGatewayStatus(t *testing.T) {
-	notProgrammed, msg := gatewayStatus(conditionsFrom(t,
-		condition("Accepted", "True", ""), condition("Programmed", "False", "no address")))
-	if notProgrammed != "NotProgrammed" || msg != "no address" {
-		t.Errorf("got %q %q", notProgrammed, msg)
-	}
-	if status, _ := gatewayStatus(nil); status != "Pending" {
-		t.Errorf("no conditions: got %q, want Pending", status)
-	}
-}
-
 func TestListHTTPRoutes(t *testing.T) {
 	client := fakeDynamic(object("HTTPRoute", "web", "api", map[string]any{
 		"spec": map[string]any{
@@ -150,32 +139,6 @@ func TestListHTTPRoutes(t *testing.T) {
 	}
 	if r.Status != "UnresolvedRefs" || r.Message != "service old/legacy not found" || r.Rules != 2 {
 		t.Errorf("unexpected route row: %+v", r)
-	}
-}
-
-func TestRouteStatus(t *testing.T) {
-	tests := []struct {
-		name    string
-		parents [][]any
-		want    string
-	}{
-		{"no parent has reported", nil, "Pending"},
-		{"all accepted", [][]any{{condition("Accepted", "True", ""), condition("ResolvedRefs", "True", "")}}, "Accepted"},
-		{"one gateway rejects it", [][]any{
-			{condition("Accepted", "True", "")},
-			{condition("Accepted", "False", "hostname doesn't match")},
-		}, "NotAccepted"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var parents [][]metav1.Condition
-			for _, p := range tt.parents {
-				parents = append(parents, conditionsFrom(t, p...))
-			}
-			if got, _ := routeStatus(parents); got != tt.want {
-				t.Errorf("routeStatus() = %q, want %q", got, tt.want)
-			}
-		})
 	}
 }
 
@@ -217,16 +180,4 @@ func TestGatewayAPINotInstalled(t *testing.T) {
 	if o.GatewayAPI != nil {
 		t.Errorf("expected no Gateway API counts, got %+v", o.GatewayAPI)
 	}
-}
-
-// conditionsFrom converts condition maps into typed conditions.
-func conditionsFrom(t *testing.T, maps ...any) []metav1.Condition {
-	t.Helper()
-	var holder struct {
-		Conditions []metav1.Condition `json:"conditions"`
-	}
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(map[string]any{"conditions": maps}, &holder); err != nil {
-		t.Fatal(err)
-	}
-	return holder.Conditions
 }
