@@ -53,6 +53,14 @@
   white-space: nowrap;
 }
 
+/* The value's text, in its own box: .combobox-value is a flex row, and
+   text-overflow only works on a block. */
+.combobox-value-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .combobox-chevron {
   flex-shrink: 0;
   margin-left: auto;
