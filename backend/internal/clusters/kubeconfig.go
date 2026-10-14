@@ -116,6 +116,7 @@ type clientSet struct {
 	kube   *kubernetes.Clientset  // typed: Go structs for built-in kinds (Pods, Services, ...)
 	dyn    *dynamic.DynamicClient // dynamic: any kind as plain maps, incl. custom resources
 	stream *kubernetes.Clientset  // typed, but with no timeout: for long streams like following logs
+	route  *kindRoute             // kind clusters only: reaches them from a container too (kind.go)
 }
 
 // newClients builds the clients for the current context of config. It does
@@ -125,7 +126,14 @@ func newClients(config *clientcmdapi.Config) (clientSet, string, error) {
 	if err != nil {
 		return clientSet{}, "", fmt.Errorf("can't build a client from this kubeconfig: %w", err)
 	}
-	return clientsFor(restConfig)
+	// Set before clientsFor copies the config, so every client uses it.
+	route := kindRouteFor(config)
+	if route != nil {
+		restConfig.Dial = route.dial
+	}
+	clients, server, err := clientsFor(restConfig)
+	clients.route = route
+	return clients, server, err
 }
 
 // clientsFor builds the clients from connection settings, wherever they came

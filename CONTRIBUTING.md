@@ -83,7 +83,8 @@ only in development and is left out of production builds.
 ```
 backend/                  Go server
   main.go                 entry point: reads env vars, loads clusters, serves, shuts down cleanly
-  internal/clusters/      known clusters (environment, in-cluster, added in the UI), clients for each
+  internal/clusters/      known clusters (environment, in-cluster, added in the UI), clients for each;
+                          kind.go reaches kind clusters from inside a container
   internal/resources/     one file per resource type: lists it and flattens it into table rows;
                           detail.go builds detail pages, gatewayapi.go reads Gateway API resources,
                           names.go builds the search index
@@ -108,6 +109,7 @@ frontend/                 React app (Vite, plain JavaScript)
 deploy/kubernetes/        manifests for running Opscope in a cluster
 docs/                     deployment guide, API reference, design records
 Dockerfile                the single image (multi-platform)
+compose.yaml              Opscope on kind's Docker network, for local kind clusters
 Makefile                  common commands
 .github/                  CI and release workflows, issue forms, Dependabot
 ```

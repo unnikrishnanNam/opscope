@@ -41,6 +41,8 @@ type Cluster struct {
 	Client  *kubernetes.Clientset `json:"-"` // typed client for built-in kinds
 	Dynamic dynamic.Interface     `json:"-"` // dynamic client for custom resources (Gateway API)
 	Stream  *kubernetes.Clientset `json:"-"` // typed client without a timeout, for log streams
+
+	route *kindRoute // kind clusters only; see Via
 }
 
 // savedCluster is the file format for clusters added in the UI.
@@ -101,6 +103,7 @@ func (m *Manager) LoadFromFile(path, contextName, name string) (*Cluster, error)
 		Client:  clients.kube,
 		Dynamic: clients.dyn,
 		Stream:  clients.stream,
+		route:   clients.route,
 	}
 	m.mu.Lock()
 	m.clusters[cluster.ID] = cluster
@@ -191,6 +194,7 @@ func (m *Manager) loadSavedFile(file string) error {
 		Client:  clients.kube,
 		Dynamic: clients.dyn,
 		Stream:  clients.stream,
+		route:   clients.route,
 	}
 	return nil
 }
@@ -235,6 +239,7 @@ func (m *Manager) Add(name string, kubeconfig []byte, contextName string) (*Clus
 		Client:  clients.kube,
 		Dynamic: clients.dyn,
 		Stream:  clients.stream,
+		route:   clients.route,
 	}
 
 	// Only save clusters we can actually talk to.

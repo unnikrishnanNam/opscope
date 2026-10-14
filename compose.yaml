@@ -1,0 +1,31 @@
+# Opscope next to local kind clusters. Start it with `docker compose up -d` and open
+# http://localhost:8080, then add a cluster with the kubeconfig kind wrote (in ~/.kube/config,
+# or `kind get kubeconfig --name <cluster>`).
+#
+# The container joins kind's Docker network, where it reaches each kind cluster by its node's
+# name; see "Reaching the cluster from a container" in docs/deployment.md. kind creates that
+# network with its first cluster, so create a cluster before starting this.
+#
+# OPSCOPE_IMAGE runs another image, such as a local build (`make docker-build`, then
+# OPSCOPE_IMAGE=opscope:dev). OPSCOPE_PORT publishes another port.
+
+services:
+  opscope:
+    image: ${OPSCOPE_IMAGE:-ghcr.io/unnikrishnannam/opscope:latest}
+    ports:
+      # 127.0.0.1 only, because Opscope has no login.
+      - "127.0.0.1:${OPSCOPE_PORT:-8080}:8080"
+    volumes:
+      - opscope-data:/data
+    networks:
+      - kind
+    restart: unless-stopped
+
+volumes:
+  # The same volume as the `docker run` examples, so clusters added in either show up in both.
+  opscope-data:
+    name: opscope-data
+
+networks:
+  kind:
+    external: true

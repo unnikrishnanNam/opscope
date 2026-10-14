@@ -89,6 +89,7 @@ type clusterStatus struct {
 	*clusters.Cluster
 	Reachable bool   `json:"reachable"`
 	Version   string `json:"version,omitempty"`
+	Via       string `json:"via,omitempty"` // where it was reached, when not at Server (a kind node)
 	Error     string `json:"error,omitempty"`
 	Detail    string `json:"detail,omitempty"`
 }
@@ -112,6 +113,7 @@ func getCluster(manager *clusters.Manager) http.HandlerFunc {
 		} else {
 			status.Reachable = true
 			status.Version = version
+			status.Via = cluster.Via()
 		}
 		writeJSON(w, http.StatusOK, status)
 	}
