@@ -1,0 +1,38 @@
+# The claim asks for a StorageClass that doesn't exist, so it's never bound,
+# and the pod that needs it is never scheduled.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data
+  namespace: opscope-scenarios
+spec:
+  storageClassName: no-such-class
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: {storage: 1Gi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: claim
+  namespace: opscope-scenarios
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: claim}
+  template:
+    metadata:
+      labels: {app: claim}
+    spec:
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: data}
+      containers:
+        - name: app
+          image: busybox:1.36
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "sleep 3600"]
+          resources:
+            limits: {memory: 32Mi}
+          volumeMounts:
+            - {name: data, mountPath: /data}

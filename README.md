@@ -11,10 +11,12 @@ https://github.com/user-attachments/assets/68c13ac5-ac03-4cff-af9e-cf6c682194e9
 
 *A 48-second tour of Opscope and its command palette.*
 
-Opscope answers the everyday questions about a cluster in a browser: is anything unhealthy, why is
-this pod restarting, what does this Service route to, what did that job log. It shows nodes,
-workloads, configuration, networking, events, logs and live resource usage, across as many clusters
-as you connect, and finds any of it from one search box.
+Opscope answers the everyday questions about a cluster in a browser: is anything unhealthy, and why;
+what does this Service route to; what did that job log. It traces a failure from what you see to
+where it starts, a Secret that doesn't exist, a crash, a node that stopped reporting, and draws how
+objects depend on each other, from one pod to the whole cluster. It shows nodes, workloads,
+configuration, networking, events, logs and live resource usage, across as many clusters as you
+connect, and finds any of it from one search box.
 
 It is read-only by design. Opscope uses only `get` and `list`, and nothing in it can change a
 cluster, so it can be given to anyone who needs to look, such as developers, on-call engineers and
@@ -23,8 +25,15 @@ machine or inside the cluster it shows.
 
 ## Features
 
-- **Cluster overview:** a health summary, nodes and pods by status, CPU and memory usage, every
-  resource kind with what needs attention, and recent warning events.
+- **Why it's failing:** every detail page traces what's wrong down to its root causes, with the
+  evidence for each step and what to look at next. Rules written for the common failures (missing
+  Secrets and ConfigMaps, crashes and their exit codes, images, scheduling, quotas, probes,
+  rollouts, claims, routes, Gateways, nodes) name what to blame; nothing is guessed silently.
+- **Topology:** a map of any object's neighbourhood (its Map tab), of a namespace or app, or of the
+  whole cluster, with the way to each root cause drawn in, and the same as a list.
+- **Cluster overview:** a health summary, the root causes of what's wrong, nodes and pods by
+  status, CPU and memory usage, every resource kind with what needs attention, and recent warning
+  events.
 - **Resources:** Nodes; Pods, Deployments, StatefulSets, DaemonSets, Jobs and CronJobs;
   ConfigMaps and Secrets; Services, Ingresses, and Gateway API Gateways, HTTPRoutes and
   GatewayClasses. Tables filter, sort and refresh on their own, with kubectl-style statuses such as
@@ -97,13 +106,13 @@ Press ⌘K (Ctrl+K on Windows and Linux), or the search box in the top bar, and 
 Enter runs the highlighted command, ⌘/Ctrl+Enter opens a link in a new tab, and Escape clears the
 search, then closes the palette. Recently used commands come first when nothing is typed.
 
-| Keys                         | Action                                                |
-| ---------------------------- | ----------------------------------------------------- |
-| `g` then `o` `n` `p` `d` `s` | Overview, Nodes, Pods, Deployments, Services          |
-| `g` then `c`                 | Manage clusters                                       |
-| `1` `2` `3` `4`              | An object's Summary, YAML, Events and Logs tabs       |
-| `/`                          | Filter the current list                               |
-| `?`                          | Every shortcut available on the current page          |
+| Keys                             | Action                                                 |
+| -------------------------------- | ------------------------------------------------------ |
+| `g` then `o` `t` `n` `p` `d` `s` | Overview, Topology, Nodes, Pods, Deployments, Services |
+| `g` then `c`                     | Manage clusters                                        |
+| `1` `2` `3` `4` `5`              | An object's Summary, YAML, Events, Logs and Map tabs   |
+| `/`                              | Filter the current list                                |
+| `?`                              | Every shortcut available on the current page           |
 
 Shortcuts are ignored while you type in a field.
 
@@ -118,6 +127,10 @@ Shortcuts are ignored while you type in a field.
   key, is never cached, and never appears in the YAML view. Reading Secrets in a cluster needs a
   separate, optional role.
 - **Logs** are never cached, since they can contain sensitive data.
+- **Background reading.** For the diagnosis and the topology, Opscope lists every kind it knows in
+  each connected cluster every 30 seconds (`OPSCOPE_SNAPSHOT_INTERVAL`), with the same `get` and
+  `list` permissions. Secrets are listed by metadata only, so their values never reach it, and
+  only the latest reading of each cluster is kept, in memory.
 - **Kubeconfigs added in the UI** are checked before they're accepted (no login commands or file
   paths, which could run programs or read files on the server), and saved with only the chosen
   context, readable only by Opscope.
@@ -129,9 +142,11 @@ Shortcuts are ignored while you type in a field.
   <img src="docs/screenshots/overview-light.png" alt="The Opscope overview: a health summary, nodes, pods, CPU and memory usage, every resource kind with what needs attention, and per-node usage">
 </picture>
 
-| Pods | A pod's detail page |
+| Why a pod is failing | The cluster's topology |
 | --- | --- |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pods-dark.png"><img src="docs/screenshots/pods-light.png" alt="The pods list, with status, readiness, restarts and live usage"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pod-dark.png"><img src="docs/screenshots/pod-light.png" alt="A crash-looping pod's detail page: facts, containers and conditions"></picture> |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pod-dark.png"><img src="docs/screenshots/pod-light.png" alt="A crash-looping pod's detail page: its diagnosis traces the crash to the container's exit code, with the evidence, the previous logs and a kubectl command to copy"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/topology-dark.png"><img src="docs/screenshots/topology-light.png" alt="The Topology page for the whole cluster: the Gateway and its classes, the namespace it serves, the namespaces with problems open with their root causes marked, and the healthy ones folded"></picture> |
+| **An object's map** | **Pods** |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/map-dark.png"><img src="docs/screenshots/map-light.png" alt="A Deployment's Map tab: its Service, its pods and the ConfigMaps and Secrets they use, with the way from the Deployment to its crashing pod drawn in red"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pods-dark.png"><img src="docs/screenshots/pods-light.png" alt="The pods list, with status, readiness, restarts and live usage"></picture> |
 
 ## Documentation
 

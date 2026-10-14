@@ -17,12 +17,16 @@ const MAX_LINES = 5000;
 
 // A pod's logs: which container, how many lines, the previous run, line
 // wrapping and following, above a LogView. `containers` comes from the
-// detail endpoint.
-export default function LogViewer({ clusterId, namespace, pod, containers }) {
-  // Start with the first normal container (init containers usually finished long ago).
-  const [container, setContainer] = useState((containers.find((c) => !c.role) ?? containers[0])?.name ?? "");
+// detail endpoint. `container` and `previous` choose where to start (a
+// diagnosis links to the previous run of a container that keeps crashing).
+export default function LogViewer({ clusterId, namespace, pod, containers, container: startContainer, previous: startPrevious = false }) {
+  // Start with the container asked for, or the first normal one (init
+  // containers usually finished long ago).
+  const [container, setContainer] = useState(
+    containers.find((c) => c.name === startContainer)?.name ?? (containers.find((c) => !c.role) ?? containers[0])?.name ?? "",
+  );
   const [lines, setLines] = useState(500);
-  const [previous, setPrevious] = useState(false);
+  const [previous, setPrevious] = useState(startPrevious);
   const [follow, setFollow] = useState(false);
   const [wrap, setWrap] = useState(true);
   const [reloads, setReloads] = useState(0);

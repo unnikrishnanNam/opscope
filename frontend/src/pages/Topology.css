@@ -1,0 +1,19 @@
+.topology-page .page-header-block {
+  margin-bottom: var(--space-4);
+}
+
+.topology-page > .callout {
+  max-width: none;
+  margin-bottom: var(--space-4);
+}
+
+/* An app in the picker, with its state's mark. */
+.topology-app {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.topology-app-all {
+  width: 12px;
+}

@@ -1,10 +1,11 @@
 import { copyText } from "../clipboard.js";
-import { CopyIcon, EventsIcon, FileTextIcon, InfoIcon, LogsIcon, NodesIcon } from "../components/icons.jsx";
+import { CopyIcon, EventsIcon, FileTextIcon, InfoIcon, LogsIcon, MapIcon, NodesIcon } from "../components/icons.jsx";
 import { kubectlDescribe, kubectlGet, kubectlLogs } from "../kubectl.js";
 import { allPages, detailPath } from "../sections.js";
 
 const GROUP = "This page";
-const TAB_ICONS = { summary: InfoIcon, yaml: FileTextIcon, events: EventsIcon, logs: LogsIcon };
+const TAB_ICONS = { summary: InfoIcon, yaml: FileTextIcon, events: EventsIcon, logs: LogsIcon, map: MapIcon };
+const TAB_KEYWORDS = { map: ["topology", "graph", "dependencies", "neighbours"] };
 
 // detailCommands lists what the command palette offers on one object's
 // page (registered by ResourceDetail with useCommands): its other tabs,
@@ -28,7 +29,7 @@ export function detailCommands({ d, page, clusterId, tab, tabs, openTab, search 
       detail: t.value === tab ? "open" : undefined,
       group: GROUP,
       icon: TAB_ICONS[t.value],
-      keywords: ["tab"],
+      keywords: ["tab", ...(TAB_KEYWORDS[t.value] ?? [])],
       shortcut: t.shortcut,
       run: () => openTab(t.value),
     });

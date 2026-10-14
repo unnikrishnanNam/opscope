@@ -1,0 +1,107 @@
+/* A map as text: one section per column, one item per object. */
+
+.topo-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.topo-list-empty {
+  color: var(--text-subtle);
+  font-size: var(--text-sm);
+}
+
+.topo-list-heading {
+  margin-bottom: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-strong);
+  color: var(--text-subtle);
+}
+
+.topo-list-column > ul {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.topo-list-item {
+  padding: var(--space-2) var(--space-3);
+}
+
+.topo-list-item + .topo-list-item {
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* You are here. */
+.topo-list-focus {
+  box-shadow: inset 2px 0 0 var(--signal);
+}
+
+.topo-list-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.topo-list-head .topo-tag {
+  margin-left: 0;
+}
+
+.topo-list-name {
+  min-width: 0;
+  font-weight: var(--weight-strong);
+  overflow-wrap: anywhere;
+}
+
+.topo-list-name a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.topo-list-name a:hover {
+  text-decoration: underline;
+}
+
+.topo-list-status {
+  color: var(--text-muted);
+}
+
+.topo-list-findings {
+  margin: 2px 0 0;
+  padding-left: 20px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-strong);
+  color: var(--text);
+}
+
+.topo-list-finding-failing::marker {
+  color: var(--bad-mark);
+}
+
+.topo-list-finding-degraded::marker {
+  color: var(--warn-mark);
+}
+
+.topo-list-finding-info {
+  font-weight: var(--weight-body);
+  color: var(--text-muted);
+}
+
+.topo-list-relations {
+  margin-top: 2px;
+  padding-left: 20px;
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+}
+
+.topo-list-other {
+  color: var(--text-muted);
+  font-weight: var(--weight-strong);
+}

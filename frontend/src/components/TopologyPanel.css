@@ -1,0 +1,236 @@
+/* The selected card's details, over the right side of the map. */
+
+.topo-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(360px, 100%);
+  overflow-y: auto;
+  padding: var(--space-3) var(--space-4) var(--space-5);
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  animation: topo-panel-in var(--duration) var(--ease);
+  cursor: auto;
+}
+
+@keyframes topo-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+
+.topo-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.topo-panel-kind {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-strong);
+  color: var(--text-subtle);
+}
+
+.topo-panel-title {
+  margin-top: 2px;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-title);
+  overflow-wrap: anywhere;
+}
+
+.topo-panel-title:focus {
+  outline: none;
+}
+
+.topo-panel-title:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.topo-panel-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.topo-panel-message {
+  margin-top: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.topo-panel-actions:empty {
+  display: none;
+}
+
+.topo-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.topo-panel-section {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.topo-panel-heading {
+  margin-bottom: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-strong);
+  color: var(--text-subtle);
+}
+
+.topo-panel-quiet {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* Findings: as in a diagnosis, flattened to this one card. */
+.topo-panel-findings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.topo-finding {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 0 var(--space-2);
+}
+
+.topo-finding-mark {
+  margin-top: 1px;
+  color: var(--neutral-mark);
+}
+
+.topo-finding-failing .topo-finding-mark {
+  color: var(--bad-mark);
+}
+
+.topo-finding-degraded .topo-finding-mark {
+  color: var(--warn-mark);
+}
+
+.topo-finding-main {
+  min-width: 0;
+}
+
+.topo-finding-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  margin-bottom: 2px;
+}
+
+.topo-finding-head .topo-tag {
+  margin-left: 0;
+}
+
+.topo-finding-objects {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.topo-finding-title {
+  font-size: var(--text-md);
+  font-weight: var(--weight-title);
+  overflow-wrap: anywhere;
+}
+
+.topo-finding-detail {
+  margin-top: 2px;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.topo-panel-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.topo-panel-link {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-strong);
+}
+
+/* Connections: the relation, then each card it leads to. */
+.topo-panel-connections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.topo-panel-connections dt {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-strong);
+  color: var(--text-subtle);
+}
+
+.topo-panel-connections dd {
+  margin: 2px 0 0;
+}
+
+.topo-panel-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 2px 4px;
+  margin-left: -4px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-strong);
+  text-align: left;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.topo-panel-pick:hover {
+  background: var(--surface-hover);
+}
+
+.topo-panel-pick:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 0;
+}
+
+.topo-panel-via {
+  display: block;
+  padding-left: 18px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+  overflow-wrap: anywhere;
+}

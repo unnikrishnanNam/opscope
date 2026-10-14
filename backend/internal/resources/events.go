@@ -5,6 +5,8 @@ import (
 	"sort"
 	"time"
 
+	"opscope/internal/kube"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -68,34 +70,7 @@ func eventRow(e *corev1.Event) Event {
 		Object:         e.InvolvedObject.Kind + "/" + e.InvolvedObject.Name,
 		ObjectName:     e.InvolvedObject.Name,
 		ObjectResource: resourceForKind(e.InvolvedObject.Kind),
-		Count:          eventCount(e),
-		LastSeen:       eventLastSeen(e),
-	}
-}
-
-// Events have been reported in a few different ways over the years, so the
-// "when" and "how many" can sit in different fields. We take the first one set.
-
-func eventLastSeen(e *corev1.Event) time.Time {
-	switch {
-	case e.Series != nil && !e.Series.LastObservedTime.IsZero():
-		return e.Series.LastObservedTime.Time
-	case !e.LastTimestamp.IsZero():
-		return e.LastTimestamp.Time
-	case !e.EventTime.IsZero():
-		return e.EventTime.Time
-	default:
-		return e.CreationTimestamp.Time
-	}
-}
-
-func eventCount(e *corev1.Event) int32 {
-	switch {
-	case e.Series != nil && e.Series.Count > 0:
-		return e.Series.Count
-	case e.Count > 0:
-		return e.Count
-	default:
-		return 1
+		Count:          kube.EventCount(e),
+		LastSeen:       kube.EventLastSeen(e),
 	}
 }

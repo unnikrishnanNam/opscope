@@ -11,6 +11,7 @@ import (
 
 	"opscope/internal/clusters"
 	"opscope/internal/metrics"
+	"opscope/internal/snapshot"
 )
 
 // Config holds the settings the server needs.
@@ -20,7 +21,7 @@ type Config struct {
 }
 
 // New returns an http.Handler with every route registered.
-func New(cfg Config, manager *clusters.Manager, history *metrics.History, logger *slog.Logger) http.Handler {
+func New(cfg Config, manager *clusters.Manager, history *metrics.History, snapshots *snapshot.Store, logger *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
 
 	// API routes. Go 1.22+ lets us put the HTTP method and {placeholders}
@@ -31,7 +32,7 @@ func New(cfg Config, manager *clusters.Manager, history *metrics.History, logger
 	mux.HandleFunc("POST /api/clusters", addCluster(manager))
 	mux.HandleFunc("POST /api/clusters/inspect", inspectKubeconfig())
 	mux.HandleFunc("GET /api/clusters/{id}", getCluster(manager))
-	mux.HandleFunc("DELETE /api/clusters/{id}", removeCluster(manager))
+	mux.HandleFunc("DELETE /api/clusters/{id}", removeCluster(manager, snapshots))
 
 	// One route for every list: namespaces, pods, deployments, ...
 	// The {resource} part picks the lister (see internal/resources).
@@ -43,6 +44,17 @@ func New(cfg Config, manager *clusters.Manager, history *metrics.History, logger
 
 	// Every object's name, for the command palette (also beats {resource}).
 	mux.HandleFunc("GET /api/clusters/{id}/names", listNames(manager))
+
+	// The graph of objects and what they need, for one namespace, app or object.
+	mux.HandleFunc("GET /api/clusters/{id}/topology", getTopology(manager, snapshots))
+
+	// The root causes of what's wrong, for the overview.
+	mux.HandleFunc("GET /api/clusters/{id}/problems", getProblems(manager, snapshots))
+
+	// Why one object is failing. The fixed "diagnosis" segment beats the
+	// detail routes' {resource} below.
+	mux.HandleFunc("GET /api/clusters/{id}/diagnosis/{resource}/{namespace}/{name}", getDiagnosis(manager, snapshots))
+	mux.HandleFunc("GET /api/clusters/{id}/diagnosis/{resource}/{name}", getDiagnosis(manager, snapshots))
 
 	// Live CPU and memory usage from metrics-server.
 	mux.HandleFunc("GET /api/clusters/{id}/metrics/nodes", getNodeMetrics(manager, history))

@@ -210,18 +210,26 @@ make docker-build && kind load docker-image opscope:dev --name <cluster>
 ## Permissions
 
 Opscope only ever uses `get` and `list`. It never creates, changes or deletes anything, and it polls
-rather than watching.
+rather than watching. For the topology and the diagnosis it also reads each cluster in the
+background; see [Background snapshots](#background-snapshots).
 
-| API group                   | Resources                                             | Used for               |
-| --------------------------- | ----------------------------------------------------- | ---------------------- |
-| core (`""`)                 | namespaces, nodes, pods, services, configmaps, events | Lists and detail pages |
-| core (`""`)                 | pods/log (`get`)                                      | The Logs tab           |
-| `apps`                      | deployments, statefulsets, daemonsets                 | Workloads              |
-| `batch`                     | jobs, cronjobs                                        | Workloads              |
-| `networking.k8s.io`         | ingresses                                             | Networking             |
-| `gateway.networking.k8s.io` | gateways, httproutes, gatewayclasses                  | Gateway API (optional) |
-| `metrics.k8s.io`            | nodes, pods                                           | CPU and memory usage   |
-| core (`""`)                 | secrets (`secrets-access.yaml` only)                  | Secrets pages, Reveal  |
+| API group                   | Resources                                                                  | Used for               |
+| --------------------------- | -------------------------------------------------------------------------- | ---------------------- |
+| core (`""`)                 | namespaces, nodes, pods, services, configmaps, events                      | Lists and detail pages |
+| core (`""`)                 | persistentvolumeclaims, persistentvolumes, serviceaccounts, resourcequotas | Topology and diagnosis |
+| core (`""`)                 | pods/log (`get`)                                                           | The Logs tab           |
+| `apps`                      | deployments, statefulsets, daemonsets                                      | Workloads              |
+| `apps`                      | replicasets                                                                | Topology and diagnosis |
+| `batch`                     | jobs, cronjobs                                                             | Workloads              |
+| `discovery.k8s.io`          | endpointslices                                                             | Topology and diagnosis |
+| `networking.k8s.io`         | ingresses                                                                  | Networking             |
+| `networking.k8s.io`         | ingressclasses                                                             | Topology and diagnosis |
+| `storage.k8s.io`            | storageclasses                                                             | Topology and diagnosis |
+| `autoscaling`               | horizontalpodautoscalers                                                   | Topology and diagnosis |
+| `policy`                    | poddisruptionbudgets                                                       | Topology and diagnosis |
+| `gateway.networking.k8s.io` | gateways, httproutes, gatewayclasses, referencegrants                      | Gateway API (optional) |
+| `metrics.k8s.io`            | nodes, pods                                                                | CPU and memory usage   |
+| core (`""`)                 | secrets (`secrets-access.yaml` only)                                       | Secrets pages, Reveal  |
 
 The same applies to a kubeconfig used from outside the cluster: Opscope can show only what that
 user is allowed to read. Anything it can't read is reported on the page that needs it, and the rest
@@ -240,7 +248,9 @@ access:
 kubectl delete -f deploy/kubernetes/secrets-access.yaml
 ```
 
-The Secrets pages then say that this user isn't allowed to read them.
+The Secrets pages then say that this user isn't allowed to read them, and the diagnosis says it
+can't check a Secret a pod needs rather than calling it missing. Even with the role, the topology
+and the diagnosis list Secrets by their metadata only: their values never reach them.
 
 ## Exposing Opscope
 
@@ -258,15 +268,17 @@ front of it handles authentication, such as an authenticating reverse proxy
 
 Opscope is configured with environment variables:
 
-| Variable               | Default            | Effect                                                            |
-| ---------------------- | ------------------ | ----------------------------------------------------------------- |
-| `PORT`                 | `8080`             | Port the server listens on                                        |
-| `OPSCOPE_KUBECONFIG`   | (none)             | Kubeconfig file for a cluster loaded at startup                   |
-| `OPSCOPE_CONTEXT`      | current context    | Which context of that file to use                                 |
-| `OPSCOPE_IN_CLUSTER`   | (off)              | `true`: use the pod's service account, when running in a pod      |
-| `OPSCOPE_CLUSTER_NAME` | context name       | Display name for the environment or in-cluster cluster            |
-| `DATA_DIR`             | `../data`          | Where clusters added in the UI are saved (`/data` in the image)   |
-| `STATIC_DIR`           | `../frontend/dist` | Folder with the built web UI (`/app/web` in the image)            |
+| Variable                    | Default            | Effect                                                                             |
+| --------------------------- | ------------------ | ---------------------------------------------------------------------------------- |
+| `PORT`                      | `8080`             | Port the server listens on                                                         |
+| `OPSCOPE_KUBECONFIG`        | (none)             | Kubeconfig file for a cluster loaded at startup                                    |
+| `OPSCOPE_CONTEXT`           | current context    | Which context of that file to use                                                  |
+| `OPSCOPE_IN_CLUSTER`        | (off)              | `true`: use the pod's service account, when running in a pod                       |
+| `OPSCOPE_CLUSTER_NAME`      | context name       | Display name for the environment or in-cluster cluster                             |
+| `DATA_DIR`                  | `../data`          | Where clusters added in the UI are saved (`/data` in the image)                    |
+| `STATIC_DIR`                | `../frontend/dist` | Folder with the built web UI (`/app/web` in the image)                             |
+| `OPSCOPE_SNAPSHOT_INTERVAL` | `30s`              | How often each cluster is read in the background (`10s` or more), or `0` for never |
+| `OPSCOPE_LOG_LEVEL`         | `info`             | `debug`, `info`, `warn` or `error`; `debug` logs each background snapshot          |
 
 Opscope never reads `~/.kube/config` or `KUBECONFIG` on its own, so a cluster is never picked up by
 accident. If `OPSCOPE_KUBECONFIG` or `OPSCOPE_IN_CLUSTER` is set but can't be used, Opscope stops
@@ -274,6 +286,22 @@ with an error rather than starting without that cluster.
 
 Clusters added in the UI are saved one file per cluster, readable only by Opscope's user, and contain
 only the chosen context with its cluster and credentials.
+
+### Background snapshots
+
+For the topology and the diagnosis, Opscope reads each cluster whole: one `list` call per kind it
+knows (27 of them), more for kinds with over 500 objects. It does this every 30 seconds whether
+anyone is looking or not, so the cluster's map is ready when you open it. While someone has a page
+open, it reads up to every 10 seconds, and the background reading waits until the page's reading is
+30 seconds old. A cluster that doesn't answer is tried again after one minute, then two, four, and
+then every five minutes, until it answers. Only the latest snapshot of each cluster is kept, in
+memory.
+
+On a cluster of about 350 objects that's some 50 small `list` calls a minute, each snapshot taking
+around 20 ms to read, and Opscope uses under 50 MB of memory.
+
+Set `OPSCOPE_SNAPSHOT_INTERVAL=0` to read clusters only while a page asks for them, or a longer
+interval (`2m`) for a cluster you'd rather read less often.
 
 ## Upgrading
 
