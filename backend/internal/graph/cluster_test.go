@@ -88,6 +88,22 @@ func TestClusterViewExpandAndProblems(t *testing.T) {
 	}
 }
 
+// A card kept only for being joined to a problem doesn't bring in what it's
+// joined to, whatever order the edges come in.
+func TestOnlyProblemsIsOneHop(t *testing.T) {
+	v := &View{
+		Nodes: []*Node{{ID: "api", State: Failing}, {ID: "storefront", State: OK}, {ID: "edge", State: OK}, {ID: "nginx", State: OK}},
+		Edges: []*Edge{{From: "storefront", To: "api"}, {From: "storefront", To: "edge"}, {From: "edge", To: "nginx"}},
+	}
+	v.onlyProblems()
+	if got := ids(v.Nodes); !slices.Equal(got, []string{"api", "storefront"}) {
+		t.Errorf("nodes = %v", got)
+	}
+	if len(v.Edges) != 1 || v.Edges[0].To != "api" {
+		t.Errorf("edges = %v", v.Edges)
+	}
+}
+
 // A pod that runs again between restarts is "ok" on its own; the problem
 // the diagnosis found in it still counts toward its app and namespace.
 func TestClusterViewCountsTroubledObjects(t *testing.T) {

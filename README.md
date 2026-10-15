@@ -57,7 +57,9 @@ machine or inside the cluster it shows.
 docker run --rm -p 127.0.0.1:8080:8080 -v opscope-data:/data ghcr.io/unnikrishnannam/opscope:latest
 ```
 
-Open http://localhost:8080 and add a cluster by pasting or uploading a kubeconfig.
+Open http://localhost:8080 and add a cluster by pasting or uploading a kubeconfig. For local
+[kind](https://kind.sigs.k8s.io/) clusters, add `--network kind` (or use [`compose.yaml`](compose.yaml));
+see [Reaching the cluster from a container](docs/deployment.md#reaching-the-cluster-from-a-container).
 
 **In a Kubernetes cluster,** to show that cluster:
 

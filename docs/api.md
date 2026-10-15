@@ -78,6 +78,7 @@ can't be reached has `reachable: false` and an explanation:
 | ----------- | ------------------------------------------------------------ |
 | `reachable` | Whether the API server answered                              |
 | `version`   | The Kubernetes version, when reachable (`v1.31.4`)           |
+| `via`       | Where it was reached, when not at `server` (a kind node)     |
 | `error`     | A readable explanation, when not                             |
 | `detail`    | The original error, when not                                 |
 

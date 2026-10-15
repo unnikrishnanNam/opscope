@@ -6,7 +6,9 @@ VERSION ?= dev
 # Docker settings shared by the run targets:
 #   - the port is published on 127.0.0.1 only, because Opscope has no login
 #   - saved clusters live in the "opscope-data" volume, so they survive restarts
-DOCKER_RUN = docker run --rm -p 127.0.0.1:8080:8080 -v opscope-data:/data
+#   - NETWORK=kind puts the container on kind's Docker network, so it can reach
+#     local kind clusters (see docs/deployment.md)
+DOCKER_RUN = docker run --rm -p 127.0.0.1:8080:8080 -v opscope-data:/data $(if $(NETWORK),--network $(NETWORK))
 
 .PHONY: help dev-backend dev-frontend test build docker-build docker-run docker-run-env
 
@@ -19,6 +21,7 @@ help:
 	@echo "make docker-run                  run the image; add clusters in the UI"
 	@echo "make docker-run-env KUBECONFIG_FILE=path/to/kubeconfig"
 	@echo "                                 run the image with a cluster from a kubeconfig file"
+	@echo "                                 (add NETWORK=kind to either to reach local kind clusters)"
 
 # Pass a cluster to the dev server like this:
 #   make dev-backend OPSCOPE_KUBECONFIG=$PWD/data/multipass.kubeconfig

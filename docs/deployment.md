@@ -71,18 +71,49 @@ that user.
 The container must be able to reach the cluster's API server. A `server:` address of `127.0.0.1`
 or `localhost` in the kubeconfig points at the container itself, not at your machine.
 
-**kind clusters** publish their API server on your machine's `127.0.0.1`. Put Opscope on kind's
-Docker network instead, and use the kubeconfig kind writes for that network:
+**kind clusters** publish their API server on your machine's `127.0.0.1`, and that's the address in
+the kubeconfig kind writes. Put Opscope on kind's Docker network and add the cluster with that
+kubeconfig as it is:
 
 ```bash
-kind get kubeconfig --internal --name <cluster> > kind.internal.kubeconfig
+docker run --rm -p 127.0.0.1:8080:8080 -v opscope-data:/data --network kind \
+  ghcr.io/unnikrishnannam/opscope:latest
 ```
 
-Then add `--network kind` to `docker run`, or connect a running container:
+or connect a container that's already running:
 
 ```bash
 docker network connect kind <opscope-container>
 ```
+
+kind creates the `kind` network with its first cluster and puts every cluster on it, so one
+container reaches all of them. Opscope dials the address in the kubeconfig first. When nothing
+answers there and the cluster or context is named `kind-<name>`, as kind names them, it connects to
+the cluster's node by name on kind's network, at `<name>-control-plane:6443`. The kubeconfig is
+saved unchanged, and the API server's certificate is still checked against the address in it, which
+kind's certificate lists. The Clusters page shows where such a cluster was reached ("reached at
+dev-control-plane:6443 on kind's network"), and if Opscope isn't on kind's network, the cluster's
+error says so.
+
+Outside a container, kind's address works and Opscope uses it directly.
+
+If you renamed both the cluster and the context, Opscope can't tell the cluster is a kind cluster.
+Use the kubeconfig kind writes for its own network instead:
+
+```bash
+kind get kubeconfig --internal --name <cluster>
+```
+
+**With Docker Compose,** [`compose.yaml`](../compose.yaml) in the repository runs Opscope on kind's
+network, with the same port and volume as the examples above:
+
+```bash
+docker compose up -d
+```
+
+Create a kind cluster first: until kind has created its network, Compose stops with "network kind
+declared as external, but could not be found". Set `OPSCOPE_PORT` to publish another port, and
+`OPSCOPE_IMAGE` to run another image, such as a local build (`opscope:dev`).
 
 ### Build the image yourself
 
@@ -94,7 +125,7 @@ make docker-build
 
 This builds `opscope:dev`. `make docker-run` and `make docker-run-env KUBECONFIG_FILE=path` run it
 with the same settings as above. Pass `VERSION=v1.2.0` to either to set the image tag and the version
-Opscope reports.
+Opscope reports, and `NETWORK=kind` to put the container on kind's network.
 
 ## Run in a Kubernetes cluster
 

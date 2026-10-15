@@ -2,6 +2,7 @@ package graph
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 )
@@ -216,15 +217,18 @@ func (g *Graph) ownedByWorkload(id string) bool {
 }
 
 // onlyProblems keeps the cards that aren't OK, and what they're joined to.
+// Only what's joined to a problem itself: a card kept for context doesn't
+// bring in what it's joined to.
 func (v *View) onlyProblems() {
-	keep := map[string]bool{}
+	problems := map[string]bool{}
 	for _, n := range v.Nodes {
 		if n.State != OK && n.State != Progressing && n.State != Unknown { // what can't be read isn't a problem
-			keep[n.ID] = true
+			problems[n.ID] = true
 		}
 	}
+	keep := maps.Clone(problems)
 	for _, e := range v.Edges {
-		if keep[e.From] || keep[e.To] {
+		if problems[e.From] || problems[e.To] {
 			keep[e.From], keep[e.To] = true, true
 		}
 	}

@@ -114,6 +114,13 @@ function ClusterRow({ cluster, status, onRemove }) {
         <div className="cluster-row-meta">
           <span className="mono">{cluster.context}</span>
           <span className="mono">{cluster.server}</span>
+          {/* A kind cluster reached on kind's Docker network, because its own
+              address only works outside a container. */}
+          {status?.reachable && status.via && (
+            <span>
+              reached at <span className="mono">{status.via}</span> on kind's network
+            </span>
+          )}
         </div>
       </div>
       <span className={`cluster-row-status cluster-row-status-${tone}`}>
