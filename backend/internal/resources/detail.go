@@ -52,6 +52,10 @@ var kinds = map[string]kindInfo{
 	"gateways":       {gatewayAPI("gateways"), "Gateway", true},
 	"httproutes":     {gatewayAPI("httproutes"), "HTTPRoute", true},
 	"gatewayclasses": {gatewayAPI("gatewayclasses"), "GatewayClass", false},
+
+	"persistentvolumeclaims": {core("persistentvolumeclaims"), "PersistentVolumeClaim", true},
+	"persistentvolumes":      {core("persistentvolumes"), "PersistentVolume", false},
+	"storageclasses":         {group("storage.k8s.io", "v1", "storageclasses"), "StorageClass", false},
 }
 
 // resourceForKind finds the URL name for a kind, so owners like

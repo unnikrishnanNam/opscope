@@ -49,6 +49,10 @@ var Listers = map[string]Lister{
 	"services":     asLister(listServices),
 	"ingresses":    asLister(listIngresses),
 
+	"persistentvolumeclaims": asLister(listPersistentVolumeClaims),
+	"persistentvolumes":      asLister(listPersistentVolumes),
+	"storageclasses":         asLister(listStorageClasses),
+
 	"gateways":       asDynamicLister(listGateways),
 	"httproutes":     asDynamicLister(listHTTPRoutes),
 	"gatewayclasses": asDynamicLister(listGatewayClasses),

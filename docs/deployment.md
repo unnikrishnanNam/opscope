@@ -188,6 +188,8 @@ rather than watching.
 | `apps`                      | deployments, statefulsets, daemonsets                 | Workloads              |
 | `batch`                     | jobs, cronjobs                                        | Workloads              |
 | `networking.k8s.io`         | ingresses                                             | Networking             |
+| core (`""`)                 | persistentvolumeclaims, persistentvolumes             | Storage                |
+| `storage.k8s.io`            | storageclasses                                        | Storage                |
 | `gateway.networking.k8s.io` | gateways, httproutes, gatewayclasses                  | Gateway API (optional) |
 | `metrics.k8s.io`            | nodes, pods                                           | CPU and memory usage   |
 | core (`""`)                 | secrets (`secrets-access.yaml` only)                  | Secrets pages, Reveal  |

@@ -16,7 +16,7 @@ R0–R8, the command palette phases P0–P6, the repositioning phases D0–D6 or
 phases G0–G7. All work happens on the `feature/storage` branch, one commit per phase, and the next
 phase starts only after the previous one is reviewed.
 
-**Status (2026-10-28):** S0 done; S1 next.
+**Status (2026-10-29):** S0–S1 done; S2 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -90,7 +90,7 @@ type PersistentVolume struct {
 	Claim         string   `json:"claim"`         // "namespace/name" of the bound claim, if any
 	StorageClass  string   `json:"storageClass"`
 	Source        string   `json:"source"`        // e.g. "CSI: ebs.csi.aws.com", "HostPath", "NFS"
-	Reason        string   `json:"reason"`        // status.reason, shown on hover for Failed
+	Message       string   `json:"message"`       // why it's Failed (status.message, else reason), shown on hover
 }
 
 // StorageClass is one row of the StorageClass list (cluster-wide).
@@ -176,16 +176,16 @@ Goal: this record, reviewed.
 
 Goal: the API lists PVCs, PVs and StorageClasses, and their detail endpoints work.
 
-- [ ] `storage.go`: `listPersistentVolumeClaims`, `listPersistentVolumes`, `listStorageClasses`,
+- [x] `storage.go`: `listPersistentVolumeClaims`, `listPersistentVolumes`, `listStorageClasses`,
       registered in `Listers` and in the detail `kinds`
-- [ ] Derived values in Go: statuses (including `Terminating`), short access modes, the PV source
+- [x] Derived values in Go: statuses (including `Terminating`), short access modes, the PV source
       text, the default StorageClass
-- [ ] RBAC in `deploy/kubernetes/opscope.yaml`: `persistentvolumeclaims`, `persistentvolumes`, and
+- [x] RBAC in `deploy/kubernetes/opscope.yaml`: `persistentvolumeclaims`, `persistentvolumes`, and
       `storage.k8s.io` `storageclasses`
-- [ ] Go tests with client-go's fake clientset: each status, a pending claim with no volume, a PV of
+- [x] Go tests with client-go's fake clientset: each status, a pending claim with no volume, a PV of
       each common source, the default annotation (both the current and the old beta key)
-- [ ] The command palette index picks the new kinds up automatically (check it does)
-- [ ] Checked with curl against the test cluster
+- [x] The command palette index picks the new kinds up automatically (check it does)
+- [x] Checked with curl against the test cluster
 
 ## Phase S2: Storage pages
 
@@ -194,7 +194,7 @@ Goal: the three list pages work in the UI, with plain detail pages.
 - [ ] Sidebar group "Storage" in `sections.js`, with kubectl short names as aliases (`pvc`, `pv`,
       `sc`) and new icons
 - [ ] Columns in `columns.jsx`; capacity with the existing `bytes` formatter; the "default" tag on
-      StorageClasses; the PV reason on hover over a `Failed` badge
+      StorageClasses; the PV message on hover over a `Failed` badge
 - [ ] Badge tones for `Bound`, `Available`, `Released` and `Lost`
 - [ ] kubectl commands on detail pages use the right names
 - [ ] Frontend tests for anything with logic (status tones, formatting)
@@ -281,3 +281,29 @@ read-only).
   it.
 - First review moved CSIDrivers, VolumeAttachments and VolumeSnapshots to Later, added volume usage
   as an opt-in phase (S5), dropped the keyboard shortcut, and added the multipass cluster to S6.
+
+### S1: Listers and RBAC (2026-10-28)
+
+- `backend/internal/resources/storage.go` has the three listers; they're registered in `Listers`
+  (so the API, the empty-cluster test and the command palette index pick them up) and in the detail
+  `kinds` (so the generic detail view, YAML and events work for them already).
+- Changed from the plan: the PV row has `message` instead of `reason`, holding `status.message` and
+  falling back to `status.reason`. The message is the part that says what went wrong, and it matches
+  the `message` Gateway API rows already show on hover.
+- A PVC's capacity is the provisioned size from `status.capacity`, and the request while it's
+  pending (kubectl leaves it blank then). Both are in the row, since a provisioner can round up.
+- The storage class follows Kubernetes' own rule: the old `volume.beta.kubernetes.io/storage-class`
+  annotation, when present, wins over `storageClassName`. Same for PVs.
+- The PV source is the name of whichever source field is set (`HostPath`, `NFS`, `Local`, ...),
+  found with reflection so new or rare sources still get a name; CSI volumes add their driver.
+- `docs/deployment.md`'s permission table got the two new rows now, so it matches the manifest.
+  The rest of the docs is still S6.
+- Tests: `storage_test.go` covers bound, pending and terminating claims, the beta annotation,
+  Released / Failed / Available volumes with CSI, HostPath and NFS sources, the reason fallback,
+  both default-class annotations and the API defaults, and the detail view for all three kinds. The
+  command palette index test now includes a PVC and a StorageClass.
+- Checked against the rebuilt multipass cluster (v1.37.1, read-only): it has a `local-path` default
+  StorageClass (`WaitForFirstConsumer`) and two bound claims in `ecommerce` with their PVs. All three
+  lists, the namespace filter, the detail views and the name index match `kubectl get`.
+  `local-path` volumes show as `HostPath`. `data/multipass.kubeconfig` still points at the cluster's
+  old address, so the check used a fresh export of the `multipass` context.
