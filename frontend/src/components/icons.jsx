@@ -175,6 +175,36 @@ export const GatewayClassesIcon = (props) => (
   </Icon>
 );
 
+// Lucide "hard-drive-download": a claim asks for storage and gets a volume.
+export const PersistentVolumeClaimsIcon = (props) => (
+  <Icon {...props}>
+    <path d="M12 2v8" />
+    <path d="m16 6-4 4-4-4" />
+    <rect width="20" height="8" x="2" y="14" rx="2" />
+    <path d="M6 18h.01" />
+    <path d="M10 18h.01" />
+  </Icon>
+);
+
+// Lucide "hard-drive".
+export const PersistentVolumesIcon = (props) => (
+  <Icon {...props}>
+    <path d="M10 16h.01" />
+    <path d="M2.212 11.577a2 2 0 0 0-.212.896V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5.527a2 2 0 0 0-.212-.896L18.55 5.11A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+    <path d="M21.946 12.013H2.054" />
+    <path d="M6 16h.01" />
+  </Icon>
+);
+
+// Lucide "layers": kinds of storage to choose from.
+export const StorageClassesIcon = (props) => (
+  <Icon {...props}>
+    <path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" />
+    <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" />
+    <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" />
+  </Icon>
+);
+
 // Lucide "keyboard", for the keyboard shortcuts help.
 export const KeyboardIcon = (props) => (
   <Icon {...props}>

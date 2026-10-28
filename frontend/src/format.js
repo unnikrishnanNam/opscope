@@ -54,6 +54,13 @@ export function bytes(n) {
   return `${i === 0 ? n : n.toFixed(1)} ${units[i]}`;
 }
 
+// size(1073741824) -> "1 GiB", size(1610612736) -> "1.5 GiB". Like bytes(),
+// but without a trailing ".0": disk sizes are usually round numbers, and
+// they read like the "1Gi" they were asked for.
+export function size(n) {
+  return bytes(n).replace(".0 ", " ");
+}
+
 // cpu(63) -> "63m", cpu(1500) -> "1.5 cores". Small values read better in
 // millicores, which is also how Kubernetes writes them.
 export function cpu(millicores) {

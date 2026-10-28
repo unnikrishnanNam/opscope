@@ -16,7 +16,7 @@ R0–R8, the command palette phases P0–P6, the repositioning phases D0–D6 or
 phases G0–G7. All work happens on the `feature/storage` branch, one commit per phase, and the next
 phase starts only after the previous one is reviewed.
 
-**Status (2026-10-29):** S0–S1 done; S2 next.
+**Status (2026-10-29):** S0–S2 done; S3 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -191,14 +191,15 @@ Goal: the API lists PVCs, PVs and StorageClasses, and their detail endpoints wor
 
 Goal: the three list pages work in the UI, with plain detail pages.
 
-- [ ] Sidebar group "Storage" in `sections.js`, with kubectl short names as aliases (`pvc`, `pv`,
+- [x] Sidebar group "Storage" in `sections.js`, with kubectl short names as aliases (`pvc`, `pv`,
       `sc`) and new icons
-- [ ] Columns in `columns.jsx`; capacity with the existing `bytes` formatter; the "default" tag on
-      StorageClasses; the PV message on hover over a `Failed` badge
-- [ ] Badge tones for `Bound`, `Available`, `Released` and `Lost`
-- [ ] kubectl commands on detail pages use the right names
-- [ ] Frontend tests for anything with logic (status tones, formatting)
-- [ ] Empty states read sensibly (a cluster with no PVs is normal)
+- [~] Columns in `columns.jsx`; capacity with ~~the existing `bytes` formatter~~ a new `size`
+      formatter (see notes); the "default" tag on StorageClasses; the PV message on hover over a
+      `Failed` badge
+- [x] Badge tones for `Bound`, `Available`, `Released` and `Lost`
+- [x] kubectl commands on detail pages use the right names
+- [x] Frontend tests for anything with logic (status tones, formatting)
+- [x] Empty states read sensibly (a cluster with no PVs is normal)
 
 ## Phase S3: Detail sections and links
 
@@ -307,3 +308,33 @@ read-only).
   lists, the namespace filter, the detail views and the name index match `kubectl get`.
   `local-path` volumes show as `HostPath`. `data/multipass.kubeconfig` still points at the cluster's
   old address, so the check used a fresh export of the `multipass` context.
+
+### S2: Storage pages (2026-10-29)
+
+- The Storage group is driven entirely by `sections.js`: the sidebar, routes, command palette pages,
+  kubectl lines and detail URLs all follow from the three entries. Nothing else in the frontend
+  keeps its own list of kinds.
+- Icons from Lucide v1.51.0, like the others: `hard-drive-download` for claims, `hard-drive` for
+  volumes, `layers` for StorageClasses.
+- Changed from the plan: capacity uses a new `size()` formatter, which is `bytes()` without a
+  trailing ".0", so a 1Gi claim reads "1 GiB" rather than "1.0 GiB". `bytes()` itself is unchanged,
+  so memory figures elsewhere look the same as before.
+- A pending claim shows its requested size, muted, with "Requested; no volume yet" on hover, so it
+  isn't mistaken for provisioned storage. When a provider rounds up, the request is on hover.
+- Hover text explains the terse values: each access mode (`RWO` → "ReadWriteOnce: read-write from
+  one node"), the reclaim policy and the binding mode. A PV's `message` is on its status badge.
+- Badge tones: `Bound` ok, `Released` warn, `Lost` bad; `Available` stays neutral; `Pending`,
+  `Terminating` and `Failed` already had theirs.
+- Aliases: `pvc`/`claim`, `pv`/`volume`, `sc`, plus the singular names.
+- Tests: `columns.test.js` (every sidebar page with a table has columns, access mode text, storage
+  status tones) and `format.test.js` (`size`). 75 frontend tests pass, and the build is clean.
+- Checked in the browser against multipass at 1440×900, dark theme: all three lists, the Default
+  tag, a PV detail page (kubectl lines without `-n`) and a PVC one (`kubectl -n ecommerce get
+  persistentvolumeclaims redis-data -o yaml`), `pvc` in the command palette, the empty state for a
+  namespace with no claims ("No persistentvolumeclaims in default."), the sidebar scrolling to the
+  new group, and no console errors. Pending, Released and Lost badges couldn't be seen on multipass
+  (all claims are bound, and it's read-only); they're covered by tests and come back in the S6 kind
+  scenarios.
+- Seen, not changed: the count above every table uses the page's plural noun, so one object reads
+  "1 storageclasses". That's how every page already works (for example "1 gatewayclasses"), so it's
+  left for a separate fix rather than changed only for storage.

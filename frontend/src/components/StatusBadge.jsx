@@ -9,8 +9,9 @@ import "./StatusBadge.css";
 //   bad     broken and probably needs a person
 //   neutral nothing to worry about either way
 
-const OK = ["Running", "Succeeded", "Completed", "Complete", "Active", "Ready", "Programmed", "Accepted"];
-const WARN = ["Pending", "ContainerCreating", "PodInitializing", "Terminating", "Suspended", "NotReady"];
+const OK = ["Running", "Succeeded", "Completed", "Complete", "Active", "Ready", "Programmed", "Accepted", "Bound"];
+// "Released": a volume whose claim is gone, with its data still there.
+const WARN = ["Pending", "ContainerCreating", "PodInitializing", "Terminating", "Suspended", "NotReady", "Released"];
 const BAD = [
   "Failed",
   "Error",
@@ -26,6 +27,7 @@ const BAD = [
   "NotProgrammed",
   "NotAccepted",
   "UnresolvedRefs",
+  "Lost", // a claim whose volume is gone
 ];
 
 export function statusTone(status) {
