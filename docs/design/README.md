@@ -11,7 +11,7 @@ describe how Opscope got there.
 | [ui-redesign.md](ui-redesign.md)          | The interface: brand, light and dark themes, every page rebuilt | v1.1.0   |
 | [command-palette.md](command-palette.md)  | The command palette, the command registry, keyboard shortcuts | v1.2.0   |
 | [repositioning.md](repositioning.md)      | Opscope as an operations tool: licence, documentation, positioning | Next release |
-| [storage.md](storage.md)                  | Storage pages: PersistentVolumeClaims, PersistentVolumes, StorageClasses | Planned |
+| [storage.md](storage.md)                  | Storage pages: PersistentVolumeClaims, PersistentVolumes, StorageClasses, volume usage | Next release |
 
 ## When to write one
 
@@ -61,7 +61,7 @@ Goal: <what works at the end of this phase>.
 ```
 
 Each phase ends with Opscope working, the tests passing and its notes written. Number phases with a
-letter not used before (D, P and R are taken), so phase names never collide across records.
+letter not used before (D, P, R and S are taken), so phase names never collide across records.
 
 Once the work is released, update the status line and add the record to the table above. Its content
 then stays as it was: later changes get their own record or are described in the current

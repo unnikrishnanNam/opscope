@@ -1,0 +1,46 @@
+# Volume usage scenario: a claim that's nearly full. The kubelet doesn't
+# measure hostPath volumes (kind's local-path ones), so this is a `local`
+# volume on a 64 MiB tmpfs inside the kind node, filled to about 92%.
+# Mount the tmpfs first; see README.md in this folder.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: small-local
+spec:
+  capacity: { storage: 64Mi }
+  accessModes: [ReadWriteOnce]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-small
+  local: { path: /mnt/small }
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - { key: kubernetes.io/hostname, operator: In, values: [opscope-storage-control-plane] }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nearly-full
+  namespace: storage-test
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-small
+  resources:
+    requests: { storage: 64Mi }
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: filler
+  namespace: storage-test
+spec:
+  containers:
+    - name: filler
+      image: busybox:1.36
+      command: [sh, -c, "dd if=/dev/zero of=/data/fill bs=1M count=59 && sleep 1000000"]
+      volumeMounts:
+        - { name: data, mountPath: /data }
+  volumes:
+    - name: data
+      persistentVolumeClaim: { claimName: nearly-full }

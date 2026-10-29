@@ -125,13 +125,15 @@ export default function ResourceDetail({ page }) {
 }
 
 // usageClaim is the claim whose volume usage this page shows: the claim
-// itself, or a volume's claim. Only while bound; before that there's no
-// volume to measure.
+// itself, or a volume's claim. Only while it has a volume: bound, or being
+// deleted while a pod still uses it (Terminating).
 function usageClaim(d, resource) {
   const field = (label) => d.fields.find((f) => f.label === label);
-  if (field("Status")?.value !== "Bound") return null;
-  if (resource === "persistentvolumeclaims") return { namespace: d.namespace, name: d.name };
-  if (resource === "persistentvolumes") return field("Claim")?.link ?? null;
+  const status = field("Status")?.value;
+  if (resource === "persistentvolumeclaims" && field("Volume") && ["Bound", "Terminating"].includes(status)) {
+    return { namespace: d.namespace, name: d.name };
+  }
+  if (resource === "persistentvolumes" && status === "Bound") return field("Claim")?.link ?? null;
   return null;
 }
 

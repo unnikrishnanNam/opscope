@@ -138,8 +138,9 @@ func GetOverview(ctx context.Context, clients Clients, q Query) (*Overview, erro
 	return result, nil
 }
 
-// storageCounts counts claims that aren't bound and volumes that were
-// released or failed. Storage was added after the rest, so credentials that
+// storageCounts counts claims that aren't bound (Pending or Lost) and
+// volumes that were released or failed. A Terminating claim is still bound
+// and has its own badge on the list, so it isn't counted here. Storage was added after the rest, so credentials that
 // could read the overview before may not be allowed to list it; then it's
 // left out rather than failing the whole page. A cluster with no claims and
 // no volumes gets no counts either, like one without Gateway API.
@@ -163,7 +164,7 @@ func storageCounts(ctx context.Context, clients Clients, q Query) ([]WorkloadCou
 	}
 	return []WorkloadCount{
 		countWorkloads("persistentvolumeclaims", claims,
-			func(c PersistentVolumeClaim) bool { return c.Status != "Bound" }),
+			func(c PersistentVolumeClaim) bool { return c.Status == "Pending" || c.Status == "Lost" }),
 		countWorkloads("persistentvolumes", volumes,
 			func(v PersistentVolume) bool { return v.Status == "Released" || v.Status == "Failed" }),
 	}, nil

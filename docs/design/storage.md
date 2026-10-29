@@ -16,7 +16,7 @@ R0–R8, the command palette phases P0–P6, the repositioning phases D0–D6 or
 phases G0–G7. All work happens on the `feature/storage` branch, one commit per phase, and the next
 phase starts only after the previous one is reviewed.
 
-**Status (2026-10-29):** S0–S5 done; S6 next.
+**Status (2026-10-29):** S0–S6 done, for the next release.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -249,16 +249,17 @@ kubelet and the pages say how to turn it on.
 
 Goal: checked against real failure cases, documented and ready to release.
 
-- [ ] Test scenarios on a kind cluster: a bound claim, a claim pending on `WaitForFirstConsumer`, a
+- [x] Test scenarios on a kind cluster: a bound claim, a claim pending on `WaitForFirstConsumer`, a
       claim pending on a StorageClass that doesn't exist, a `Released` PV with `Retain`, a
       StatefulSet with claim templates, a claim being deleted while in use (`Terminating`), a volume
-      filled close to full (usage on), and usage on without the permission
-- [ ] Check against the multipass cluster too, read-only: only whatever storage it has now (it was
+      filled close to full (usage on), and usage on without the permission; added: a node whose
+      kubelet can't be reached. Kept in `test/scenarios/` (see notes)
+- [x] Check against the multipass cluster too, read-only: only whatever storage it has now (it was
       rebuilt, so it may have no StorageClasses at all, which is a useful empty case)
-- [ ] README feature list, `docs/api.md` (new resource names, usage), `docs/deployment.md` (RBAC,
+- [x] README feature list, `docs/api.md` (new resource names, usage), `docs/deployment.md` (RBAC,
       `volume-usage.yaml`, `OPSCOPE_VOLUME_USAGE`, and what the permission allows)
-- [ ] Screenshots for the README and `docs/screenshots`
-- [ ] Phase notes, status line, design record table
+- [x] Screenshots for the README and `docs/screenshots`
+- [x] Phase notes, status line, design record table
 
 ## Later
 
@@ -468,3 +469,45 @@ read-only).
   - multipass (read-only; reading stats changes nothing): both claims "Not measured", and no row on
     the overview.
   - Light and dark theme, 900 px wide.
+
+### S6: Test scenarios, docs and screenshots (2026-10-29)
+
+- **Scenarios in the repository:** `test/scenarios/storage.yaml` and `storage-usage.yaml`, with a
+  README that says how to run them on a throwaway kind cluster, the deletions that finish the setup,
+  what each page should show, and how to check usage without the permission and with a node that
+  can't be read. They're the S3 and S5 scenarios, plus a claim deleted while a pod still uses it.
+  `CONTRIBUTING.md` points to them.
+- **All scenarios checked** on `opscope-storage` (kind v1.35.0), usage on:
+  - Terminating: `in-use`, deleted while `holder` uses it, shows Terminating with its pod under
+    "Used by".
+  - A node that can't be read: with the kind node's kubelet stopped for a minute, the claims list
+    says which node couldn't be read, its claims show a dash with "connection refused" on hover, and
+    the claim page says the same. The kubelet was started again and the node came back Ready.
+  - The S3–S5 scenarios (template claims, pod volumes, waiting and missing-class claims, a Released
+    volume, a nearly full volume, usage off, usage without the permission) still read as before.
+- **Two fixes from those checks:**
+  - The overview counted the Terminating claim as "not bound", but a Terminating claim is still
+    bound. The count is now Pending and Lost only; Terminating keeps its own badge on the list. The
+    S4 test has a Terminating claim to keep it that way.
+  - A Terminating claim's page had no Usage section, although the list showed its usage state. The
+    section now appears for a claim with a volume that's Bound or Terminating.
+- **multipass** (read-only), last check: two bound claims and volumes on `local-path`, matching
+  `kubectl get`; the claim pages link their volumes, class and pods; `postgres-0` lists its volumes;
+  usage reads "Not measured" (hostPath); the command palette finds all three kinds.
+- **Docs:**
+  - README: storage in the features and the resource list, a security note on volume usage, the
+    two new screenshots.
+  - `docs/api.md`: the three resource names, `storage` in the overview, links in detail fields and
+    tables, the volume usage endpoint, and its two codes.
+  - `docs/deployment.md` already had the permissions, `volume-usage.yaml` and the setting from S5.
+  - `CONTRIBUTING.md`: the new files in the layout.
+- **Screenshots:** the claims list and a nearly full claim's page, light and dark
+  (`docs/screenshots/claims-*.png`, `claim-*.png`), taken like the earlier ones: headless Chrome at
+  1440 × 900 and 2× density, scaled to 1600 × 1000. They show a `shop` namespace made for them on
+  the kind cluster: a StatefulSet's two claims, redis and media claims on `local` volumes on tmpfs
+  filled to 41%, 66% and 93%, and a backup claim pending on a missing NFS class. The server ran
+  from a `screenshots-storage` launch configuration on :8091, built as v1.3.0 like the existing
+  `screenshots` one, with usage on and the cluster named "demo". The existing overview, pods and pod
+  screenshots weren't retaken.
+- The kind cluster `opscope-storage` is still there, for the review; delete it with
+  `kind delete cluster --name opscope-storage` when it's no longer needed.

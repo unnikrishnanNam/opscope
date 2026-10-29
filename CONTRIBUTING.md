@@ -86,8 +86,10 @@ backend/                  Go server
   internal/clusters/      known clusters (environment, in-cluster, added in the UI), clients for each
   internal/resources/     one file per resource type: lists it and flattens it into table rows;
                           detail.go builds detail pages, gatewayapi.go reads Gateway API resources,
-                          names.go builds the search index
-  internal/metrics/       live usage from metrics-server, and the in-memory history
+                          storage.go and storage_detail.go the storage kinds, names.go builds the
+                          search index
+  internal/metrics/       live usage from metrics-server and the in-memory history; volumes.go reads
+                          volume usage from the kubelets
   internal/server/        HTTP routes, middleware, static file serving
 frontend/                 React app (Vite, plain JavaScript)
   src/api.js              fetch helper and the useApi hook
@@ -102,11 +104,13 @@ frontend/                 React app (Vite, plain JavaScript)
   src/styles/             design tokens (both themes) and page-wide base styles
   src/kit/                the component kit at /kit (development only)
   src/format.js           ages, durations, sizes
+  src/volumeUsage.js      how full a claim's volume is, from the volume usage endpoint
   src/kubectl.js          read-only kubectl commands for one object, for copying
   src/theme.js            light, dark or system theme, remembered in the browser
   src/toast.js            short confirmations ("Copied …")
 deploy/kubernetes/        manifests for running Opscope in a cluster
 docs/                     deployment guide, API reference, design records
+test/scenarios/           manifests that set up cases to check in a throwaway kind cluster
 Dockerfile                the single image (multi-platform)
 Makefile                  common commands
 .github/                  CI and release workflows, issue forms, Dependabot
@@ -136,7 +140,8 @@ runs the Go tests and the frontend tests. Before opening a pull request, also ch
   test (`match.test.js`).
 - **In the browser:** check a UI change in light and dark, with the keyboard only, at 375 px wide and
   on a wide screen, against a cluster with and without metrics-server and Gateway API where it
-  matters.
+  matters. `test/scenarios/` has manifests for cases a healthy cluster doesn't have, such as claims
+  that can't bind; its README says how to run them.
 
 ## Code style
 

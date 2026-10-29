@@ -27,8 +27,12 @@ machine or inside the cluster it shows.
   resource kind with what needs attention, and recent warning events.
 - **Resources:** Nodes; Pods, Deployments, StatefulSets, DaemonSets, Jobs and CronJobs;
   ConfigMaps and Secrets; Services, Ingresses, and Gateway API Gateways, HTTPRoutes and
-  GatewayClasses. Tables filter, sort and refresh on their own, with kubectl-style statuses such as
-  `CrashLoopBackOff` and `Init:1/2`.
+  GatewayClasses; PersistentVolumeClaims, PersistentVolumes and StorageClasses. Tables filter, sort
+  and refresh on their own, with kubectl-style statuses such as `CrashLoopBackOff` and `Init:1/2`.
+- **Storage:** claims link to their volumes, StorageClasses and the pods that use them, pods and
+  StatefulSets show their volumes and claims, and the overview counts claims that can't bind and
+  volumes left behind. Optionally, how full each volume is
+  ([volume usage](docs/deployment.md#volume-usage), off by default).
 - **Detail pages:** a summary, containers, conditions, events and YAML for every object, links to
   owners and nodes, and pod logs with the previous run and live follow.
 - **Live usage:** CPU and memory per node and pod from metrics-server, with the last 15 minutes as
@@ -115,6 +119,9 @@ Shortcuts are ignored while you type in a field.
 - **Secrets** are listed by key name only. A value is fetched only when you choose "Reveal" on one
   key, is never cached, and never appears in the YAML view. Reading Secrets in a cluster needs a
   separate, optional role.
+- **Volume usage** is off by default. It needs `get` on `nodes/proxy`, which reaches the kubelet's
+  whole API, so it's turned on deliberately, with a setting and a separate, optional role. See
+  [Volume usage](docs/deployment.md#volume-usage).
 - **Logs** are never cached, since they can contain sensitive data.
 - **Kubeconfigs added in the UI** are checked before they're accepted (no login commands or file
   paths, which could run programs or read files on the server), and saved with only the chosen
@@ -130,12 +137,14 @@ Shortcuts are ignored while you type in a field.
 | Pods | A pod's detail page |
 | --- | --- |
 | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pods-dark.png"><img src="docs/screenshots/pods-light.png" alt="The pods list, with status, readiness, restarts and live usage"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pod-dark.png"><img src="docs/screenshots/pod-light.png" alt="A crash-looping pod's detail page: facts, containers and conditions"></picture> |
+| **PersistentVolumeClaims** | **A claim's detail page** |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/claims-dark.png"><img src="docs/screenshots/claims-light.png" alt="The PersistentVolumeClaims list, with status, volume, capacity, how full each volume is, and claims that are pending"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/claim-dark.png"><img src="docs/screenshots/claim-light.png" alt="A nearly full claim's detail page: its volume and StorageClass, used and free space, and the pod that uses it"></picture> |
 
 ## Documentation
 
 | Document                                     | Contents                                                              |
 | -------------------------------------------- | --------------------------------------------------------------------- |
-| [Deploying Opscope](docs/deployment.md)      | Docker, Kubernetes, permissions, Secret access, exposure, configuration, upgrading |
+| [Deploying Opscope](docs/deployment.md)      | Docker, Kubernetes, permissions, Secret access, volume usage, exposure, configuration, upgrading |
 | [HTTP API](docs/api.md)                      | The JSON API behind the UI                                            |
 | [Contributing](CONTRIBUTING.md)              | Development setup, project layout, tests, code style, releases       |
 | [Design records](docs/design/)               | How and why Opscope was built, feature by feature                    |

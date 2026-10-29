@@ -242,6 +242,11 @@ func TestOverviewStorage(t *testing.T) {
 	claim := func(namespace, name string, phase corev1.PersistentVolumeClaimPhase) *corev1.PersistentVolumeClaim {
 		return &corev1.PersistentVolumeClaim{ObjectMeta: meta(namespace, name), Status: corev1.PersistentVolumeClaimStatus{Phase: phase}}
 	}
+	// Being deleted while a pod still uses it: Terminating, but still bound.
+	terminating := claim("data", "leaving", corev1.ClaimBound)
+	now := metav1.Now()
+	terminating.DeletionTimestamp = &now
+	terminating.Finalizers = []string{"kubernetes.io/pvc-protection"}
 	volume := func(name string, phase corev1.PersistentVolumePhase) *corev1.PersistentVolume {
 		return &corev1.PersistentVolume{ObjectMeta: metav1.ObjectMeta{Name: name}, Status: corev1.PersistentVolumeStatus{Phase: phase}}
 	}
@@ -250,6 +255,7 @@ func TestOverviewStorage(t *testing.T) {
 		claim("data", "waiting", corev1.ClaimPending),
 		claim("data", "lost", corev1.ClaimLost),
 		claim("web", "cache", corev1.ClaimPending),
+		terminating,
 		volume("bound", corev1.VolumeBound),
 		volume("spare", corev1.VolumeAvailable),
 		volume("released", corev1.VolumeReleased),
@@ -262,7 +268,7 @@ func TestOverviewStorage(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []WorkloadCount{
-		{Resource: "persistentvolumeclaims", Total: 4, Unhealthy: 3},
+		{Resource: "persistentvolumeclaims", Total: 5, Unhealthy: 3},
 		{Resource: "persistentvolumes", Total: 4, Unhealthy: 2},
 	}
 	if !slices.Equal(o.Storage, want) {
