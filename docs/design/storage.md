@@ -16,7 +16,7 @@ R0–R8, the command palette phases P0–P6, the repositioning phases D0–D6 or
 phases G0–G7. All work happens on the `feature/storage` branch, one commit per phase, and the next
 phase starts only after the previous one is reviewed.
 
-**Status (2026-10-29):** S0–S2 done; S3 next.
+**Status (2026-10-29):** S0–S3 done; S4 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -205,13 +205,13 @@ Goal: the three list pages work in the UI, with plain detail pages.
 
 Goal: storage objects explain themselves and link to each other.
 
-- [ ] Optional `resource`/`namespace`/`name` link on a detail `Field` and on a table cell, rendered
+- [x] Optional `resource`/`namespace`/`name` link on a detail `Field` and on a table cell, rendered
       as a link by the detail page; plain text stays the default
-- [ ] PVC, PV and StorageClass sections as described above
-- [ ] PVC "Used by": pods in the claim's namespace that mount it
-- [ ] Pod: Volumes table, with mounts per container
-- [ ] StatefulSet: volume claim templates and the PVCs made from them
-- [ ] Go tests for each section
+- [x] PVC, PV and StorageClass sections as described above
+- [x] PVC "Used by": pods in the claim's namespace that mount it
+- [x] Pod: Volumes table, with mounts per container
+- [x] StatefulSet: volume claim templates and the PVCs made from them
+- [x] Go tests for each section
 
 ## Phase S4: Overview
 
@@ -338,3 +338,48 @@ read-only).
 - Seen, not changed: the count above every table uses the page's plural noun, so one object reads
   "1 storageclasses". That's how every page already works (for example "1 gatewayclasses"), so it's
   left for a separate fix rather than changed only for storage.
+
+### S3: Detail sections and links (2026-10-29)
+
+- **Links.** A detail `Field` has an optional `link` (`resource`, `namespace`, `name`). A `Table`
+  has an optional `links` grid parallel to `rows`, only present when some cell links, so every
+  existing table keeps its plain `[][]string` shape and nothing else had to change. Go code adds
+  rows with `addRow(cells...)`, which keeps the grid aligned. The detail page renders both through
+  one small `ObjectLink`; plain cells stay strings, so empty cells still show their dash.
+- **Related objects** are a separate step, `addRelated`, after the kind's own sections, because
+  they need other API calls: the pods using a claim, the claims of a StatefulSet, how many volumes
+  and claims use a StorageClass, and whether a named StorageClass exists. If listing those is
+  forbidden, the section is left out instead of failing the page.
+- Added beyond the plan, after seeing it on kind: a claim or volume that names a **StorageClass that
+  doesn't exist** shows `does-not-exist (not found)`, without a link. That's exactly why such a claim
+  stays Pending, and the link would only have led to an error page. Static volumes often name a
+  class that's never created (like `manual`), and read the same way.
+- A **Released** volume shows its old claim as `ns/name (no longer bound)`, without a link, since the
+  claim is gone. Bound volumes link to their claim.
+- **Source settings** on a volume are read generically (the source as YAML would show it, flattened
+  to `key.subkey` rows, empty values left out), so CSI, NFS, HostPath, local and the rarer types
+  all get their details without a case per type. Node affinity is one line, e.g.
+  `kubernetes.io/hostname in (kubeworker1)`.
+- **Pod volumes:** type, what it points to (claims, ConfigMaps and Secrets link; generic ephemeral
+  volumes link to their `<pod>-<volume>` claim), and every mount per container with subPath and
+  read-only.
+- **StatefulSets:** claim templates (a template without a class shows `(default)`) and the claims
+  made from them, matched by `<template>-<statefulset>-<ordinal>` like the controller does.
+- Tests: `storage_detail_test.go` covers the claim page (fields, links, "Used by" only for its own
+  namespace), a missing class, forbidden pod access, bound and Released volumes with source settings
+  and node affinity, StorageClass counts and parameters, pod volumes and mounts, StatefulSet claims
+  (ignoring look-alike names), `addRow` alignment and `sizeText`. Go and frontend tests pass.
+- **Checked in the browser** against both clusters:
+  - multipass (read-only, v1.37.1): `postgres-data` links to its volume, `local-path` and the pod
+    `postgres-0`; the volume shows its HostPath settings and node affinity; `local-path` counts 2
+    volumes and 2 claims; `postgres-0` lists its claim and two emptyDirs.
+  - A throwaway kind cluster, `opscope-storage` (v1.35.0), with scenarios in the `storage-test`
+    namespace: a StatefulSet with two template claims, a pod with an ephemeral volume, ConfigMap,
+    Secret, memory emptyDir and the projected service account volume, a claim waiting for a pod,
+    a claim on a missing class, and a Released `Retain` volume. Pending and Released badges show in
+    amber on the lists, which S2 couldn't check.
+  - Light and dark theme; links look like the existing "Owned by" links.
+- Seen, not changed: in narrow windows (around 800 px) short words in detail tables can break
+  mid-word ("Ephem/eral"), because detail tables use `overflow-wrap: anywhere` so long paths don't
+  widen the page. That's shared by every detail table (container ports do it too), so it's left
+  for a separate look rather than changed here.

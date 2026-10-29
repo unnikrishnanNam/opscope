@@ -100,6 +100,14 @@ type Owner struct {
 type Field struct {
 	Label string `json:"label"`
 	Value string `json:"value"`
+	Link  *Link  `json:"link,omitempty"` // set when the value names an object Opscope has a page for
+}
+
+// Link points at another object's detail page, e.g. a claim's volume.
+type Link struct {
+	Resource  string `json:"resource"` // the URL name, e.g. "persistentvolumes"
+	Namespace string `json:"namespace,omitempty"`
+	Name      string `json:"name"`
 }
 
 type Condition struct {
@@ -111,10 +119,15 @@ type Condition struct {
 }
 
 // Table is a small titled table, e.g. "Ports" with a row per port.
+//
+// Links is only there when some cell names another object: Links[r][c] is
+// the link for Rows[r][c], or null. Most tables are plain text, so they
+// keep the simple shape.
 type Table struct {
 	Title   string     `json:"title"`
 	Columns []string   `json:"columns"`
 	Rows    [][]string `json:"rows"`
+	Links   [][]*Link  `json:"links,omitempty"`
 }
 
 type DataEntry struct {
@@ -173,6 +186,9 @@ func GetDetail(ctx context.Context, clients Clients, resource, namespace, name s
 	}
 	if err := addSections(d, resource, obj); err != nil {
 		return nil, fmt.Errorf("reading %s %s: %w", info.Kind, name, err)
+	}
+	if err := addRelated(ctx, clients, d, resource, obj); err != nil {
+		return nil, err
 	}
 
 	yamlBytes, err := yaml.Marshal(obj.Object)

@@ -130,6 +130,13 @@ function DetailSkeleton() {
   );
 }
 
+// ObjectLink: text that names another object (a claim's volume, a pod's
+// ConfigMap), as a link to its page when Opscope has one.
+function ObjectLink({ cluster, link, text, search }) {
+  const path = link && detailPath(cluster.id, link.resource, link.namespace, link.name);
+  return path ? <Link to={path + search}>{text}</Link> : text;
+}
+
 function Summary({ d, cluster, resource }) {
   const search = nsQuery(useLocation().search);
   const facts = d.fields.filter((f) => f.label !== "Status"); // already in the header
@@ -141,7 +148,7 @@ function Summary({ d, cluster, resource }) {
           <FactGrid>
             {facts.map((f) => (
               <Fact key={f.label} label={f.label}>
-                {f.value || <span className="cell-empty">–</span>}
+                {f.value ? <ObjectLink cluster={cluster} link={f.link} text={f.value} search={search} /> : <span className="cell-empty">–</span>}
               </Fact>
             ))}
             {d.owners.map((o) => {
@@ -196,7 +203,17 @@ function Summary({ d, cluster, resource }) {
 
       {d.tables.map((t) => (
         <Section key={t.title} title={t.title}>
-          <SimpleTable label={t.title} columns={t.columns.map((label) => ({ label }))} rows={t.rows} />
+          <SimpleTable
+            label={t.title}
+            columns={t.columns.map((label) => ({ label }))}
+            // Plain strings stay strings, so empty cells still get their dash.
+            rows={t.rows.map((row, r) =>
+              row.map((cell, c) => {
+                const link = t.links?.[r]?.[c];
+                return link && cell ? <ObjectLink cluster={cluster} link={link} text={cell} search={search} /> : cell;
+              }),
+            )}
+          />
         </Section>
       ))}
 
