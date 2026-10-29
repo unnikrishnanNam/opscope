@@ -31,6 +31,8 @@ const KINDS = {
   cronjobs: { problem: null, ok: "Scheduled" }, // nothing to be unhealthy about
   gateways: { problem: "not programmed", ok: "All programmed" },
   httproutes: { problem: "not accepted", ok: "All accepted" },
+  persistentvolumeclaims: { problem: "not bound", ok: "All bound" },
+  persistentvolumes: { problem: "released or failed", ok: "None released or failed" },
 };
 
 const pageFor = (resource) => allPages.find((p) => p.resource === resource);
@@ -101,7 +103,8 @@ export default function Overview({ page }) {
 
       {namespace && (
         <Callout compact>
-          Showing namespace <strong>{namespace}</strong>. Nodes, usage and the namespace count cover the whole cluster.
+          Showing namespace <strong>{namespace}</strong>. Nodes, PersistentVolumes, usage and the namespace count cover
+          the whole cluster.
         </Callout>
       )}
 
@@ -131,6 +134,8 @@ export default function Overview({ page }) {
               <ResourceGroup title="Workloads" items={o.workloads} to={to} />
               {/* gatewayAPI is null when the cluster doesn't have Gateway API. */}
               {o.gatewayAPI && <ResourceGroup title="Gateway API" items={o.gatewayAPI} to={to} />}
+              {/* storage is null when there are no claims or volumes, or they can't be listed. */}
+              {o.storage && <ResourceGroup title="Storage" items={o.storage} to={to} />}
             </Card>
             <Card
               title="Pods by status"
@@ -188,7 +193,7 @@ function issuesOf(o) {
   };
   add(o.nodes.total - o.nodes.ready, "Nodes", "not ready");
   add(unhealthyPods(o.pods.byStatus), "Pods", "unhealthy");
-  for (const w of [...o.workloads, ...(o.gatewayAPI ?? [])]) {
+  for (const w of [...o.workloads, ...(o.gatewayAPI ?? []), ...(o.storage ?? [])]) {
     const problem = KINDS[w.resource]?.problem;
     if (problem) add(w.unhealthy, pageFor(w.resource).label, problem);
   }
@@ -342,7 +347,7 @@ function UsageCell({ usage, field, what, format }) {
   );
 }
 
-// One group of resource kinds ("Workloads", "Gateway API"), a row each:
+// One group of resource kinds ("Workloads", "Gateway API", "Storage"), a row each:
 // name, count, a bar of healthy against not, and what needs attention.
 function ResourceGroup({ title, items, to }) {
   return (

@@ -16,7 +16,7 @@ R0–R8, the command palette phases P0–P6, the repositioning phases D0–D6 or
 phases G0–G7. All work happens on the `feature/storage` branch, one commit per phase, and the next
 phase starts only after the previous one is reviewed.
 
-**Status (2026-10-29):** S0–S3 done; S4 next.
+**Status (2026-10-29):** S0–S4 done; S5 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -217,10 +217,10 @@ Goal: storage objects explain themselves and link to each other.
 
 Goal: storage problems show up on the cluster's front page.
 
-- [ ] `Storage` in the overview response: PVCs (not bound) and PVs (released or failed)
-- [ ] Overview card that links to the filtered list pages, hidden when the cluster has no PVCs and
-      no PVs
-- [ ] Tests for the counts
+- [x] `Storage` in the overview response: PVCs (not bound) and PVs (released or failed)
+- [~] ~~Overview card~~ A "Storage" group in the Resources card that links to the list pages,
+      hidden when the cluster has no PVCs and no PVs (see notes)
+- [x] Tests for the counts
 
 ## Phase S5: Volume usage (opt-in)
 
@@ -383,3 +383,28 @@ read-only).
   mid-word ("Ephem/eral"), because detail tables use `overflow-wrap: anywhere` so long paths don't
   widen the page. That's shared by every detail table (container ports do it too), so it's left
   for a separate look rather than changed here.
+
+### S4: Overview (2026-10-29)
+
+- The overview response has `storage`, two counts in the same shape as `workloads` and
+  `gatewayAPI`: claims not `Bound` (Pending, Lost or Terminating) and volumes `Released` or
+  `Failed`. Claims follow the namespace filter; volumes are cluster-wide, like nodes, and the
+  namespace note on the overview now says so.
+- Changed from the plan: not a separate card, but a **Storage** group inside the Resources card,
+  under Workloads and Gateway API. It reuses the same rows (count, bar, what needs a look), which is
+  what the Design section described ("like the Gateway API one"). The rows link to the list pages
+  and keep the selected namespace; the list pages have no status filter, so "filtered" means the
+  namespace only.
+- `storage` is `null`, and the group hidden, when the cluster has no claims and no volumes, and also
+  when Opscope isn't allowed to list them. Storage is new, so credentials that could read the
+  overview before may not have the permission; they keep the overview instead of getting an error.
+- The health chip next to the cluster's name counts storage problems too, e.g.
+  "2 PersistentVolumeClaims not bound · 1 PersistentVolume released or failed".
+- Tests: `storage_test.go` covers the counts for each status, the namespace filter (claims only),
+  a cluster with no storage, and a forbidden volume list. Go and frontend tests pass.
+- Checked in the browser:
+  - kind (`opscope-storage`): 5 claims with 2 not bound, 4 volumes with 1 released, matching
+    `kubectl get`; the chip reads "3 need attention"; with `default` picked, claims show 0 and
+    volumes still 4; the claims row opens the claim list.
+  - multipass (read-only): 2 claims "All bound", 2 volumes "None released or failed".
+  - Light and dark theme, and 820 px wide, where the longest text still fits on one line.

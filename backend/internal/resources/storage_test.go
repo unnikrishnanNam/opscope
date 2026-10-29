@@ -2,15 +2,20 @@ package resources
 
 import (
 	"context"
+	"errors"
+	"slices"
 	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
 )
 
 func storage(size string) corev1.ResourceList {
@@ -230,5 +235,70 @@ func TestStorageDetails(t *testing.T) {
 		if d.Kind != tt.kind || d.Name != tt.name || !strings.Contains(d.YAML, "kind: "+tt.kind) {
 			t.Errorf("%s: unexpected detail: kind %q, name %q", tt.resource, d.Kind, d.Name)
 		}
+	}
+}
+
+func TestOverviewStorage(t *testing.T) {
+	claim := func(namespace, name string, phase corev1.PersistentVolumeClaimPhase) *corev1.PersistentVolumeClaim {
+		return &corev1.PersistentVolumeClaim{ObjectMeta: meta(namespace, name), Status: corev1.PersistentVolumeClaimStatus{Phase: phase}}
+	}
+	volume := func(name string, phase corev1.PersistentVolumePhase) *corev1.PersistentVolume {
+		return &corev1.PersistentVolume{ObjectMeta: metav1.ObjectMeta{Name: name}, Status: corev1.PersistentVolumeStatus{Phase: phase}}
+	}
+	client := fake.NewClientset(
+		claim("data", "db", corev1.ClaimBound),
+		claim("data", "waiting", corev1.ClaimPending),
+		claim("data", "lost", corev1.ClaimLost),
+		claim("web", "cache", corev1.ClaimPending),
+		volume("bound", corev1.VolumeBound),
+		volume("spare", corev1.VolumeAvailable),
+		volume("released", corev1.VolumeReleased),
+		volume("failed", corev1.VolumeFailed),
+	)
+	clients := Clients{Kube: client, Dynamic: fakeDynamic()}
+
+	o, err := GetOverview(context.Background(), clients, Query{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []WorkloadCount{
+		{Resource: "persistentvolumeclaims", Total: 4, Unhealthy: 3},
+		{Resource: "persistentvolumes", Total: 4, Unhealthy: 2},
+	}
+	if !slices.Equal(o.Storage, want) {
+		t.Errorf("all namespaces: got %+v, want %+v", o.Storage, want)
+	}
+
+	// Claims follow the namespace; volumes are cluster-wide, like nodes.
+	o, err = GetOverview(context.Background(), clients, Query{Namespace: "web"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want[0] = WorkloadCount{Resource: "persistentvolumeclaims", Total: 1, Unhealthy: 1}
+	if !slices.Equal(o.Storage, want) {
+		t.Errorf("namespace web: got %+v, want %+v", o.Storage, want)
+	}
+}
+
+func TestOverviewWithoutStorage(t *testing.T) {
+	o, err := GetOverview(context.Background(), Clients{Kube: fake.NewClientset(), Dynamic: fakeDynamic()}, Query{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o.Storage != nil {
+		t.Errorf("a cluster with no claims or volumes should get no counts, got %+v", o.Storage)
+	}
+
+	// Credentials that can't list volumes still get the rest of the overview.
+	client := fake.NewClientset(&corev1.PersistentVolumeClaim{ObjectMeta: meta("data", "db")})
+	client.PrependReactor("list", "persistentvolumes", func(clienttesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "persistentvolumes"}, "", errors.New("RBAC"))
+	})
+	o, err = GetOverview(context.Background(), Clients{Kube: client, Dynamic: fakeDynamic()}, Query{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o.Storage != nil {
+		t.Errorf("forbidden storage should be left out, got %+v", o.Storage)
 	}
 }
