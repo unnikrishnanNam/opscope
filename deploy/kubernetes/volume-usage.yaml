@@ -1,0 +1,36 @@
+# Optional: lets Opscope show how full each volume is.
+#
+# Only the kubelet on each node knows how much of a volume is used, and
+# Opscope reads it through the API server's node proxy. That needs `get` on
+# nodes/proxy, which reaches the kubelet's whole API, not only its stats:
+# Opscope only ever asks for the stats summary, but the permission itself
+# allows more. So, like Secret access, it's a choice to make on purpose.
+#
+# Two steps turn it on: apply this file, and set OPSCOPE_VOLUME_USAGE=true
+# on the Deployment (see the commented lines in opscope.yaml). Without the
+# setting, Opscope never calls the node proxy. To turn it off again, remove
+# the setting and delete these two objects:
+#
+#   kubectl delete -f deploy/kubernetes/volume-usage.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: opscope-read-volume-usage
+rules:
+  - apiGroups: [""]
+    resources: [nodes/proxy]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: opscope-read-volume-usage
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: opscope-read-volume-usage
+subjects:
+  - kind: ServiceAccount
+    name: opscope
+    namespace: opscope

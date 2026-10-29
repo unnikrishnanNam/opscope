@@ -73,3 +73,10 @@
 .detail-binary .mono {
   color: var(--text);
 }
+
+/* A claim's volume usage: the bar across the card, the numbers below. */
+.volume-usage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}

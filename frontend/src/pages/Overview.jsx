@@ -14,12 +14,14 @@ import Tooltip from "../components/Tooltip.jsx";
 import { Sparkline, UsageBar } from "../components/Usage.jsx";
 import { CpuIcon, MemoryIcon, NodesIcon, PodsIcon, RefreshIcon, SuccessIcon, WarningIcon } from "../components/icons.jsx";
 import { allPages, detailPath, nsQuery } from "../sections.js";
+import { isNearlyFull } from "../volumeUsage.js";
 import "./Overview.css";
 
 const REFRESH_MS = 10_000;
 const WARNINGS_SHOWN = 8;
 const WARNINGS_ID = "recent-warnings";
 const METRICS_REFRESH_MS = 15_000; // metrics-server's own refresh interval
+const VOLUME_USAGE_REFRESH_MS = 30_000; // the kubelet measures volumes about once a minute
 
 // How each kind's "needs attention" count reads, and what to say when it's
 // zero. Labels, links and icons come from sections.js.
@@ -33,6 +35,7 @@ const KINDS = {
   httproutes: { problem: "not accepted", ok: "All accepted" },
   persistentvolumeclaims: { problem: "not bound", ok: "All bound" },
   persistentvolumes: { problem: "released or failed", ok: "None released or failed" },
+  measuredClaims: { problem: "nearly full", ok: "None nearly full", tone: "bad" }, // with volume usage on
 };
 
 const pageFor = (resource) => allPages.find((p) => p.resource === resource);
@@ -56,8 +59,13 @@ export default function Overview({ page }) {
   const usage = useApi(base && `${base}/metrics/nodes`, { refreshMs: METRICS_REFRESH_MS });
   const warningsQuery = namespace ? `&namespace=${encodeURIComponent(namespace)}` : "";
   const warnings = useApi(base && `${base}/events?type=Warning${warningsQuery}`, { refreshMs: REFRESH_MS });
+  // How full the claims are, when volume usage is on. Only asked for when there are claims.
+  const hasClaims = overview.data?.storage?.find((s) => s.resource === "persistentvolumeclaims")?.total > 0;
+  const volumes = useApi(base && hasClaims && `${base}/metrics/volumes${query}`, {
+    refreshMs: VOLUME_USAGE_REFRESH_MS,
+  });
 
-  const o = overview.data;
+  const o = overview.data && { ...overview.data, storage: withMeasuredClaims(overview.data.storage, volumes.data) };
   const error = overview.error ?? nodes.error ?? warnings.error;
   // Links to list pages keep the selected namespace.
   const to = (path) => `/c/${cluster.id}/${path}${search}`;
@@ -71,7 +79,7 @@ export default function Overview({ page }) {
             title: "Refresh the overview",
             group: "This page",
             icon: RefreshIcon,
-            run: () => [overview, nodes, usage, warnings].forEach((part) => part.reload()),
+            run: () => [overview, nodes, usage, warnings, volumes].forEach((part) => part.reload()),
           },
           {
             id: "overview.warnings",
@@ -185,6 +193,24 @@ export default function Overview({ page }) {
   );
 }
 
+// withMeasuredClaims adds a row to the Storage group when volume usage is
+// on: how many claims have numbers, and how many of those are nearly full.
+// Left out when none do (for example, every claim is a local-path folder
+// the kubelet doesn't measure), rather than claim "none nearly full".
+function withMeasuredClaims(storage, report) {
+  if (!storage || !report?.volumes.length) return storage;
+  return [
+    ...storage,
+    {
+      resource: "persistentvolumeclaims",
+      kind: "measuredClaims",
+      label: "Measured claims",
+      total: report.volumes.length,
+      unhealthy: report.volumes.filter(isNearlyFull).length,
+    },
+  ];
+}
+
 // Everything that needs a look, as short phrases: ["3 Pods unhealthy", "2 Deployments not ready"].
 function issuesOf(o) {
   const issues = [];
@@ -194,7 +220,7 @@ function issuesOf(o) {
   add(o.nodes.total - o.nodes.ready, "Nodes", "not ready");
   add(unhealthyPods(o.pods.byStatus), "Pods", "unhealthy");
   for (const w of [...o.workloads, ...(o.gatewayAPI ?? []), ...(o.storage ?? [])]) {
-    const problem = KINDS[w.resource]?.problem;
+    const problem = KINDS[w.kind ?? w.resource]?.problem;
     if (problem) add(w.unhealthy, pageFor(w.resource).label, problem);
   }
   return issues;
@@ -356,15 +382,15 @@ function ResourceGroup({ title, items, to }) {
       <ul className="resource-rows">
         {items.map((w) => {
           const p = pageFor(w.resource);
-          const kind = KINDS[w.resource];
+          const kind = KINDS[w.kind ?? w.resource];
           const bad = kind.problem ? w.unhealthy : 0;
           const tone = kind.tone ?? "warn";
           return (
-            <li key={w.resource}>
+            <li key={w.kind ?? w.resource}>
               <Link className="resource-row" to={to(p.path)}>
                 <span className="resource-name">
                   <p.icon size={16} />
-                  {p.label}
+                  {w.label ?? p.label}
                 </span>
                 <span className="resource-count">{w.total}</span>
                 <span className="resource-bar" aria-hidden="true">

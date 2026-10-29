@@ -16,7 +16,7 @@ R0–R8, the command palette phases P0–P6, the repositioning phases D0–D6 or
 phases G0–G7. All work happens on the `feature/storage` branch, one commit per phase, and the next
 phase starts only after the previous one is reviewed.
 
-**Status (2026-10-29):** S0–S4 done; S5 next.
+**Status (2026-10-29):** S0–S5 done; S6 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -227,21 +227,23 @@ Goal: storage problems show up on the cluster's front page.
 Goal: with usage turned on, PVC pages show how full each volume is; with it off, nothing calls the
 kubelet and the pages say how to turn it on.
 
-- [ ] `OPSCOPE_VOLUME_USAGE` setting, off by default, documented with the other settings
-- [ ] Read `stats/summary` only from the nodes that run pods mounting claims in the current scope,
+- [x] `OPSCOPE_VOLUME_USAGE` setting, off by default, documented with the other settings
+- [x] Read `stats/summary` only from the nodes that run pods mounting claims in the current scope,
       in parallel, with a short timeout per node and a short cache, so a big cluster isn't asked
       for every node on every refresh
-- [ ] Match volumes to claims through the summary's `pvcRef` (namespace and name)
-- [ ] A node that can't be read (forbidden, timeout, node down) leaves its claims without usage
+- [x] Match volumes to claims through the summary's `pvcRef` (namespace and name)
+- [x] A node that can't be read (forbidden, timeout, node down) leaves its claims without usage
       and doesn't fail the list; a forbidden answer is reported so the page can explain it
-- [ ] PVC list: "Used" column with the existing `UsageBar` ("2.1 GiB of 10 GiB" on hover)
-- [ ] PVC detail: used, free, and inodes; PV detail shows the same when bound
-- [ ] Overview: claims nearly full (space or inodes)
-- [ ] Friendly notes: usage off (how to turn it on, and what it means), on but not permitted (which
-      permission is missing), claim not mounted (usage is only known while a pod uses it)
-- [ ] `deploy/kubernetes/volume-usage.yaml`, the optional ClusterRole and binding for `nodes/proxy`
+- [~] PVC list: "Used" column with the existing `UsageBar` ("2.1 GiB used, 7.7 GiB free of 10 GiB"
+      on hover), from ~~`usage` on each row~~ a separate endpoint (see notes)
+- [x] PVC detail: used, free, and inodes; PV detail shows the same when bound
+- [~] Overview: claims nearly full (space or inodes), as a "Measured claims" row (see notes)
+- [x] Friendly notes: usage off (how to turn it on, and what it means), on but not permitted (which
+      permission is missing), claim not mounted (usage is only known while a pod uses it), and,
+      added, claim mounted but not measured (see notes)
+- [x] `deploy/kubernetes/volume-usage.yaml`, the optional ClusterRole and binding for `nodes/proxy`
       `get`, with a header comment in the same tone as `secrets-access.yaml`
-- [ ] Go tests with a stubbed stats source: matching, partial failures, forbidden, cache
+- [x] Go tests with a stubbed stats source: matching, partial failures, forbidden, cache
 
 ## Phase S6: Test scenarios, docs and screenshots
 
@@ -408,3 +410,61 @@ read-only).
     volumes still 4; the claims row opens the claim list.
   - multipass (read-only): 2 claims "All bound", 2 volumes "None released or failed".
   - Light and dark theme, and 820 px wide, where the longest text still fits on one line.
+
+### S5: Volume usage (2026-10-29)
+
+- **Changed from the plan: a separate endpoint**, `GET /api/clusters/{id}/metrics/volumes?namespace=`,
+  instead of a `usage` field on PVC rows. It's built like the metrics-server endpoints, which the
+  pages already read next to the lists: the PVC list stays exactly as it was, and "off" and "not
+  allowed" are answered with codes (`volume_usage_off` 404, `volume_usage_forbidden` 403), which
+  settles the open point of how the page learns either. With the setting off, the handler answers
+  before even looking up the cluster, so nothing can reach a kubelet. The answer is
+  `{volumes, unread, unmeasured}`: claims with numbers, nodes that couldn't be read (with their
+  claims), and claims that are mounted but have no numbers.
+- **The reader** lives in `internal/metrics/volumes.go`. It lists the pods in scope, takes the nodes
+  of running pods that mount claims (generic ephemeral volumes included), and asks those nodes at
+  once, each with a 5-second timeout. Each node's answer, failures included, is kept for 30
+  seconds per cluster, so a node that's down doesn't slow every refresh; the kubelet itself only
+  measures about once a minute. One forbidden node answers for all, since RBAC is cluster-wide.
+- **Found while checking: the kubelet doesn't measure hostPath volumes.** Both test clusters use
+  the local-path provisioner, whose volumes are hostPath folders, and their kubelets report no
+  numbers for any claim. The first version said "Not mounted" for those, which was wrong. The
+  backend now also returns `unmeasured` (mounted on a node that answered, but no numbers), shown as
+  "Not measured", with the reason on hover and on the detail page. The deployment docs say which
+  volumes are measured (CSI and `local`, not hostPath).
+- **Overview:** a "Measured claims" row in the Storage group, counting claims with numbers and how
+  many are 90% full or more (space or inodes), also counted in the health chip. It's left out when
+  nothing is measured, rather than saying "none nearly full" about claims it knows nothing about.
+  An earlier "Mounted claims" version counted unmeasured claims and did exactly that on multipass.
+- **Fullness** is measured from what's still available (`1 - available / capacity`), not from used:
+  filesystems keep some space back, so "used" alone understates how close a pod is to "disk full".
+- The PVC list's "Used" column is left out entirely when usage is off or not allowed, rather than a
+  column of dashes; the note above the table says why. Block volumes show "Block", pending claims a
+  dash, and claims on a node that couldn't be read a dash with the node's error on hover, plus a
+  note above the table.
+- The refused node-proxy call came back as just "unknown": the typed client expects protobuf and
+  doesn't decode the API server's JSON answer. `fetchSummary` decodes it, so the details read like
+  kubectl's ("User ... cannot get resource nodes/proxy ...").
+- `opscope.yaml` has the setting as commented lines. `docs/deployment.md` now says to apply
+  `opscope.yaml` alone from a clone, because applying the whole folder also applies both optional
+  files. It also has a "Volume usage" section: what it shows, why it's off by default (what
+  `nodes/proxy` allows), the two steps to turn it on and how to turn it off. The rest of the docs is
+  S6.
+- Tests: `volumes_test.go` covers which nodes are asked, namespace filtering, claims on several
+  nodes, volumes without claims or numbers, unread and unmeasured claims, the per-cluster cache and
+  its expiry, forbidden, pods not listable, a bad summary, and `fetchSummary` against a stand-in API
+  server (path, refusal message). Server tests cover "off" and both forbidden cases;
+  `volumeUsage.test.js` covers matching and fullness. Go (with `-race`) and frontend tests pass.
+- **Checked in the browser:**
+  - kind (`opscope-storage`), with new scenarios: a `local` PV on a 64 MiB tmpfs inside the node,
+    filled to 92% by a pod. The list shows a red 92% bar; the claim and its volume show used, free,
+    filesystem size and inodes; the overview shows "Measured claims 1, 1 nearly full", and the chip
+    adds "1 PersistentVolumeClaim nearly full". The local-path claims read "Not measured".
+  - Usage off: no "Used" column, the note above the list and on the claim page, and no row on the
+    overview.
+  - On without the permission: Opscope's own service account with only `opscope.yaml`'s ClusterRole
+    (the same RBAC, applied to kind on its own), added as a second cluster. The pages show the
+    `nodes/proxy` note, the rest works, and after applying `volume-usage.yaml` the numbers appear.
+  - multipass (read-only; reading stats changes nothing): both claims "Not measured", and no row on
+    the overview.
+  - Light and dark theme, 900 px wide.

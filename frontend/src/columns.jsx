@@ -4,6 +4,7 @@ import StatusBadge, { Fraction } from "./components/StatusBadge.jsx";
 import { Tag } from "./components/Tag.jsx";
 import { age, bytes, cores, cpu, duration, size } from "./format.js";
 import { Sparkline, UsageBar } from "./components/Usage.jsx";
+import { NEARLY_FULL, UNMEASURED_TEXT, inodesFull, inodesText, spaceFull, spaceText } from "./volumeUsage.js";
 
 // Columns that most tables share.
 const name = { key: "name", label: "Name", className: "name" };
@@ -191,6 +192,13 @@ export const columns = {
             {size(row.requested)}
           </span>
         ),
+    },
+    {
+      key: "used",
+      label: "Used",
+      usage: true, // only with volume usage on
+      render: (row) => <ClaimUsage row={row} />,
+      sortValue: (row) => (row.usage?.capacity ? spaceFull(row.usage) : undefined),
     },
     accessModes,
     storageClass,
@@ -446,6 +454,53 @@ function NodeUsage({ usage, field, total, format, what }) {
 }
 
 // What the short access modes mean, for hovering over "RWO".
+// How full a claim's volume is, or why there's no number for it.
+function ClaimUsage({ row }) {
+  const u = row.usage;
+  if (u?.capacity) {
+    const inodes = inodesFull(u);
+    return (
+      <span className="usage-cell">
+        <UsageBar used={u.capacity - u.available} total={u.capacity} label={`${spaceText(u)}; ${inodesText(u)}`} />
+        {inodes >= NEARLY_FULL && (
+          <span className="status status-bad" title={inodesText(u)}>
+            inodes {inodes}%
+          </span>
+        )}
+      </span>
+    );
+  }
+  if (u?.unread) {
+    return (
+      <span className="muted" title={`Couldn't read node ${u.unread.node}: ${u.unread.error}`}>
+        –
+      </span>
+    );
+  }
+  if (u?.unmeasured) {
+    return (
+      <span className="muted" title={UNMEASURED_TEXT}>
+        Not measured
+      </span>
+    );
+  }
+  if (row.volumeMode === "Block") {
+    return (
+      <span className="muted" title="A raw block device has no filesystem to measure">
+        Block
+      </span>
+    );
+  }
+  if (row.status === "Bound") {
+    return (
+      <span className="muted" title="No running pod uses this claim, and usage is only measured while one does">
+        Not mounted
+      </span>
+    );
+  }
+  return <span className="muted">–</span>;
+}
+
 const accessModeText = {
   RWO: "ReadWriteOnce: read-write from one node",
   ROX: "ReadOnlyMany: read-only from many nodes",

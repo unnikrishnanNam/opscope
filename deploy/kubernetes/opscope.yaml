@@ -107,6 +107,10 @@ spec:
               value: "true"
             - name: OPSCOPE_CLUSTER_NAME
               value: "this cluster"
+            # Optional: show how full each volume is. Also apply volume-usage.yaml;
+            # see "Volume usage" in docs/deployment.md for what it allows.
+            # - name: OPSCOPE_VOLUME_USAGE
+            #   value: "true"
           ports:
             - name: http
               containerPort: 8080

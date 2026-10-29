@@ -56,7 +56,7 @@ export const sections = [
   {
     group: "Storage",
     items: [
-      { path: "storage/persistentvolumeclaims", icon: icons.PersistentVolumeClaimsIcon, resource: "persistentvolumeclaims", aliases: ["pvc", "persistentvolumeclaim", "claim"], label: "PersistentVolumeClaims", about: "Requests for storage made by apps, and the volume each one is bound to." },
+      { path: "storage/persistentvolumeclaims", icon: icons.PersistentVolumeClaimsIcon, resource: "persistentvolumeclaims", aliases: ["pvc", "persistentvolumeclaim", "claim"], metrics: "volumes", label: "PersistentVolumeClaims", about: "Requests for storage made by apps, and the volume each one is bound to." },
       { path: "storage/persistentvolumes", icon: icons.PersistentVolumesIcon, resource: "persistentvolumes", aliases: ["pv", "persistentvolume", "volume"], clusterScoped: true, label: "PersistentVolumes", about: "Pieces of storage in the cluster, and the claim each one belongs to." },
       { path: "storage/storageclasses", icon: icons.StorageClassesIcon, resource: "storageclasses", aliases: ["sc", "storageclass"], clusterScoped: true, label: "StorageClasses", about: "Kinds of storage that claims can ask for, and who provisions them." },
     ],

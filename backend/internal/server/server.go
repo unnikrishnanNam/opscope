@@ -17,6 +17,9 @@ import (
 type Config struct {
 	Version   string // shown by /api/health
 	StaticDir string // folder with the built React app (index.html, assets/)
+	// VolumeUsage turns on reading volume usage from the nodes' kubelets
+	// (OPSCOPE_VOLUME_USAGE). Off, Opscope never calls the node proxy.
+	VolumeUsage bool
 }
 
 // New returns an http.Handler with every route registered.
@@ -47,6 +50,9 @@ func New(cfg Config, manager *clusters.Manager, history *metrics.History, logger
 	// Live CPU and memory usage from metrics-server.
 	mux.HandleFunc("GET /api/clusters/{id}/metrics/nodes", getNodeMetrics(manager, history))
 	mux.HandleFunc("GET /api/clusters/{id}/metrics/pods", getPodMetrics(manager))
+
+	// How full each claim's volume is, from the kubelets; only when turned on.
+	mux.HandleFunc("GET /api/clusters/{id}/metrics/volumes", getVolumeUsage(cfg.VolumeUsage, metrics.NewVolumes(), manager))
 
 	// One value of one secret, fetched only when the user clicks "Reveal".
 	mux.HandleFunc("GET /api/clusters/{id}/secrets/{namespace}/{name}/{key}", getSecretValue(manager))
