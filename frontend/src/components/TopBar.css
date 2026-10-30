@@ -10,18 +10,30 @@
   background: var(--bg);
 }
 
+/* Takes only the room left over (flex-basis 0), so the crumbs give way
+   before the pickers do. */
 .topbar-start {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* Once the crumbs have no room left, the pickers shrink too, so a long
+   cluster or namespace name gets "…" instead of making the page scroll
+   sideways. (min-width: 0 at each level: a flex item won't shrink below
+   its content otherwise.) */
+.topbar-end {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
 }
 
-.topbar-end {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-shrink: 0;
+.topbar-end > *,
+.topbar-end .combobox-button {
+  min-width: 0;
 }
 
 /* Opens the command palette. It looks like a search box, since that's what
@@ -81,6 +93,12 @@
   .topbar-menu {
     display: inline-flex;
   }
+
+  /* Room for the menu button (34px, less its -8px margin) when the crumbs
+     have none, so the search button doesn't cover it. */
+  .topbar-start {
+    min-width: calc(var(--control-md) - var(--space-2));
+  }
 }
 
 /* Phones: the pickers move to a second row and share it. Earlier crumbs
@@ -100,10 +118,6 @@
   }
 
   /* An icon button at the end of the first row. */
-  .topbar-start {
-    flex: 1;
-  }
-
   .topbar-search {
     justify-content: center;
     width: var(--control-sm);
@@ -114,13 +128,13 @@
     display: none;
   }
 
+  /* The pickers share the row: each gets an equal share, and one that needs
+     less (a short cluster name) leaves the rest to the other. */
   .topbar-end {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, auto);
     flex: 1 1 100%;
-  }
-
-  .topbar-end > * {
-    flex: 1;
-    min-width: 0;
   }
 
   .topbar-end .combobox-button {

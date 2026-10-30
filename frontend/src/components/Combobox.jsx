@@ -104,7 +104,9 @@ export default function Combobox({
       >
         {showLabel && <span className="combobox-label">{label}</span>}
         <span className="combobox-value">
-          {selected ? (renderValue ?? renderOption ?? ((o) => o.label))(selected) : "Choose…"}
+          {selected
+            ? (renderValue ?? renderOption ?? ((o) => <span className="combobox-value-text">{o.label}</span>))(selected)
+            : "Choose…"}
         </span>
         <ChevronDownIcon size={size === "sm" ? 14 : 16} className="combobox-chevron" />
       </button>

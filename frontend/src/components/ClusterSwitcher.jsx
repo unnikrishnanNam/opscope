@@ -24,7 +24,7 @@ export default function ClusterSwitcher({ clusters, value, onChange, manageTo = 
       renderValue={(o) => (
         <>
           <StatusDot status={o.status} />
-          {o.label}
+          <span className="combobox-value-text">{o.label}</span>
           <span className={`cluster-value-meta ${o.status && !o.status.reachable ? "is-bad" : ""}`}>
             {statusText(o.status)}
           </span>
