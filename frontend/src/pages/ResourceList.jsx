@@ -83,7 +83,7 @@ export default function ResourceList({ page }) {
       {forbidden && (
         <Callout tone="warning" title={`Opscope isn't allowed to read ${noun}`} detail={error.detail}>
           The Kubernetes user or service account it connects with has no permission for this. See “Permissions” in the
-          README.
+          deployment guide.
         </Callout>
       )}
       {error && !notInstalled && !forbidden && (

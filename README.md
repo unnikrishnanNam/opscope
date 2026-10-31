@@ -44,17 +44,31 @@ machine or inside the cluster it shows.
   UI, and switch between them.
 - **Light and dark themes**, small screens, and keyboard and screen reader support (WCAG 2.1 AA).
 
-## Quick start
+## Install
 
-**With Docker,** on your own machine:
+Pick the way that fits what you want to do:
+
+| You want to…                                               | Start here                                        |
+| ---------------------------------------------------------- | ------------------------------------------------- |
+| Try Opscope on your machine, with clusters you already use | [Try it on your machine](#try-it-on-your-machine) |
+| Run Opscope in a cluster for your team                     | [Run it for your team](#run-it-for-your-team)     |
+| Work on Opscope's code                                     | [Work on the code](#work-on-the-code)             |
+
+### Try it on your machine
+
+With Docker:
 
 ```bash
 docker run --rm -p 127.0.0.1:8080:8080 -v opscope-data:/data ghcr.io/unnikrishnannam/opscope:latest
 ```
 
 Open http://localhost:8080 and add a cluster by pasting or uploading a kubeconfig.
+[Running Opscope on your machine](docs/local.md) covers starting with a kubeconfig file, kind
+clusters, and cleaning up.
 
-**In a Kubernetes cluster,** to show that cluster:
+### Run it for your team
+
+In the cluster Opscope should show:
 
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.2.0/deploy/kubernetes/opscope.yaml
@@ -64,26 +78,32 @@ kubectl apply -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.2.
 kubectl -n opscope port-forward svc/opscope 8080:80
 ```
 
-Open http://localhost:8080. Secrets pages need an extra, optional role; see
-[Deploying Opscope](docs/deployment.md) for Secret access, kind clusters, persistent storage and
-every setting.
+Open http://localhost:8080. Before others use it, read [Deploying Opscope](docs/deployment.md): it
+covers the optional Secret and volume usage roles, giving people access safely, keeping clusters
+added in the UI, running with Docker on a server, upgrading and uninstalling.
 
-## Connecting clusters
+### Work on the code
 
-Opscope has no built-in cluster and never reads `~/.kube/config` on its own. There are three ways to
-give it one:
+With Go and Node.js, run the backend and the frontend in two terminals:
 
-1. **A kubeconfig file:** set `OPSCOPE_KUBECONFIG` to its path (and `OPSCOPE_CONTEXT` to pick a
-   context). The cluster is loaded at startup and marked "Environment".
-2. **Inside the cluster:** set `OPSCOPE_IN_CLUSTER=true` when Opscope runs as a pod. It uses the
-   pod's service account, as the manifests in `deploy/kubernetes/` do.
-3. **In the UI:** open *Clusters → Add a cluster*, paste or upload a kubeconfig and pick a context.
-   Opscope checks that it can connect, then saves only that context. Kubeconfigs added this way
-   must have their credentials embedded; `kubectl config view --minify --flatten` prints the current
-   context in that form.
+```bash
+make dev-backend
+```
 
-Opscope can show only what the kubeconfig's user or the service account is allowed to read. Every
-setting is listed under [Configuration](docs/deployment.md#configuration).
+```bash
+make dev-frontend
+```
+
+Open http://localhost:5173. [CONTRIBUTING.md](CONTRIBUTING.md#development-setup) covers the setup,
+test clusters, building the image, and how changes are checked.
+
+### Connecting clusters
+
+Opscope has no built-in cluster and never reads `~/.kube/config` on its own. It gets clusters in
+three ways: added in the UI (*Clusters → Add a cluster*), from a kubeconfig file given at startup
+(`OPSCOPE_KUBECONFIG`), or from the pod's service account when it runs in a cluster. It can show
+only what that user or service account is allowed to read. Every setting is listed under
+[Configuration](docs/deployment.md#configuration).
 
 ## Command palette and shortcuts
 
@@ -115,7 +135,7 @@ Shortcuts are ignored while you type in a field.
   nothing more. See [Permissions](docs/deployment.md#permissions).
 - **No login.** Anyone who can open Opscope can read everything it can read. Keep it on
   `127.0.0.1`, reach it through `kubectl port-forward` in a cluster, or put an authenticating proxy
-  in front of it. See [Exposing Opscope](docs/deployment.md#exposing-opscope).
+  in front of it. See [Giving people access](docs/deployment.md#giving-people-access).
 - **Secrets** are listed by key name only. A value is fetched only when you choose "Reveal" on one
   key, is never cached, and never appears in the YAML view. Reading Secrets in a cluster needs a
   separate, optional role.
@@ -144,7 +164,8 @@ Shortcuts are ignored while you type in a field.
 
 | Document                                     | Contents                                                              |
 | -------------------------------------------- | --------------------------------------------------------------------- |
-| [Deploying Opscope](docs/deployment.md)      | Docker, Kubernetes, permissions, Secret access, volume usage, exposure, configuration, upgrading |
+| [Running Opscope on your machine](docs/local.md) | Trying Opscope with Docker: adding clusters, kubeconfig files, kind |
+| [Deploying Opscope](docs/deployment.md)      | Running it for a team: installing, permissions, access, configuration, upgrading, uninstalling |
 | [HTTP API](docs/api.md)                      | The JSON API behind the UI                                            |
 | [Contributing](CONTRIBUTING.md)              | Development setup, project layout, tests, code style, releases       |
 | [Design records](docs/design/)               | How and why Opscope was built, feature by feature                    |

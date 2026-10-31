@@ -72,6 +72,42 @@ to use a server on another address. Restart `make dev-backend` after Go changes.
 `OPSCOPE_KUBECONFIG` is optional: without it, add clusters in the UI. In development they are
 saved under `data/`, which git and Docker ignore. `make help` lists every Makefile target.
 
+### Test clusters
+
+A throwaway [kind](https://kind.sigs.k8s.io/) cluster with its own kubeconfig keeps experiments away
+from clusters you care about:
+
+```bash
+kind create cluster --name opscope-dev --kubeconfig /tmp/opscope-dev.kubeconfig
+```
+
+```bash
+make dev-backend OPSCOPE_KUBECONFIG=/tmp/opscope-dev.kubeconfig
+```
+
+[`test/scenarios/`](test/scenarios/) has manifests for cases a healthy cluster doesn't have, such as
+claims that can't bind, and says how to run them. Delete the cluster when you're done with
+`kind delete cluster --name opscope-dev`.
+
+### Building and running the image
+
+```bash
+make docker-build
+```
+
+This builds `opscope:dev`. `make docker-run` runs it like the published image (add clusters in the
+UI), and `make docker-run-env KUBECONFIG_FILE=path` starts it with a kubeconfig file. Pass
+`VERSION=v1.2.0` to any of them to set the image tag and the version Opscope reports. A container
+can't reach a kind cluster at `127.0.0.1`; see
+[Reaching the cluster from the container](docs/local.md#reaching-the-cluster-from-the-container).
+
+To run a local build inside a kind cluster, load it into the cluster's nodes, then set `image:
+opscope:dev` in `deploy/kubernetes/opscope.yaml` before applying it:
+
+```bash
+kind load docker-image opscope:dev --name opscope-dev
+```
+
 ### The component kit
 
 http://localhost:5173/kit shows every design token and component in both themes, with sample data
@@ -206,8 +242,9 @@ Update the documentation in the same pull request as the change it describes:
 
 | Document                                    | Audience and contents                                      |
 | ------------------------------------------- | ---------------------------------------------------------- |
-| [`README.md`](README.md)                    | Users: what Opscope does, quick start, configuration       |
-| [`docs/deployment.md`](docs/deployment.md)  | Operators: Docker, Kubernetes, permissions, exposure       |
+| [`README.md`](README.md)                    | Everyone: what Opscope does, and where to start            |
+| [`docs/local.md`](docs/local.md)            | People trying Opscope on their machine, with Docker        |
+| [`docs/deployment.md`](docs/deployment.md)  | Admins running it for a team: install, permissions, access |
 | [`docs/api.md`](docs/api.md)                | The HTTP API                                               |
 | [`docs/design/`](docs/design/)              | Design records for larger features                         |
 | `CONTRIBUTING.md`                           | Contributors: this guide                                   |
