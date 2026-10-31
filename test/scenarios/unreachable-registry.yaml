@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unreachable-registry
+  namespace: opscope-scenarios
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: unreachable-registry}
+  template:
+    metadata:
+      labels: {app: unreachable-registry}
+    spec:
+
+      containers:
+        - name: app
+          image: registry.opscope.invalid/app:1.0
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits: {memory: 32Mi}
+          command: ["sh", "-c", "sleep 3600"]

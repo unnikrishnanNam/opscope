@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: opscope-scenarios
+---
+# Every pod here must set a memory limit, and together they may use 1 GiB.
+# over-quota.yaml asks for more.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: memory
+  namespace: opscope-scenarios
+spec:
+  hard:
+    limits.memory: 1Gi

@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	"opscope/internal/kube"
+
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -95,7 +97,7 @@ func podSections(d *Detail, obj *unstructured.Unstructured) error {
 	if err := convert(obj, &pod); err != nil {
 		return err
 	}
-	d.add("Status", podStatus(&pod))
+	d.add("Status", kube.PodStatus(&pod))
 	d.add("Node", pod.Spec.NodeName)
 	d.add("Pod IP", pod.Status.PodIP)
 	d.add("Service account", pod.Spec.ServiceAccountName)
@@ -441,11 +443,11 @@ func quantityText(name corev1.ResourceName, q resource.Quantity) string {
 // ---- Gateway API ----
 
 func gatewaySections(d *Detail, obj *unstructured.Unstructured) error {
-	var g gatewayObject
+	var g kube.Gateway
 	if err := convert(obj, &g); err != nil {
 		return err
 	}
-	status, _ := gatewayStatus(g.Status.Conditions)
+	status, _ := g.Summary()
 	d.add("Status", status)
 	d.add("Class", g.Spec.GatewayClassName)
 	addresses := []string{}
@@ -475,8 +477,8 @@ func gatewaySections(d *Detail, obj *unstructured.Unstructured) error {
 type httpRouteDetail struct {
 	Metadata metav1.ObjectMeta `json:"metadata"`
 	Spec     struct {
-		Hostnames  []string    `json:"hostnames"`
-		ParentRefs []objectRef `json:"parentRefs"`
+		Hostnames  []string         `json:"hostnames"`
+		ParentRefs []kube.ObjectRef `json:"parentRefs"`
 		Rules      []struct {
 			Matches []struct {
 				Path *struct {
@@ -492,18 +494,11 @@ type httpRouteDetail struct {
 			Filters []struct {
 				Type string `json:"type"`
 			} `json:"filters"`
-			BackendRefs []struct {
-				objectRef `json:",inline"`
-				Weight    *int32 `json:"weight"`
-			} `json:"backendRefs"`
+			BackendRefs []kube.BackendRef `json:"backendRefs"`
 		} `json:"rules"`
 	} `json:"spec"`
 	Status struct {
-		Parents []struct {
-			ParentRef      objectRef          `json:"parentRef"`
-			ControllerName string             `json:"controllerName"`
-			Conditions     []metav1.Condition `json:"conditions"`
-		} `json:"parents"`
+		Parents []kube.RouteParentStatus `json:"parents"`
 	} `json:"status"`
 }
 
@@ -542,7 +537,7 @@ func httpRouteSections(d *Detail, obj *unstructured.Unstructured) error {
 
 		backends := []string{}
 		for _, b := range rule.BackendRefs {
-			backend := refName(b.objectRef, ns, "Service")
+			backend := kube.RefName(b.ObjectRef, ns, "Service")
 			if b.Port != nil {
 				backend += fmt.Sprintf(":%d", *b.Port)
 			}
@@ -570,7 +565,7 @@ func httpRouteSections(d *Detail, obj *unstructured.Unstructured) error {
 			}
 		}
 		parents.Rows = append(parents.Rows, []string{
-			refName(p.ParentRef, ns, "Gateway"), conditionText(accepted), conditionText(resolved), message,
+			kube.RefName(p.ParentRef, ns, "Gateway"), conditionText(accepted), conditionText(resolved), message,
 		})
 	}
 	d.addTable(parents)
@@ -585,7 +580,7 @@ func conditionText(c *metav1.Condition) string {
 }
 
 func gatewayClassSections(d *Detail, obj *unstructured.Unstructured) error {
-	var c gatewayClassObject
+	var c kube.GatewayClass
 	if err := convert(obj, &c); err != nil {
 		return err
 	}

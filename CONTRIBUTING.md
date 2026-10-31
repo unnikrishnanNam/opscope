@@ -83,11 +83,16 @@ only in development and is left out of production builds.
 ```
 backend/                  Go server
   main.go                 entry point: reads env vars, loads clusters, serves, shuts down cleanly
-  internal/clusters/      known clusters (environment, in-cluster, added in the UI), clients for each
+  internal/clusters/      known clusters (environment, in-cluster, added in the UI), clients for each;
+                          kind.go reaches kind clusters from inside a container
+  internal/kube/          what several packages share: the clients, Gateway API types, pod status
   internal/resources/     one file per resource type: lists it and flattens it into table rows;
                           detail.go builds detail pages, gatewayapi.go reads Gateway API resources,
                           names.go builds the search index
   internal/metrics/       live usage from metrics-server, and the in-memory history
+  internal/snapshot/      the whole cluster read at once, for the topology and diagnosis
+  internal/graph/         the snapshot as a graph of objects and what they need, and its views
+  internal/diagnose/      rules that explain why objects fail, and traces down to the root cause
   internal/server/        HTTP routes, middleware, static file serving
 frontend/                 React app (Vite, plain JavaScript)
   src/api.js              fetch helper and the useApi hook
@@ -98,6 +103,8 @@ frontend/                 React app (Vite, plain JavaScript)
   src/commands/           the command registry behind the palette and the shortcuts (sources/ has
                           the commands available on every page)
   src/components/         shared components, each with its own CSS file
+  src/graph/              laying out a topology map (columns by kind, rows ordered to uncross
+                          edges) and following findings along it to their root causes
   src/pages/              one file per page
   src/styles/             design tokens (both themes) and page-wide base styles
   src/kit/                the component kit at /kit (development only)
@@ -108,6 +115,7 @@ frontend/                 React app (Vite, plain JavaScript)
 deploy/kubernetes/        manifests for running Opscope in a cluster
 docs/                     deployment guide, API reference, design records
 Dockerfile                the single image (multi-platform)
+compose.yaml              Opscope on kind's Docker network, for local kind clusters
 Makefile                  common commands
 .github/                  CI and release workflows, issue forms, Dependabot
 ```
@@ -168,11 +176,30 @@ runs the Go tests and the frontend tests. Before opening a pull request, also ch
    `detail_sections.go` if it needs any.
 3. **Permissions:** the resource in the ClusterRole in `deploy/kubernetes/opscope.yaml`, with only
    `get` and `list`.
-4. **Frontend:** an entry in `src/sections.js` (with `aliases` for kubectl's short names) and its
+4. **Snapshot:** if the topology and diagnosis should see it, a field on `Snapshot`, a line in
+   `loaders` (`internal/snapshot/load.go`) and a line in `BuildIndex`. A test checks that the
+   ClusterRole lets Opscope list every kind the snapshot reads.
+5. **Frontend:** an entry in `src/sections.js` (with `aliases` for kubectl's short names) and its
    columns in `src/columns.jsx`. The sidebar, the route, the palette's "Go to" and object search
    follow from these.
-5. **Docs:** the resource list in the README, the permissions table in
+6. **Docs:** the resource list in the README, the permissions table in
    [`docs/deployment.md`](docs/deployment.md) and the resource table in [`docs/api.md`](docs/api.md).
+
+### Adding a diagnosis rule
+
+A rule (`internal/diagnose/rules_*.go`) looks at one kind of object and returns findings: a title,
+evidence, the objects it blames, and next steps. It goes in the `rules` list in `builtin.go`.
+
+- **Name the culprit.** A finding blames the object that causes it, not every unhealthy neighbour.
+- **Prefer structured status** (container states, conditions, references) over event text. A
+  finding read from text is `Likely`, not `Certain`.
+- **Next steps are read-only:** links to Opscope pages, or `kubectl get`, `describe` or `logs`.
+  A test fails on anything else. Describe a fix in the finding's detail, never as a command.
+- **Test it** with objects built in Go (`rules_test.go`), and where a real cluster can show the
+  failure, with a scenario: a manifest in `test/scenarios/`, applied to a throwaway cluster and
+  captured into `internal/diagnose/testdata/scenarios/` (see `scenario_test.go`). Failures that need
+  more than one cluster can offer (Gateway API, a node going down) are in subfolders, captured
+  into `testdata/edge-cases/` (`edge_test.go`); `test/scenarios/README.md` says how.
 
 ### Adding commands
 

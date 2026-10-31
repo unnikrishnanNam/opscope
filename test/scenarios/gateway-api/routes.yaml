@@ -1,0 +1,48 @@
+# shop sends traffic to web, which exists, and to api, which doesn't.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: shop
+  namespace: opscope-edge
+spec:
+  parentRefs: [{name: edge}]
+  rules:
+    - matches: [{path: {type: PathPrefix, value: /}}]
+      backendRefs: [{name: web, port: 80}]
+    - matches: [{path: {type: PathPrefix, value: /api}}]
+      backendRefs: [{name: api, port: 80}]
+---
+# catalog sends traffic to a Service in another namespace, and no
+# ReferenceGrant there allows it.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: catalog
+  namespace: opscope-edge
+spec:
+  parentRefs: [{name: edge}]
+  rules:
+    - backendRefs: [{name: catalog, namespace: opscope-backends, port: 80}]
+---
+# reviews does the same, for a Service the grant below does allow, so this
+# one is fine.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: reviews
+  namespace: opscope-edge
+spec:
+  parentRefs: [{name: edge}]
+  rules:
+    - backendRefs: [{name: reviews, namespace: opscope-backends, port: 80}]
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: routes-to-reviews
+  namespace: opscope-backends
+spec:
+  from:
+    - {group: gateway.networking.k8s.io, kind: HTTPRoute, namespace: opscope-edge}
+  to:
+    - {group: "", kind: Service, name: reviews}

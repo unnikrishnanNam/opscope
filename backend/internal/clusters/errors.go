@@ -42,8 +42,7 @@ func Explain(err error, server string) string {
 	case apierrors.IsForbidden(err):
 		return "The credentials work, but this user isn't allowed to read this."
 	case errors.As(err, &netErr), strings.Contains(err.Error(), "connection refused"), strings.Contains(err.Error(), "no such host"):
-		return "Couldn't reach the API server at " + server + ". Check the address and that this machine " +
-			"(or container) can reach it."
+		return explainUnreachable(err, server)
 	default:
 		return "Something went wrong talking to the cluster."
 	}

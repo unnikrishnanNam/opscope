@@ -1,0 +1,4303 @@
+{
+ "apiVersion": "v1",
+ "items": [
+  {
+   "apiVersion": "v1",
+   "kind": "Pod",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "deletionGracePeriodSeconds": 30,
+    "deletionTimestamp": "2026-10-12T15:18:12Z",
+    "generateName": "web-7bdb5997ff-",
+    "generation": 2,
+    "labels": {
+     "app": "web",
+     "pod-template-hash": "7bdb5997ff"
+    },
+    "name": "web-7bdb5997ff-mvgmq",
+    "namespace": "opscope-edge",
+    "ownerReferences": [
+     {
+      "apiVersion": "apps/v1",
+      "blockOwnerDeletion": true,
+      "controller": true,
+      "kind": "ReplicaSet",
+      "name": "web-7bdb5997ff",
+      "uid": "8c7f6813-6b8e-40d9-948b-e6cc54950546"
+     }
+    ],
+    "resourceVersion": "1242",
+    "uid": "8f272451-9288-4c9f-b512-9d957329aa6a"
+   },
+   "spec": {
+    "containers": [
+     {
+      "command": [
+       "httpd",
+       "-f",
+       "-p",
+       "8080"
+      ],
+      "image": "busybox:1.36",
+      "imagePullPolicy": "IfNotPresent",
+      "name": "web",
+      "ports": [
+       {
+        "containerPort": 8080,
+        "protocol": "TCP"
+       }
+      ],
+      "resources": {},
+      "terminationMessagePath": "/dev/termination-log",
+      "terminationMessagePolicy": "File",
+      "volumeMounts": [
+       {
+        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+        "name": "kube-api-access-k6lb5",
+        "readOnly": true
+       }
+      ]
+     }
+    ],
+    "dnsPolicy": "ClusterFirst",
+    "enableServiceLinks": true,
+    "nodeName": "opscope-g7-worker",
+    "preemptionPolicy": "PreemptLowerPriority",
+    "priority": 0,
+    "restartPolicy": "Always",
+    "schedulerName": "default-scheduler",
+    "securityContext": {},
+    "serviceAccount": "default",
+    "serviceAccountName": "default",
+    "terminationGracePeriodSeconds": 30,
+    "tolerations": [
+     {
+      "effect": "NoExecute",
+      "key": "node.kubernetes.io/not-ready",
+      "operator": "Exists",
+      "tolerationSeconds": 300
+     },
+     {
+      "effect": "NoExecute",
+      "key": "node.kubernetes.io/unreachable",
+      "operator": "Exists",
+      "tolerationSeconds": 300
+     }
+    ],
+    "volumes": [
+     {
+      "name": "kube-api-access-k6lb5",
+      "projected": {
+       "defaultMode": 420,
+       "sources": [
+        {
+         "serviceAccountToken": {
+          "expirationSeconds": 3607,
+          "path": "token"
+         }
+        },
+        {
+         "configMap": {
+          "items": [
+           {
+            "key": "ca.crt",
+            "path": "ca.crt"
+           }
+          ],
+          "name": "kube-root-ca.crt"
+         }
+        },
+        {
+         "downwardAPI": {
+          "items": [
+           {
+            "fieldRef": {
+             "apiVersion": "v1",
+             "fieldPath": "metadata.namespace"
+            },
+            "path": "namespace"
+           }
+          ]
+         }
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "status": {
+    "conditions": [
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:11:25Z",
+      "observedGeneration": 1,
+      "status": "True",
+      "type": "PodReadyToStartContainers"
+     },
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:11:18Z",
+      "observedGeneration": 1,
+      "status": "True",
+      "type": "Initialized"
+     },
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:12:42Z",
+      "observedGeneration": 1,
+      "status": "False",
+      "type": "Ready"
+     },
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:11:25Z",
+      "observedGeneration": 1,
+      "status": "True",
+      "type": "ContainersReady"
+     },
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:11:18Z",
+      "observedGeneration": 1,
+      "status": "True",
+      "type": "PodScheduled"
+     },
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:17:42Z",
+      "message": "Taint manager: deleting due to NoExecute taint",
+      "observedGeneration": 1,
+      "reason": "DeletionByTaintManager",
+      "status": "True",
+      "type": "DisruptionTarget"
+     }
+    ],
+    "containerStatuses": [
+     {
+      "containerID": "containerd://b6abced948662e0be534c2bdd50503f97976ef6fd96236ea3cf9908f13600074",
+      "image": "docker.io/library/busybox:1.36",
+      "imageID": "docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662",
+      "lastState": {},
+      "name": "web",
+      "ready": true,
+      "resources": {},
+      "restartCount": 0,
+      "started": true,
+      "state": {
+       "running": {
+        "startedAt": "2026-10-12T15:11:24Z"
+       }
+      },
+      "user": {
+       "linux": {
+        "gid": 0,
+        "supplementalGroups": [
+         0,
+         10
+        ],
+        "uid": 0
+       }
+      },
+      "volumeMounts": [
+       {
+        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+        "name": "kube-api-access-k6lb5",
+        "readOnly": true,
+        "recursiveReadOnly": "Disabled"
+       }
+      ]
+     }
+    ],
+    "hostIP": "172.18.0.4",
+    "hostIPs": [
+     {
+      "ip": "172.18.0.4"
+     }
+    ],
+    "observedGeneration": 1,
+    "phase": "Running",
+    "podIP": "10.244.1.2",
+    "podIPs": [
+     {
+      "ip": "10.244.1.2"
+     }
+    ],
+    "qosClass": "BestEffort",
+    "startTime": "2026-10-12T15:11:18Z"
+   }
+  },
+  {
+   "apiVersion": "v1",
+   "kind": "Pod",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:17:42Z",
+    "generateName": "web-7bdb5997ff-",
+    "generation": 1,
+    "labels": {
+     "app": "web",
+     "pod-template-hash": "7bdb5997ff"
+    },
+    "name": "web-7bdb5997ff-xjmlp",
+    "namespace": "opscope-edge",
+    "ownerReferences": [
+     {
+      "apiVersion": "apps/v1",
+      "blockOwnerDeletion": true,
+      "controller": true,
+      "kind": "ReplicaSet",
+      "name": "web-7bdb5997ff",
+      "uid": "8c7f6813-6b8e-40d9-948b-e6cc54950546"
+     }
+    ],
+    "resourceVersion": "1278",
+    "uid": "1c150ae9-1bb7-4d7f-8d38-51367edacbc8"
+   },
+   "spec": {
+    "containers": [
+     {
+      "command": [
+       "httpd",
+       "-f",
+       "-p",
+       "8080"
+      ],
+      "image": "busybox:1.36",
+      "imagePullPolicy": "IfNotPresent",
+      "name": "web",
+      "ports": [
+       {
+        "containerPort": 8080,
+        "protocol": "TCP"
+       }
+      ],
+      "resources": {},
+      "terminationMessagePath": "/dev/termination-log",
+      "terminationMessagePolicy": "File",
+      "volumeMounts": [
+       {
+        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+        "name": "kube-api-access-xtr42",
+        "readOnly": true
+       }
+      ]
+     }
+    ],
+    "dnsPolicy": "ClusterFirst",
+    "enableServiceLinks": true,
+    "preemptionPolicy": "PreemptLowerPriority",
+    "priority": 0,
+    "restartPolicy": "Always",
+    "schedulerName": "default-scheduler",
+    "securityContext": {},
+    "serviceAccount": "default",
+    "serviceAccountName": "default",
+    "terminationGracePeriodSeconds": 30,
+    "tolerations": [
+     {
+      "effect": "NoExecute",
+      "key": "node.kubernetes.io/not-ready",
+      "operator": "Exists",
+      "tolerationSeconds": 300
+     },
+     {
+      "effect": "NoExecute",
+      "key": "node.kubernetes.io/unreachable",
+      "operator": "Exists",
+      "tolerationSeconds": 300
+     }
+    ],
+    "volumes": [
+     {
+      "name": "kube-api-access-xtr42",
+      "projected": {
+       "defaultMode": 420,
+       "sources": [
+        {
+         "serviceAccountToken": {
+          "expirationSeconds": 3607,
+          "path": "token"
+         }
+        },
+        {
+         "configMap": {
+          "items": [
+           {
+            "key": "ca.crt",
+            "path": "ca.crt"
+           }
+          ],
+          "name": "kube-root-ca.crt"
+         }
+        },
+        {
+         "downwardAPI": {
+          "items": [
+           {
+            "fieldRef": {
+             "apiVersion": "v1",
+             "fieldPath": "metadata.namespace"
+            },
+            "path": "namespace"
+           }
+          ]
+         }
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "status": {
+    "conditions": [
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:17:42Z",
+      "message": "0/2 nodes are available: 2 node(s) had untolerated taint(s). no new claims to deallocate, preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling.",
+      "observedGeneration": 1,
+      "reason": "Unschedulable",
+      "status": "False",
+      "type": "PodScheduled"
+     }
+    ],
+    "phase": "Pending",
+    "qosClass": "BestEffort"
+   }
+  },
+  {
+   "apiVersion": "apps/v1",
+   "kind": "Deployment",
+   "metadata": {
+    "annotations": {
+     "deployment.kubernetes.io/revision": "1"
+    },
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "generation": 1,
+    "name": "web",
+    "namespace": "opscope-edge",
+    "resourceVersion": "1281",
+    "uid": "5a08e7ca-2030-4d90-8258-3de84f56fc53"
+   },
+   "spec": {
+    "progressDeadlineSeconds": 600,
+    "replicas": 1,
+    "revisionHistoryLimit": 10,
+    "selector": {
+     "matchLabels": {
+      "app": "web"
+     }
+    },
+    "strategy": {
+     "rollingUpdate": {
+      "maxSurge": "25%",
+      "maxUnavailable": "25%"
+     },
+     "type": "RollingUpdate"
+    },
+    "template": {
+     "metadata": {
+      "labels": {
+       "app": "web"
+      }
+     },
+     "spec": {
+      "containers": [
+       {
+        "command": [
+         "httpd",
+         "-f",
+         "-p",
+         "8080"
+        ],
+        "image": "busybox:1.36",
+        "imagePullPolicy": "IfNotPresent",
+        "name": "web",
+        "ports": [
+         {
+          "containerPort": 8080,
+          "protocol": "TCP"
+         }
+        ],
+        "resources": {},
+        "terminationMessagePath": "/dev/termination-log",
+        "terminationMessagePolicy": "File"
+       }
+      ],
+      "dnsPolicy": "ClusterFirst",
+      "restartPolicy": "Always",
+      "schedulerName": "default-scheduler",
+      "securityContext": {},
+      "terminationGracePeriodSeconds": 30
+     }
+    }
+   },
+   "status": {
+    "conditions": [
+     {
+      "lastTransitionTime": "2026-10-12T15:11:18Z",
+      "lastUpdateTime": "2026-10-12T15:11:25Z",
+      "message": "ReplicaSet \"web-7bdb5997ff\" has successfully progressed.",
+      "reason": "NewReplicaSetAvailable",
+      "status": "True",
+      "type": "Progressing"
+     },
+     {
+      "lastTransitionTime": "2026-10-12T15:12:42Z",
+      "lastUpdateTime": "2026-10-12T15:12:42Z",
+      "message": "Deployment does not have minimum availability.",
+      "reason": "MinimumReplicasUnavailable",
+      "status": "False",
+      "type": "Available"
+     }
+    ],
+    "observedGeneration": 1,
+    "replicas": 1,
+    "terminatingReplicas": 1,
+    "unavailableReplicas": 1,
+    "updatedReplicas": 1
+   }
+  },
+  {
+   "apiVersion": "apps/v1",
+   "kind": "ReplicaSet",
+   "metadata": {
+    "annotations": {
+     "deployment.kubernetes.io/desired-replicas": "1",
+     "deployment.kubernetes.io/max-replicas": "2",
+     "deployment.kubernetes.io/revision": "1"
+    },
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "generation": 1,
+    "labels": {
+     "app": "web",
+     "pod-template-hash": "7bdb5997ff"
+    },
+    "name": "web-7bdb5997ff",
+    "namespace": "opscope-edge",
+    "ownerReferences": [
+     {
+      "apiVersion": "apps/v1",
+      "blockOwnerDeletion": true,
+      "controller": true,
+      "kind": "Deployment",
+      "name": "web",
+      "uid": "5a08e7ca-2030-4d90-8258-3de84f56fc53"
+     }
+    ],
+    "resourceVersion": "1280",
+    "uid": "8c7f6813-6b8e-40d9-948b-e6cc54950546"
+   },
+   "spec": {
+    "replicas": 1,
+    "selector": {
+     "matchLabels": {
+      "app": "web",
+      "pod-template-hash": "7bdb5997ff"
+     }
+    },
+    "template": {
+     "metadata": {
+      "labels": {
+       "app": "web",
+       "pod-template-hash": "7bdb5997ff"
+      }
+     },
+     "spec": {
+      "containers": [
+       {
+        "command": [
+         "httpd",
+         "-f",
+         "-p",
+         "8080"
+        ],
+        "image": "busybox:1.36",
+        "imagePullPolicy": "IfNotPresent",
+        "name": "web",
+        "ports": [
+         {
+          "containerPort": 8080,
+          "protocol": "TCP"
+         }
+        ],
+        "resources": {},
+        "terminationMessagePath": "/dev/termination-log",
+        "terminationMessagePolicy": "File"
+       }
+      ],
+      "dnsPolicy": "ClusterFirst",
+      "restartPolicy": "Always",
+      "schedulerName": "default-scheduler",
+      "securityContext": {},
+      "terminationGracePeriodSeconds": 30
+     }
+    }
+   },
+   "status": {
+    "fullyLabeledReplicas": 1,
+    "observedGeneration": 1,
+    "replicas": 1,
+    "terminatingReplicas": 1
+   }
+  },
+  {
+   "apiVersion": "v1",
+   "kind": "Service",
+   "metadata": {
+    "annotations": {},
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "name": "web",
+    "namespace": "opscope-edge",
+    "resourceVersion": "608",
+    "uid": "e8c3eccb-0b55-4289-9cdb-92a8cb647dc5"
+   },
+   "spec": {
+    "clusterIP": "10.96.247.248",
+    "clusterIPs": [
+     "10.96.247.248"
+    ],
+    "internalTrafficPolicy": "Cluster",
+    "ipFamilies": [
+     "IPv4"
+    ],
+    "ipFamilyPolicy": "SingleStack",
+    "ports": [
+     {
+      "port": 80,
+      "protocol": "TCP",
+      "targetPort": 8080
+     }
+    ],
+    "selector": {
+     "app": "web"
+    },
+    "sessionAffinity": "None",
+    "type": "ClusterIP"
+   },
+   "status": {
+    "loadBalancer": {}
+   }
+  },
+  {
+   "addressType": "IPv4",
+   "apiVersion": "discovery.k8s.io/v1",
+   "endpoints": [
+    {
+     "addresses": [
+      "10.244.1.2"
+     ],
+     "conditions": {
+      "ready": false,
+      "serving": false,
+      "terminating": true
+     },
+     "nodeName": "opscope-g7-worker",
+     "targetRef": {
+      "kind": "Pod",
+      "name": "web-7bdb5997ff-mvgmq",
+      "namespace": "opscope-edge",
+      "uid": "8f272451-9288-4c9f-b512-9d957329aa6a"
+     }
+    }
+   ],
+   "kind": "EndpointSlice",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "generateName": "web-",
+    "generation": 4,
+    "labels": {
+     "endpointslice.kubernetes.io/managed-by": "endpointslice-controller.k8s.io",
+     "kubernetes.io/service-name": "web"
+    },
+    "name": "web-9g6tt",
+    "namespace": "opscope-edge",
+    "ownerReferences": [
+     {
+      "apiVersion": "v1",
+      "blockOwnerDeletion": true,
+      "controller": true,
+      "kind": "Service",
+      "name": "web",
+      "uid": "e8c3eccb-0b55-4289-9cdb-92a8cb647dc5"
+     }
+    ],
+    "resourceVersion": "1251",
+    "uid": "f6dd758e-ef1e-4ce1-ac2c-19ad081cdc3d"
+   },
+   "ports": [
+    {
+     "name": "",
+     "port": 8080,
+     "protocol": "TCP"
+    }
+   ]
+  },
+  {
+   "apiVersion": "v1",
+   "data": {
+    "ca.crt": "-----BEGIN CERTIFICATE-----\nMIIDBTCCAe2gAwIBAgIILt7WYeKkhocwDQYJKoZIhvcNAQELBQAwFTETMBEGA1UE\nAxMKa3ViZXJuZXRlczAeFw0yNjEwMTIxNTA1MDFaFw0zNjEwMDkxNTEwMDFaMBUx\nEzARBgNVBAMTCmt1YmVybmV0ZXMwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK\nAoIBAQC2gK6Fu399J+s4EpijzDhdKwtKOnO81jcVOQayH+LPdMrtQ0Uuf7g9dCLx\nN2YMT6GpYcnmyoPi3MceEUVVoumkZ8zhI4FVx+s58zS89zfRUhdNRkqM7bZFr4nW\naifGx6BfZnHLVbgy75lO0iaoG7xJvwMhe7lV/31PlZVHDV4wJ8TiKh+O74KhgLgP\njitgCExqQU2z1qcYO3GbPwCpYwLBurt4mnVlhYr12foV44le3sIgnsW4HnI3XKlq\n9GUj2a3lpoIrnMTf1JRwbVRxWPMTQJdXEhgFWhZnRiD1gx3cPUw9HlWx8iNOiTBO\np0SIp1luhpfWeUnLAiAY4z95nxUtAgMBAAGjWTBXMA4GA1UdDwEB/wQEAwICpDAP\nBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBRrGLMfVJJn2OfHDa7x9hBQ19rU8TAV\nBgNVHREEDjAMggprdWJlcm5ldGVzMA0GCSqGSIb3DQEBCwUAA4IBAQCLh3b2kPBM\nRqXvU4FjvJ0MYT2PyBEnUWcBat8FhQAPt3oWSBv9tpEla7vn9DI/VEzJ010f8wXk\nS9lLvE9Pbk42KCBxx8lXTP81f2RsL5N/wwjUZxTYNHUmNZFc53vW6RPVnEAFWHXS\nYr7xIavHf0rzO24V8GFgEmv8zLbaLeQbUWHOF+eusH899PepEc4BszhqE3uwd08I\nDBi07Gty1WRUAs7pI93HsVZHKvxAdHd3qPscv48zK6TdcWvLWP0k1SPwx635fdXv\nRIX1KVzJxPvfB+bd9mJV72QB9uZ02bcIiTljxU5sNx8wqtko6LDwt2TrzvR7Y6Hd\nysNv7BE752Ow\n-----END CERTIFICATE-----\n"
+   },
+   "kind": "ConfigMap",
+   "metadata": {
+    "annotations": {
+     "kubernetes.io/description": "Contains a CA bundle that can be used to verify the kube-apiserver when using internal endpoints such as the internal service IP or kubernetes.default.svc. No other usage is guaranteed across distributions of Kubernetes clusters."
+    },
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "name": "kube-root-ca.crt",
+    "namespace": "opscope-edge",
+    "resourceVersion": "597",
+    "uid": "8b19e740-bc7d-44d8-80a0-82eb26a3dad0"
+   }
+  },
+  {
+   "apiVersion": "v1",
+   "kind": "ServiceAccount",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "name": "default",
+    "namespace": "opscope-edge",
+    "resourceVersion": "598",
+    "uid": "7a7ca8d9-7d99-405e-b140-cc3e71a79f21"
+   }
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:18Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "web-7bdb5997ff-mvgmq",
+    "namespace": "opscope-edge",
+    "resourceVersion": "607",
+    "uid": "8f272451-9288-4c9f-b512-9d957329aa6a"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:18Z",
+   "message": "Successfully assigned opscope-edge/web-7bdb5997ff-mvgmq to opscope-g7-worker",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "name": "web-7bdb5997ff-mvgmq.18ddd0de124af38e",
+    "namespace": "opscope-edge",
+    "resourceVersion": "615",
+    "uid": "06d93f81-e27c-4d2c-a880-f85ded42ea98"
+   },
+   "reason": "Scheduled",
+   "reportingComponent": "default-scheduler",
+   "reportingInstance": "",
+   "source": {
+    "component": "default-scheduler"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:19Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "fieldPath": "spec.containers{web}",
+    "kind": "Pod",
+    "name": "web-7bdb5997ff-mvgmq",
+    "namespace": "opscope-edge",
+    "resourceVersion": "610",
+    "uid": "8f272451-9288-4c9f-b512-9d957329aa6a"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:19Z",
+   "message": "Pulling image \"busybox:1.36\"",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:19Z",
+    "name": "web-7bdb5997ff-mvgmq.18ddd0de27d87b5a",
+    "namespace": "opscope-edge",
+    "resourceVersion": "668",
+    "uid": "b21b5e48-15c0-4389-a1dc-5dc495e77969"
+   },
+   "reason": "Pulling",
+   "reportingComponent": "kubelet",
+   "reportingInstance": "opscope-g7-worker",
+   "source": {
+    "component": "kubelet",
+    "host": "opscope-g7-worker"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:24Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "fieldPath": "spec.containers{web}",
+    "kind": "Pod",
+    "name": "web-7bdb5997ff-mvgmq",
+    "namespace": "opscope-edge",
+    "resourceVersion": "610",
+    "uid": "8f272451-9288-4c9f-b512-9d957329aa6a"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:24Z",
+   "message": "Successfully pulled image \"busybox:1.36\" in 5.551s (5.551s including waiting). Image size: 1906887 bytes.",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:24Z",
+    "name": "web-7bdb5997ff-mvgmq.18ddd0df72c15a27",
+    "namespace": "opscope-edge",
+    "resourceVersion": "678",
+    "uid": "97bda02b-d08c-458c-b2e4-4e90883411db"
+   },
+   "reason": "Pulled",
+   "reportingComponent": "kubelet",
+   "reportingInstance": "opscope-g7-worker",
+   "source": {
+    "component": "kubelet",
+    "host": "opscope-g7-worker"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:24Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "fieldPath": "spec.containers{web}",
+    "kind": "Pod",
+    "name": "web-7bdb5997ff-mvgmq",
+    "namespace": "opscope-edge",
+    "resourceVersion": "610",
+    "uid": "8f272451-9288-4c9f-b512-9d957329aa6a"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:24Z",
+   "message": "Container created",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:24Z",
+    "name": "web-7bdb5997ff-mvgmq.18ddd0df73513dc4",
+    "namespace": "opscope-edge",
+    "resourceVersion": "679",
+    "uid": "773324dc-c243-4017-b5ea-146b389e3357"
+   },
+   "reason": "Created",
+   "reportingComponent": "kubelet",
+   "reportingInstance": "opscope-g7-worker",
+   "source": {
+    "component": "kubelet",
+    "host": "opscope-g7-worker"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:24Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "fieldPath": "spec.containers{web}",
+    "kind": "Pod",
+    "name": "web-7bdb5997ff-mvgmq",
+    "namespace": "opscope-edge",
+    "resourceVersion": "610",
+    "uid": "8f272451-9288-4c9f-b512-9d957329aa6a"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:24Z",
+   "message": "Container started",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:24Z",
+    "name": "web-7bdb5997ff-mvgmq.18ddd0df76354437",
+    "namespace": "opscope-edge",
+    "resourceVersion": "680",
+    "uid": "bef0233d-f93a-431d-9108-96534d65f2b1"
+   },
+   "reason": "Started",
+   "reportingComponent": "kubelet",
+   "reportingInstance": "opscope-g7-worker",
+   "source": {
+    "component": "kubelet",
+    "host": "opscope-g7-worker"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:12:42Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "web-7bdb5997ff-mvgmq",
+    "namespace": "opscope-edge",
+    "resourceVersion": "682",
+    "uid": "8f272451-9288-4c9f-b512-9d957329aa6a"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:12:42Z",
+   "message": "Node is not ready",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:12:42Z",
+    "name": "web-7bdb5997ff-mvgmq.18ddd0f183919bf6",
+    "namespace": "opscope-edge",
+    "resourceVersion": "823",
+    "uid": "91d802cc-cc08-4376-a6a7-2fe26c935c8a"
+   },
+   "reason": "NodeNotReady",
+   "reportingComponent": "node-controller",
+   "reportingInstance": "",
+   "source": {
+    "component": "node-controller"
+   },
+   "type": "Warning"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:17:42Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "web-7bdb5997ff-mvgmq",
+    "namespace": "opscope-edge"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:17:42Z",
+   "message": "Marking for deletion Pod opscope-edge/web-7bdb5997ff-mvgmq",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:17:42Z",
+    "name": "web-7bdb5997ff-mvgmq.18ddd1375ec7123f",
+    "namespace": "opscope-edge",
+    "resourceVersion": "1239",
+    "uid": "a8dc84e7-44e8-411a-a22a-eefb66102206"
+   },
+   "reason": "TaintManagerEviction",
+   "reportingComponent": "taint-eviction-controller",
+   "reportingInstance": "",
+   "source": {
+    "component": "taint-eviction-controller"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:17:42Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "web-7bdb5997ff-xjmlp",
+    "namespace": "opscope-edge",
+    "resourceVersion": "1274",
+    "uid": "1c150ae9-1bb7-4d7f-8d38-51367edacbc8"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:17:42Z",
+   "message": "0/2 nodes are available: 2 node(s) had untolerated taint(s). no new claims to deallocate, preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling.",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:17:42Z",
+    "name": "web-7bdb5997ff-xjmlp.18ddd13765807701",
+    "namespace": "opscope-edge",
+    "resourceVersion": "1276",
+    "uid": "f8dfebf3-4fe9-4ca8-95a4-8f521ae0cfcf"
+   },
+   "reason": "FailedScheduling",
+   "reportingComponent": "default-scheduler",
+   "reportingInstance": "",
+   "source": {
+    "component": "default-scheduler"
+   },
+   "type": "Warning"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:18Z",
+   "involvedObject": {
+    "apiVersion": "apps/v1",
+    "kind": "ReplicaSet",
+    "name": "web-7bdb5997ff",
+    "namespace": "opscope-edge",
+    "resourceVersion": "603",
+    "uid": "8c7f6813-6b8e-40d9-948b-e6cc54950546"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:18Z",
+   "message": "Created pod: web-7bdb5997ff-mvgmq",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "name": "web-7bdb5997ff.18ddd0de121e9264",
+    "namespace": "opscope-edge",
+    "resourceVersion": "609",
+    "uid": "24bd1ab4-16c2-45fb-a343-a7990596b4a2"
+   },
+   "reason": "SuccessfulCreate",
+   "reportingComponent": "replicaset-controller",
+   "reportingInstance": "",
+   "source": {
+    "component": "replicaset-controller"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:17:42Z",
+   "involvedObject": {
+    "apiVersion": "apps/v1",
+    "kind": "ReplicaSet",
+    "name": "web-7bdb5997ff",
+    "namespace": "opscope-edge",
+    "resourceVersion": "826",
+    "uid": "8c7f6813-6b8e-40d9-948b-e6cc54950546"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:17:42Z",
+   "message": "Created pod: web-7bdb5997ff-xjmlp",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:17:42Z",
+    "name": "web-7bdb5997ff.18ddd137657f2a52",
+    "namespace": "opscope-edge",
+    "resourceVersion": "1275",
+    "uid": "098d13ad-4d66-43d5-ba0a-37e3fb4af498"
+   },
+   "reason": "SuccessfulCreate",
+   "reportingComponent": "replicaset-controller",
+   "reportingInstance": "",
+   "source": {
+    "component": "replicaset-controller"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:18Z",
+   "involvedObject": {
+    "apiVersion": "apps/v1",
+    "kind": "Deployment",
+    "name": "web",
+    "namespace": "opscope-edge",
+    "resourceVersion": "602",
+    "uid": "5a08e7ca-2030-4d90-8258-3de84f56fc53"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:18Z",
+   "message": "Scaled up replica set web-7bdb5997ff from 0 to 1",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "name": "web.18ddd0de11f3b6b6",
+    "namespace": "opscope-edge",
+    "resourceVersion": "605",
+    "uid": "d5224524-6dd9-4ed0-9263-305565f65231"
+   },
+   "reason": "ScalingReplicaSet",
+   "reportingComponent": "deployment-controller",
+   "reportingInstance": "",
+   "source": {
+    "component": "deployment-controller"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "gateway.networking.k8s.io/v1",
+   "kind": "Gateway",
+   "metadata": {
+    "annotations": {},
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "generation": 1,
+    "name": "edge",
+    "namespace": "opscope-edge",
+    "resourceVersion": "633",
+    "uid": "93fac780-a1e3-4e08-aaec-e6d8505346d4"
+   },
+   "spec": {
+    "gatewayClassName": "opscope-nobody",
+    "listeners": [
+     {
+      "allowedRoutes": {
+       "namespaces": {
+        "from": "All"
+       }
+      },
+      "name": "http",
+      "port": 80,
+      "protocol": "HTTP"
+     }
+    ]
+   },
+   "status": {
+    "conditions": [
+     {
+      "lastTransitionTime": "1970-01-01T00:00:00Z",
+      "message": "Waiting for controller",
+      "reason": "Pending",
+      "status": "Unknown",
+      "type": "Accepted"
+     },
+     {
+      "lastTransitionTime": "1970-01-01T00:00:00Z",
+      "message": "Waiting for controller",
+      "reason": "Pending",
+      "status": "Unknown",
+      "type": "Programmed"
+     }
+    ]
+   }
+  },
+  {
+   "apiVersion": "gateway.networking.k8s.io/v1",
+   "kind": "HTTPRoute",
+   "metadata": {
+    "annotations": {},
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "generation": 1,
+    "name": "catalog",
+    "namespace": "opscope-edge",
+    "resourceVersion": "635",
+    "uid": "25d7156e-4715-4a6c-a969-7b7c3523fafe"
+   },
+   "spec": {
+    "parentRefs": [
+     {
+      "group": "gateway.networking.k8s.io",
+      "kind": "Gateway",
+      "name": "edge"
+     }
+    ],
+    "rules": [
+     {
+      "backendRefs": [
+       {
+        "group": "",
+        "kind": "Service",
+        "name": "catalog",
+        "namespace": "opscope-backends",
+        "port": 80,
+        "weight": 1
+       }
+      ],
+      "matches": [
+       {
+        "path": {
+         "type": "PathPrefix",
+         "value": "/"
+        }
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "apiVersion": "gateway.networking.k8s.io/v1",
+   "kind": "HTTPRoute",
+   "metadata": {
+    "annotations": {},
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "generation": 1,
+    "name": "reviews",
+    "namespace": "opscope-edge",
+    "resourceVersion": "636",
+    "uid": "6c8296bb-2983-40bc-83d9-478afd869dc3"
+   },
+   "spec": {
+    "parentRefs": [
+     {
+      "group": "gateway.networking.k8s.io",
+      "kind": "Gateway",
+      "name": "edge"
+     }
+    ],
+    "rules": [
+     {
+      "backendRefs": [
+       {
+        "group": "",
+        "kind": "Service",
+        "name": "reviews",
+        "namespace": "opscope-backends",
+        "port": 80,
+        "weight": 1
+       }
+      ],
+      "matches": [
+       {
+        "path": {
+         "type": "PathPrefix",
+         "value": "/"
+        }
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "apiVersion": "gateway.networking.k8s.io/v1",
+   "kind": "HTTPRoute",
+   "metadata": {
+    "annotations": {},
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "generation": 1,
+    "name": "shop",
+    "namespace": "opscope-edge",
+    "resourceVersion": "634",
+    "uid": "2a3ccfeb-72ce-4868-ba40-f40ddc41e655"
+   },
+   "spec": {
+    "parentRefs": [
+     {
+      "group": "gateway.networking.k8s.io",
+      "kind": "Gateway",
+      "name": "edge"
+     }
+    ],
+    "rules": [
+     {
+      "backendRefs": [
+       {
+        "group": "",
+        "kind": "Service",
+        "name": "web",
+        "port": 80,
+        "weight": 1
+       }
+      ],
+      "matches": [
+       {
+        "path": {
+         "type": "PathPrefix",
+         "value": "/"
+        }
+       }
+      ]
+     },
+     {
+      "backendRefs": [
+       {
+        "group": "",
+        "kind": "Service",
+        "name": "api",
+        "port": 80,
+        "weight": 1
+       }
+      ],
+      "matches": [
+       {
+        "path": {
+         "type": "PathPrefix",
+         "value": "/api"
+        }
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "apiVersion": "v1",
+   "kind": "Namespace",
+   "metadata": {
+    "annotations": {},
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "labels": {
+     "kubernetes.io/metadata.name": "opscope-edge"
+    },
+    "name": "opscope-edge",
+    "resourceVersion": "596",
+    "uid": "86be361e-38a4-48ce-b747-7906242ba5d4"
+   },
+   "spec": {
+    "finalizers": [
+     "kubernetes"
+    ]
+   },
+   "status": {
+    "phase": "Active"
+   }
+  },
+  {
+   "apiVersion": "v1",
+   "kind": "Pod",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:19Z",
+    "deletionGracePeriodSeconds": 30,
+    "deletionTimestamp": "2026-10-12T15:18:12Z",
+    "generateName": "catalog-64b7d596ff-",
+    "generation": 2,
+    "labels": {
+     "app": "catalog",
+     "pod-template-hash": "64b7d596ff"
+    },
+    "name": "catalog-64b7d596ff-bs7nj",
+    "namespace": "opscope-backends",
+    "ownerReferences": [
+     {
+      "apiVersion": "apps/v1",
+      "blockOwnerDeletion": true,
+      "controller": true,
+      "kind": "ReplicaSet",
+      "name": "catalog-64b7d596ff",
+      "uid": "d5066559-b994-4af3-acb5-5d01ca42ce51"
+     }
+    ],
+    "resourceVersion": "1241",
+    "uid": "2867225f-0d90-4837-acc3-eeae42ed7d4f"
+   },
+   "spec": {
+    "containers": [
+     {
+      "command": [
+       "httpd",
+       "-f",
+       "-p",
+       "8080"
+      ],
+      "image": "busybox:1.36",
+      "imagePullPolicy": "IfNotPresent",
+      "name": "catalog",
+      "ports": [
+       {
+        "containerPort": 8080,
+        "protocol": "TCP"
+       }
+      ],
+      "resources": {},
+      "terminationMessagePath": "/dev/termination-log",
+      "terminationMessagePolicy": "File",
+      "volumeMounts": [
+       {
+        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+        "name": "kube-api-access-kt96j",
+        "readOnly": true
+       }
+      ]
+     }
+    ],
+    "dnsPolicy": "ClusterFirst",
+    "enableServiceLinks": true,
+    "nodeName": "opscope-g7-worker",
+    "preemptionPolicy": "PreemptLowerPriority",
+    "priority": 0,
+    "restartPolicy": "Always",
+    "schedulerName": "default-scheduler",
+    "securityContext": {},
+    "serviceAccount": "default",
+    "serviceAccountName": "default",
+    "terminationGracePeriodSeconds": 30,
+    "tolerations": [
+     {
+      "effect": "NoExecute",
+      "key": "node.kubernetes.io/not-ready",
+      "operator": "Exists",
+      "tolerationSeconds": 300
+     },
+     {
+      "effect": "NoExecute",
+      "key": "node.kubernetes.io/unreachable",
+      "operator": "Exists",
+      "tolerationSeconds": 300
+     }
+    ],
+    "volumes": [
+     {
+      "name": "kube-api-access-kt96j",
+      "projected": {
+       "defaultMode": 420,
+       "sources": [
+        {
+         "serviceAccountToken": {
+          "expirationSeconds": 3607,
+          "path": "token"
+         }
+        },
+        {
+         "configMap": {
+          "items": [
+           {
+            "key": "ca.crt",
+            "path": "ca.crt"
+           }
+          ],
+          "name": "kube-root-ca.crt"
+         }
+        },
+        {
+         "downwardAPI": {
+          "items": [
+           {
+            "fieldRef": {
+             "apiVersion": "v1",
+             "fieldPath": "metadata.namespace"
+            },
+            "path": "namespace"
+           }
+          ]
+         }
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "status": {
+    "conditions": [
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:11:26Z",
+      "observedGeneration": 1,
+      "status": "True",
+      "type": "PodReadyToStartContainers"
+     },
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:11:19Z",
+      "observedGeneration": 1,
+      "status": "True",
+      "type": "Initialized"
+     },
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:12:42Z",
+      "observedGeneration": 1,
+      "status": "False",
+      "type": "Ready"
+     },
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:11:26Z",
+      "observedGeneration": 1,
+      "status": "True",
+      "type": "ContainersReady"
+     },
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:11:19Z",
+      "observedGeneration": 1,
+      "status": "True",
+      "type": "PodScheduled"
+     },
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:17:42Z",
+      "message": "Taint manager: deleting due to NoExecute taint",
+      "observedGeneration": 1,
+      "reason": "DeletionByTaintManager",
+      "status": "True",
+      "type": "DisruptionTarget"
+     }
+    ],
+    "containerStatuses": [
+     {
+      "containerID": "containerd://81774bc8edf51d062bca8b7c17ba8f1ac6414c57f2752f3a0908adb878bead88",
+      "image": "docker.io/library/busybox:1.36",
+      "imageID": "docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662",
+      "lastState": {},
+      "name": "catalog",
+      "ready": true,
+      "resources": {},
+      "restartCount": 0,
+      "started": true,
+      "state": {
+       "running": {
+        "startedAt": "2026-10-12T15:11:26Z"
+       }
+      },
+      "user": {
+       "linux": {
+        "gid": 0,
+        "supplementalGroups": [
+         0,
+         10
+        ],
+        "uid": 0
+       }
+      },
+      "volumeMounts": [
+       {
+        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+        "name": "kube-api-access-kt96j",
+        "readOnly": true,
+        "recursiveReadOnly": "Disabled"
+       }
+      ]
+     }
+    ],
+    "hostIP": "172.18.0.4",
+    "hostIPs": [
+     {
+      "ip": "172.18.0.4"
+     }
+    ],
+    "observedGeneration": 1,
+    "phase": "Running",
+    "podIP": "10.244.1.3",
+    "podIPs": [
+     {
+      "ip": "10.244.1.3"
+     }
+    ],
+    "qosClass": "BestEffort",
+    "startTime": "2026-10-12T15:11:19Z"
+   }
+  },
+  {
+   "apiVersion": "v1",
+   "kind": "Pod",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:17:42Z",
+    "generateName": "catalog-64b7d596ff-",
+    "generation": 1,
+    "labels": {
+     "app": "catalog",
+     "pod-template-hash": "64b7d596ff"
+    },
+    "name": "catalog-64b7d596ff-dg2n7",
+    "namespace": "opscope-backends",
+    "ownerReferences": [
+     {
+      "apiVersion": "apps/v1",
+      "blockOwnerDeletion": true,
+      "controller": true,
+      "kind": "ReplicaSet",
+      "name": "catalog-64b7d596ff",
+      "uid": "d5066559-b994-4af3-acb5-5d01ca42ce51"
+     }
+    ],
+    "resourceVersion": "1257",
+    "uid": "cd260e2c-17a4-496d-9bcc-a44581615c36"
+   },
+   "spec": {
+    "containers": [
+     {
+      "command": [
+       "httpd",
+       "-f",
+       "-p",
+       "8080"
+      ],
+      "image": "busybox:1.36",
+      "imagePullPolicy": "IfNotPresent",
+      "name": "catalog",
+      "ports": [
+       {
+        "containerPort": 8080,
+        "protocol": "TCP"
+       }
+      ],
+      "resources": {},
+      "terminationMessagePath": "/dev/termination-log",
+      "terminationMessagePolicy": "File",
+      "volumeMounts": [
+       {
+        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+        "name": "kube-api-access-xkng8",
+        "readOnly": true
+       }
+      ]
+     }
+    ],
+    "dnsPolicy": "ClusterFirst",
+    "enableServiceLinks": true,
+    "preemptionPolicy": "PreemptLowerPriority",
+    "priority": 0,
+    "restartPolicy": "Always",
+    "schedulerName": "default-scheduler",
+    "securityContext": {},
+    "serviceAccount": "default",
+    "serviceAccountName": "default",
+    "terminationGracePeriodSeconds": 30,
+    "tolerations": [
+     {
+      "effect": "NoExecute",
+      "key": "node.kubernetes.io/not-ready",
+      "operator": "Exists",
+      "tolerationSeconds": 300
+     },
+     {
+      "effect": "NoExecute",
+      "key": "node.kubernetes.io/unreachable",
+      "operator": "Exists",
+      "tolerationSeconds": 300
+     }
+    ],
+    "volumes": [
+     {
+      "name": "kube-api-access-xkng8",
+      "projected": {
+       "defaultMode": 420,
+       "sources": [
+        {
+         "serviceAccountToken": {
+          "expirationSeconds": 3607,
+          "path": "token"
+         }
+        },
+        {
+         "configMap": {
+          "items": [
+           {
+            "key": "ca.crt",
+            "path": "ca.crt"
+           }
+          ],
+          "name": "kube-root-ca.crt"
+         }
+        },
+        {
+         "downwardAPI": {
+          "items": [
+           {
+            "fieldRef": {
+             "apiVersion": "v1",
+             "fieldPath": "metadata.namespace"
+            },
+            "path": "namespace"
+           }
+          ]
+         }
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "status": {
+    "conditions": [
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:17:42Z",
+      "message": "0/2 nodes are available: 2 node(s) had untolerated taint(s). no new claims to deallocate, preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling.",
+      "observedGeneration": 1,
+      "reason": "Unschedulable",
+      "status": "False",
+      "type": "PodScheduled"
+     }
+    ],
+    "phase": "Pending",
+    "qosClass": "BestEffort"
+   }
+  },
+  {
+   "apiVersion": "apps/v1",
+   "kind": "Deployment",
+   "metadata": {
+    "annotations": {
+     "deployment.kubernetes.io/revision": "1"
+    },
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "generation": 1,
+    "name": "catalog",
+    "namespace": "opscope-backends",
+    "resourceVersion": "1266",
+    "uid": "c75d3eda-2456-4f68-bead-2db78b67937c"
+   },
+   "spec": {
+    "progressDeadlineSeconds": 600,
+    "replicas": 1,
+    "revisionHistoryLimit": 10,
+    "selector": {
+     "matchLabels": {
+      "app": "catalog"
+     }
+    },
+    "strategy": {
+     "rollingUpdate": {
+      "maxSurge": "25%",
+      "maxUnavailable": "25%"
+     },
+     "type": "RollingUpdate"
+    },
+    "template": {
+     "metadata": {
+      "labels": {
+       "app": "catalog"
+      }
+     },
+     "spec": {
+      "containers": [
+       {
+        "command": [
+         "httpd",
+         "-f",
+         "-p",
+         "8080"
+        ],
+        "image": "busybox:1.36",
+        "imagePullPolicy": "IfNotPresent",
+        "name": "catalog",
+        "ports": [
+         {
+          "containerPort": 8080,
+          "protocol": "TCP"
+         }
+        ],
+        "resources": {},
+        "terminationMessagePath": "/dev/termination-log",
+        "terminationMessagePolicy": "File"
+       }
+      ],
+      "dnsPolicy": "ClusterFirst",
+      "restartPolicy": "Always",
+      "schedulerName": "default-scheduler",
+      "securityContext": {},
+      "terminationGracePeriodSeconds": 30
+     }
+    }
+   },
+   "status": {
+    "conditions": [
+     {
+      "lastTransitionTime": "2026-10-12T15:11:18Z",
+      "lastUpdateTime": "2026-10-12T15:11:26Z",
+      "message": "ReplicaSet \"catalog-64b7d596ff\" has successfully progressed.",
+      "reason": "NewReplicaSetAvailable",
+      "status": "True",
+      "type": "Progressing"
+     },
+     {
+      "lastTransitionTime": "2026-10-12T15:12:42Z",
+      "lastUpdateTime": "2026-10-12T15:12:42Z",
+      "message": "Deployment does not have minimum availability.",
+      "reason": "MinimumReplicasUnavailable",
+      "status": "False",
+      "type": "Available"
+     }
+    ],
+    "observedGeneration": 1,
+    "replicas": 1,
+    "terminatingReplicas": 1,
+    "unavailableReplicas": 1,
+    "updatedReplicas": 1
+   }
+  },
+  {
+   "apiVersion": "apps/v1",
+   "kind": "ReplicaSet",
+   "metadata": {
+    "annotations": {
+     "deployment.kubernetes.io/desired-replicas": "1",
+     "deployment.kubernetes.io/max-replicas": "2",
+     "deployment.kubernetes.io/revision": "1"
+    },
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "generation": 1,
+    "labels": {
+     "app": "catalog",
+     "pod-template-hash": "64b7d596ff"
+    },
+    "name": "catalog-64b7d596ff",
+    "namespace": "opscope-backends",
+    "ownerReferences": [
+     {
+      "apiVersion": "apps/v1",
+      "blockOwnerDeletion": true,
+      "controller": true,
+      "kind": "Deployment",
+      "name": "catalog",
+      "uid": "c75d3eda-2456-4f68-bead-2db78b67937c"
+     }
+    ],
+    "resourceVersion": "1262",
+    "uid": "d5066559-b994-4af3-acb5-5d01ca42ce51"
+   },
+   "spec": {
+    "replicas": 1,
+    "selector": {
+     "matchLabels": {
+      "app": "catalog",
+      "pod-template-hash": "64b7d596ff"
+     }
+    },
+    "template": {
+     "metadata": {
+      "labels": {
+       "app": "catalog",
+       "pod-template-hash": "64b7d596ff"
+      }
+     },
+     "spec": {
+      "containers": [
+       {
+        "command": [
+         "httpd",
+         "-f",
+         "-p",
+         "8080"
+        ],
+        "image": "busybox:1.36",
+        "imagePullPolicy": "IfNotPresent",
+        "name": "catalog",
+        "ports": [
+         {
+          "containerPort": 8080,
+          "protocol": "TCP"
+         }
+        ],
+        "resources": {},
+        "terminationMessagePath": "/dev/termination-log",
+        "terminationMessagePolicy": "File"
+       }
+      ],
+      "dnsPolicy": "ClusterFirst",
+      "restartPolicy": "Always",
+      "schedulerName": "default-scheduler",
+      "securityContext": {},
+      "terminationGracePeriodSeconds": 30
+     }
+    }
+   },
+   "status": {
+    "fullyLabeledReplicas": 1,
+    "observedGeneration": 1,
+    "replicas": 1,
+    "terminatingReplicas": 1
+   }
+  },
+  {
+   "apiVersion": "v1",
+   "kind": "Service",
+   "metadata": {
+    "annotations": {},
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "name": "catalog",
+    "namespace": "opscope-backends",
+    "resourceVersion": "624",
+    "uid": "6213851f-74eb-4847-bc87-933e84c37fe3"
+   },
+   "spec": {
+    "clusterIP": "10.96.139.59",
+    "clusterIPs": [
+     "10.96.139.59"
+    ],
+    "internalTrafficPolicy": "Cluster",
+    "ipFamilies": [
+     "IPv4"
+    ],
+    "ipFamilyPolicy": "SingleStack",
+    "ports": [
+     {
+      "port": 80,
+      "protocol": "TCP",
+      "targetPort": 8080
+     }
+    ],
+    "selector": {
+     "app": "catalog"
+    },
+    "sessionAffinity": "None",
+    "type": "ClusterIP"
+   },
+   "status": {
+    "loadBalancer": {}
+   }
+  },
+  {
+   "apiVersion": "v1",
+   "kind": "Service",
+   "metadata": {
+    "annotations": {},
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "name": "reviews",
+    "namespace": "opscope-backends",
+    "resourceVersion": "629",
+    "uid": "c1e03f16-f373-4aa6-b48d-1611f0f80af6"
+   },
+   "spec": {
+    "clusterIP": "10.96.210.181",
+    "clusterIPs": [
+     "10.96.210.181"
+    ],
+    "internalTrafficPolicy": "Cluster",
+    "ipFamilies": [
+     "IPv4"
+    ],
+    "ipFamilyPolicy": "SingleStack",
+    "ports": [
+     {
+      "port": 80,
+      "protocol": "TCP",
+      "targetPort": 8080
+     }
+    ],
+    "selector": {
+     "app": "catalog"
+    },
+    "sessionAffinity": "None",
+    "type": "ClusterIP"
+   },
+   "status": {
+    "loadBalancer": {}
+   }
+  },
+  {
+   "addressType": "IPv4",
+   "apiVersion": "discovery.k8s.io/v1",
+   "endpoints": [
+    {
+     "addresses": [
+      "10.244.1.3"
+     ],
+     "conditions": {
+      "ready": false,
+      "serving": false,
+      "terminating": true
+     },
+     "nodeName": "opscope-g7-worker",
+     "targetRef": {
+      "kind": "Pod",
+      "name": "catalog-64b7d596ff-bs7nj",
+      "namespace": "opscope-backends",
+      "uid": "2867225f-0d90-4837-acc3-eeae42ed7d4f"
+     }
+    }
+   ],
+   "kind": "EndpointSlice",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "generateName": "catalog-",
+    "generation": 4,
+    "labels": {
+     "endpointslice.kubernetes.io/managed-by": "endpointslice-controller.k8s.io",
+     "kubernetes.io/service-name": "catalog"
+    },
+    "name": "catalog-mrqnk",
+    "namespace": "opscope-backends",
+    "ownerReferences": [
+     {
+      "apiVersion": "v1",
+      "blockOwnerDeletion": true,
+      "controller": true,
+      "kind": "Service",
+      "name": "catalog",
+      "uid": "6213851f-74eb-4847-bc87-933e84c37fe3"
+     }
+    ],
+    "resourceVersion": "1245",
+    "uid": "9634ce30-cd00-47aa-b4a4-b1c4f174b342"
+   },
+   "ports": [
+    {
+     "name": "",
+     "port": 8080,
+     "protocol": "TCP"
+    }
+   ]
+  },
+  {
+   "addressType": "IPv4",
+   "apiVersion": "discovery.k8s.io/v1",
+   "endpoints": [
+    {
+     "addresses": [
+      "10.244.1.3"
+     ],
+     "conditions": {
+      "ready": false,
+      "serving": false,
+      "terminating": true
+     },
+     "nodeName": "opscope-g7-worker",
+     "targetRef": {
+      "kind": "Pod",
+      "name": "catalog-64b7d596ff-bs7nj",
+      "namespace": "opscope-backends",
+      "uid": "2867225f-0d90-4837-acc3-eeae42ed7d4f"
+     }
+    }
+   ],
+   "kind": "EndpointSlice",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "generateName": "reviews-",
+    "generation": 4,
+    "labels": {
+     "endpointslice.kubernetes.io/managed-by": "endpointslice-controller.k8s.io",
+     "kubernetes.io/service-name": "reviews"
+    },
+    "name": "reviews-lx79m",
+    "namespace": "opscope-backends",
+    "ownerReferences": [
+     {
+      "apiVersion": "v1",
+      "blockOwnerDeletion": true,
+      "controller": true,
+      "kind": "Service",
+      "name": "reviews",
+      "uid": "c1e03f16-f373-4aa6-b48d-1611f0f80af6"
+     }
+    ],
+    "resourceVersion": "1247",
+    "uid": "9642036c-1c73-4c97-a9e8-7dfc5a7ad0fa"
+   },
+   "ports": [
+    {
+     "name": "",
+     "port": 8080,
+     "protocol": "TCP"
+    }
+   ]
+  },
+  {
+   "apiVersion": "v1",
+   "data": {
+    "ca.crt": "-----BEGIN CERTIFICATE-----\nMIIDBTCCAe2gAwIBAgIILt7WYeKkhocwDQYJKoZIhvcNAQELBQAwFTETMBEGA1UE\nAxMKa3ViZXJuZXRlczAeFw0yNjEwMTIxNTA1MDFaFw0zNjEwMDkxNTEwMDFaMBUx\nEzARBgNVBAMTCmt1YmVybmV0ZXMwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK\nAoIBAQC2gK6Fu399J+s4EpijzDhdKwtKOnO81jcVOQayH+LPdMrtQ0Uuf7g9dCLx\nN2YMT6GpYcnmyoPi3MceEUVVoumkZ8zhI4FVx+s58zS89zfRUhdNRkqM7bZFr4nW\naifGx6BfZnHLVbgy75lO0iaoG7xJvwMhe7lV/31PlZVHDV4wJ8TiKh+O74KhgLgP\njitgCExqQU2z1qcYO3GbPwCpYwLBurt4mnVlhYr12foV44le3sIgnsW4HnI3XKlq\n9GUj2a3lpoIrnMTf1JRwbVRxWPMTQJdXEhgFWhZnRiD1gx3cPUw9HlWx8iNOiTBO\np0SIp1luhpfWeUnLAiAY4z95nxUtAgMBAAGjWTBXMA4GA1UdDwEB/wQEAwICpDAP\nBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBRrGLMfVJJn2OfHDa7x9hBQ19rU8TAV\nBgNVHREEDjAMggprdWJlcm5ldGVzMA0GCSqGSIb3DQEBCwUAA4IBAQCLh3b2kPBM\nRqXvU4FjvJ0MYT2PyBEnUWcBat8FhQAPt3oWSBv9tpEla7vn9DI/VEzJ010f8wXk\nS9lLvE9Pbk42KCBxx8lXTP81f2RsL5N/wwjUZxTYNHUmNZFc53vW6RPVnEAFWHXS\nYr7xIavHf0rzO24V8GFgEmv8zLbaLeQbUWHOF+eusH899PepEc4BszhqE3uwd08I\nDBi07Gty1WRUAs7pI93HsVZHKvxAdHd3qPscv48zK6TdcWvLWP0k1SPwx635fdXv\nRIX1KVzJxPvfB+bd9mJV72QB9uZ02bcIiTljxU5sNx8wqtko6LDwt2TrzvR7Y6Hd\nysNv7BE752Ow\n-----END CERTIFICATE-----\n"
+   },
+   "kind": "ConfigMap",
+   "metadata": {
+    "annotations": {
+     "kubernetes.io/description": "Contains a CA bundle that can be used to verify the kube-apiserver when using internal endpoints such as the internal service IP or kubernetes.default.svc. No other usage is guaranteed across distributions of Kubernetes clusters."
+    },
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "name": "kube-root-ca.crt",
+    "namespace": "opscope-backends",
+    "resourceVersion": "600",
+    "uid": "2b794ecd-f7c0-4505-a004-82de48266b1b"
+   }
+  },
+  {
+   "apiVersion": "v1",
+   "kind": "ServiceAccount",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "name": "default",
+    "namespace": "opscope-backends",
+    "resourceVersion": "601",
+    "uid": "d5cbf3c4-d06e-4fd2-936a-29f6101f774b"
+   }
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:19Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "catalog-64b7d596ff-bs7nj",
+    "namespace": "opscope-backends",
+    "resourceVersion": "639",
+    "uid": "2867225f-0d90-4837-acc3-eeae42ed7d4f"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:19Z",
+   "message": "Successfully assigned opscope-backends/catalog-64b7d596ff-bs7nj to opscope-g7-worker",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:19Z",
+    "name": "catalog-64b7d596ff-bs7nj.18ddd0de1838d996",
+    "namespace": "opscope-backends",
+    "resourceVersion": "643",
+    "uid": "519b477c-cec1-40cc-99c8-cf1fd224dcf4"
+   },
+   "reason": "Scheduled",
+   "reportingComponent": "default-scheduler",
+   "reportingInstance": "",
+   "source": {
+    "component": "default-scheduler"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:19Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "fieldPath": "spec.containers{catalog}",
+    "kind": "Pod",
+    "name": "catalog-64b7d596ff-bs7nj",
+    "namespace": "opscope-backends",
+    "resourceVersion": "641",
+    "uid": "2867225f-0d90-4837-acc3-eeae42ed7d4f"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:19Z",
+   "message": "Pulling image \"busybox:1.36\"",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:19Z",
+    "name": "catalog-64b7d596ff-bs7nj.18ddd0de2dce2627",
+    "namespace": "opscope-backends",
+    "resourceVersion": "669",
+    "uid": "28bd750b-278a-4d8a-9ab4-55ee2f13a302"
+   },
+   "reason": "Pulling",
+   "reportingComponent": "kubelet",
+   "reportingInstance": "opscope-g7-worker",
+   "source": {
+    "component": "kubelet",
+    "host": "opscope-g7-worker"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:26Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "fieldPath": "spec.containers{catalog}",
+    "kind": "Pod",
+    "name": "catalog-64b7d596ff-bs7nj",
+    "namespace": "opscope-backends",
+    "resourceVersion": "641",
+    "uid": "2867225f-0d90-4837-acc3-eeae42ed7d4f"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:26Z",
+   "message": "Successfully pulled image \"busybox:1.36\" in 1.594s (7.046s including waiting). Image size: 1906887 bytes.",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:26Z",
+    "name": "catalog-64b7d596ff-bs7nj.18ddd0dfd1c80dbc",
+    "namespace": "opscope-backends",
+    "resourceVersion": "689",
+    "uid": "f14d643d-a08e-407e-868a-c8571a663839"
+   },
+   "reason": "Pulled",
+   "reportingComponent": "kubelet",
+   "reportingInstance": "opscope-g7-worker",
+   "source": {
+    "component": "kubelet",
+    "host": "opscope-g7-worker"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:26Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "fieldPath": "spec.containers{catalog}",
+    "kind": "Pod",
+    "name": "catalog-64b7d596ff-bs7nj",
+    "namespace": "opscope-backends",
+    "resourceVersion": "641",
+    "uid": "2867225f-0d90-4837-acc3-eeae42ed7d4f"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:26Z",
+   "message": "Container created",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:26Z",
+    "name": "catalog-64b7d596ff-bs7nj.18ddd0dfd27127c6",
+    "namespace": "opscope-backends",
+    "resourceVersion": "691",
+    "uid": "cda149bd-1082-4052-9655-13982719870e"
+   },
+   "reason": "Created",
+   "reportingComponent": "kubelet",
+   "reportingInstance": "opscope-g7-worker",
+   "source": {
+    "component": "kubelet",
+    "host": "opscope-g7-worker"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:26Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "fieldPath": "spec.containers{catalog}",
+    "kind": "Pod",
+    "name": "catalog-64b7d596ff-bs7nj",
+    "namespace": "opscope-backends",
+    "resourceVersion": "641",
+    "uid": "2867225f-0d90-4837-acc3-eeae42ed7d4f"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:26Z",
+   "message": "Container started",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:26Z",
+    "name": "catalog-64b7d596ff-bs7nj.18ddd0dfd58d5a99",
+    "namespace": "opscope-backends",
+    "resourceVersion": "692",
+    "uid": "6e3e6a8d-5228-49fe-8394-4bb661588dce"
+   },
+   "reason": "Started",
+   "reportingComponent": "kubelet",
+   "reportingInstance": "opscope-g7-worker",
+   "source": {
+    "component": "kubelet",
+    "host": "opscope-g7-worker"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:12:42Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "catalog-64b7d596ff-bs7nj",
+    "namespace": "opscope-backends",
+    "resourceVersion": "693",
+    "uid": "2867225f-0d90-4837-acc3-eeae42ed7d4f"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:12:42Z",
+   "message": "Node is not ready",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:12:42Z",
+    "name": "catalog-64b7d596ff-bs7nj.18ddd0f183c5b604",
+    "namespace": "opscope-backends",
+    "resourceVersion": "829",
+    "uid": "158da55f-ec80-42ed-8e6c-0a1d3a2bb08e"
+   },
+   "reason": "NodeNotReady",
+   "reportingComponent": "node-controller",
+   "reportingInstance": "",
+   "source": {
+    "component": "node-controller"
+   },
+   "type": "Warning"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:17:42Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "catalog-64b7d596ff-bs7nj",
+    "namespace": "opscope-backends"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:17:42Z",
+   "message": "Marking for deletion Pod opscope-backends/catalog-64b7d596ff-bs7nj",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:17:42Z",
+    "name": "catalog-64b7d596ff-bs7nj.18ddd1375ec6f887",
+    "namespace": "opscope-backends",
+    "resourceVersion": "1249",
+    "uid": "f1d8228c-a250-44fe-88a5-8cfa7c77a79d"
+   },
+   "reason": "TaintManagerEviction",
+   "reportingComponent": "taint-eviction-controller",
+   "reportingInstance": "",
+   "source": {
+    "component": "taint-eviction-controller"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:17:42Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "catalog-64b7d596ff-dg2n7",
+    "namespace": "opscope-backends",
+    "resourceVersion": "1252",
+    "uid": "cd260e2c-17a4-496d-9bcc-a44581615c36"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:17:42Z",
+   "message": "0/2 nodes are available: 2 node(s) had untolerated taint(s). no new claims to deallocate, preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling.",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:17:42Z",
+    "name": "catalog-64b7d596ff-dg2n7.18ddd1375f72bcdc",
+    "namespace": "opscope-backends",
+    "resourceVersion": "1255",
+    "uid": "b47b00cd-3bd3-4182-b706-13a5b55df743"
+   },
+   "reason": "FailedScheduling",
+   "reportingComponent": "default-scheduler",
+   "reportingInstance": "",
+   "source": {
+    "component": "default-scheduler"
+   },
+   "type": "Warning"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:19Z",
+   "involvedObject": {
+    "apiVersion": "apps/v1",
+    "kind": "ReplicaSet",
+    "name": "catalog-64b7d596ff",
+    "namespace": "opscope-backends",
+    "resourceVersion": "618",
+    "uid": "d5066559-b994-4af3-acb5-5d01ca42ce51"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:19Z",
+   "message": "Created pod: catalog-64b7d596ff-bs7nj",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:19Z",
+    "name": "catalog-64b7d596ff.18ddd0de1815c3fb",
+    "namespace": "opscope-backends",
+    "resourceVersion": "640",
+    "uid": "7fd5ad25-ae41-4055-b6f1-c36d71382e46"
+   },
+   "reason": "SuccessfulCreate",
+   "reportingComponent": "replicaset-controller",
+   "reportingInstance": "",
+   "source": {
+    "component": "replicaset-controller"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:17:42Z",
+   "involvedObject": {
+    "apiVersion": "apps/v1",
+    "kind": "ReplicaSet",
+    "name": "catalog-64b7d596ff",
+    "namespace": "opscope-backends",
+    "resourceVersion": "832",
+    "uid": "d5066559-b994-4af3-acb5-5d01ca42ce51"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:17:42Z",
+   "message": "Created pod: catalog-64b7d596ff-dg2n7",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:17:42Z",
+    "name": "catalog-64b7d596ff.18ddd1375f747ee4",
+    "namespace": "opscope-backends",
+    "resourceVersion": "1254",
+    "uid": "d0d919f3-b33b-43a2-b61d-09ea931ff245"
+   },
+   "reason": "SuccessfulCreate",
+   "reportingComponent": "replicaset-controller",
+   "reportingInstance": "",
+   "source": {
+    "component": "replicaset-controller"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:18Z",
+   "involvedObject": {
+    "apiVersion": "apps/v1",
+    "kind": "Deployment",
+    "name": "catalog",
+    "namespace": "opscope-backends",
+    "resourceVersion": "616",
+    "uid": "c75d3eda-2456-4f68-bead-2db78b67937c"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:18Z",
+   "message": "Scaled up replica set catalog-64b7d596ff from 0 to 1",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "name": "catalog.18ddd0de12aa5e7a",
+    "namespace": "opscope-backends",
+    "resourceVersion": "620",
+    "uid": "acb6eb8a-1c66-4890-8083-96cb714f2613"
+   },
+   "reason": "ScalingReplicaSet",
+   "reportingComponent": "deployment-controller",
+   "reportingInstance": "",
+   "source": {
+    "component": "deployment-controller"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "gateway.networking.k8s.io/v1",
+   "kind": "ReferenceGrant",
+   "metadata": {
+    "annotations": {},
+    "creationTimestamp": "2026-10-12T15:11:19Z",
+    "generation": 1,
+    "name": "routes-to-reviews",
+    "namespace": "opscope-backends",
+    "resourceVersion": "637",
+    "uid": "05e068c3-ed92-4848-9630-a70de3b3043e"
+   },
+   "spec": {
+    "from": [
+     {
+      "group": "gateway.networking.k8s.io",
+      "kind": "HTTPRoute",
+      "namespace": "opscope-edge"
+     }
+    ],
+    "to": [
+     {
+      "group": "",
+      "kind": "Service",
+      "name": "reviews"
+     }
+    ]
+   }
+  },
+  {
+   "apiVersion": "v1",
+   "kind": "Namespace",
+   "metadata": {
+    "annotations": {},
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "labels": {
+     "kubernetes.io/metadata.name": "opscope-backends"
+    },
+    "name": "opscope-backends",
+    "resourceVersion": "599",
+    "uid": "209c43b8-3106-4b3a-a14b-fdf255d1260b"
+   },
+   "spec": {
+    "finalizers": [
+     "kubernetes"
+    ]
+   },
+   "status": {
+    "phase": "Active"
+   }
+  },
+  {
+   "apiVersion": "v1",
+   "kind": "Pod",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:17:42Z",
+    "generateName": "pinned-5b84465d4-",
+    "generation": 1,
+    "labels": {
+     "app": "pinned",
+     "pod-template-hash": "5b84465d4"
+    },
+    "name": "pinned-5b84465d4-dc5vs",
+    "namespace": "opscope-node-down",
+    "ownerReferences": [
+     {
+      "apiVersion": "apps/v1",
+      "blockOwnerDeletion": true,
+      "controller": true,
+      "kind": "ReplicaSet",
+      "name": "pinned-5b84465d4",
+      "uid": "c41f51bc-006e-4557-952b-d774eb74129b"
+     }
+    ],
+    "resourceVersion": "1269",
+    "uid": "1e763132-666d-4aad-8b79-6f76e880f7ca"
+   },
+   "spec": {
+    "containers": [
+     {
+      "command": [
+       "sleep",
+       "infinity"
+      ],
+      "image": "busybox:1.36",
+      "imagePullPolicy": "IfNotPresent",
+      "name": "app",
+      "resources": {},
+      "terminationMessagePath": "/dev/termination-log",
+      "terminationMessagePolicy": "File",
+      "volumeMounts": [
+       {
+        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+        "name": "kube-api-access-j8l5q",
+        "readOnly": true
+       }
+      ]
+     }
+    ],
+    "dnsPolicy": "ClusterFirst",
+    "enableServiceLinks": true,
+    "nodeSelector": {
+     "opscope-scenario": "node-down"
+    },
+    "preemptionPolicy": "PreemptLowerPriority",
+    "priority": 0,
+    "restartPolicy": "Always",
+    "schedulerName": "default-scheduler",
+    "securityContext": {},
+    "serviceAccount": "default",
+    "serviceAccountName": "default",
+    "terminationGracePeriodSeconds": 30,
+    "tolerations": [
+     {
+      "effect": "NoExecute",
+      "key": "node.kubernetes.io/not-ready",
+      "operator": "Exists",
+      "tolerationSeconds": 300
+     },
+     {
+      "effect": "NoExecute",
+      "key": "node.kubernetes.io/unreachable",
+      "operator": "Exists",
+      "tolerationSeconds": 300
+     }
+    ],
+    "volumes": [
+     {
+      "name": "kube-api-access-j8l5q",
+      "projected": {
+       "defaultMode": 420,
+       "sources": [
+        {
+         "serviceAccountToken": {
+          "expirationSeconds": 3607,
+          "path": "token"
+         }
+        },
+        {
+         "configMap": {
+          "items": [
+           {
+            "key": "ca.crt",
+            "path": "ca.crt"
+           }
+          ],
+          "name": "kube-root-ca.crt"
+         }
+        },
+        {
+         "downwardAPI": {
+          "items": [
+           {
+            "fieldRef": {
+             "apiVersion": "v1",
+             "fieldPath": "metadata.namespace"
+            },
+            "path": "namespace"
+           }
+          ]
+         }
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "status": {
+    "conditions": [
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:17:42Z",
+      "message": "0/2 nodes are available: 2 node(s) had untolerated taint(s). no new claims to deallocate, preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling.",
+      "observedGeneration": 1,
+      "reason": "Unschedulable",
+      "status": "False",
+      "type": "PodScheduled"
+     }
+    ],
+    "phase": "Pending",
+    "qosClass": "BestEffort"
+   }
+  },
+  {
+   "apiVersion": "v1",
+   "kind": "Pod",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:19Z",
+    "deletionGracePeriodSeconds": 30,
+    "deletionTimestamp": "2026-10-12T15:18:12Z",
+    "generateName": "pinned-5b84465d4-",
+    "generation": 2,
+    "labels": {
+     "app": "pinned",
+     "pod-template-hash": "5b84465d4"
+    },
+    "name": "pinned-5b84465d4-fb2mb",
+    "namespace": "opscope-node-down",
+    "ownerReferences": [
+     {
+      "apiVersion": "apps/v1",
+      "blockOwnerDeletion": true,
+      "controller": true,
+      "kind": "ReplicaSet",
+      "name": "pinned-5b84465d4",
+      "uid": "c41f51bc-006e-4557-952b-d774eb74129b"
+     }
+    ],
+    "resourceVersion": "1240",
+    "uid": "d0db6167-1d14-4b19-9f68-e687c686dfd1"
+   },
+   "spec": {
+    "containers": [
+     {
+      "command": [
+       "sleep",
+       "infinity"
+      ],
+      "image": "busybox:1.36",
+      "imagePullPolicy": "IfNotPresent",
+      "name": "app",
+      "resources": {},
+      "terminationMessagePath": "/dev/termination-log",
+      "terminationMessagePolicy": "File",
+      "volumeMounts": [
+       {
+        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+        "name": "kube-api-access-wmq6m",
+        "readOnly": true
+       }
+      ]
+     }
+    ],
+    "dnsPolicy": "ClusterFirst",
+    "enableServiceLinks": true,
+    "nodeName": "opscope-g7-worker",
+    "nodeSelector": {
+     "opscope-scenario": "node-down"
+    },
+    "preemptionPolicy": "PreemptLowerPriority",
+    "priority": 0,
+    "restartPolicy": "Always",
+    "schedulerName": "default-scheduler",
+    "securityContext": {},
+    "serviceAccount": "default",
+    "serviceAccountName": "default",
+    "terminationGracePeriodSeconds": 30,
+    "tolerations": [
+     {
+      "effect": "NoExecute",
+      "key": "node.kubernetes.io/not-ready",
+      "operator": "Exists",
+      "tolerationSeconds": 300
+     },
+     {
+      "effect": "NoExecute",
+      "key": "node.kubernetes.io/unreachable",
+      "operator": "Exists",
+      "tolerationSeconds": 300
+     }
+    ],
+    "volumes": [
+     {
+      "name": "kube-api-access-wmq6m",
+      "projected": {
+       "defaultMode": 420,
+       "sources": [
+        {
+         "serviceAccountToken": {
+          "expirationSeconds": 3607,
+          "path": "token"
+         }
+        },
+        {
+         "configMap": {
+          "items": [
+           {
+            "key": "ca.crt",
+            "path": "ca.crt"
+           }
+          ],
+          "name": "kube-root-ca.crt"
+         }
+        },
+        {
+         "downwardAPI": {
+          "items": [
+           {
+            "fieldRef": {
+             "apiVersion": "v1",
+             "fieldPath": "metadata.namespace"
+            },
+            "path": "namespace"
+           }
+          ]
+         }
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "status": {
+    "conditions": [
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:11:30Z",
+      "observedGeneration": 1,
+      "status": "True",
+      "type": "PodReadyToStartContainers"
+     },
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:11:19Z",
+      "observedGeneration": 1,
+      "status": "True",
+      "type": "Initialized"
+     },
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:12:42Z",
+      "observedGeneration": 1,
+      "status": "False",
+      "type": "Ready"
+     },
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:11:30Z",
+      "observedGeneration": 1,
+      "status": "True",
+      "type": "ContainersReady"
+     },
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:11:19Z",
+      "observedGeneration": 1,
+      "status": "True",
+      "type": "PodScheduled"
+     },
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:17:42Z",
+      "message": "Taint manager: deleting due to NoExecute taint",
+      "observedGeneration": 1,
+      "reason": "DeletionByTaintManager",
+      "status": "True",
+      "type": "DisruptionTarget"
+     }
+    ],
+    "containerStatuses": [
+     {
+      "containerID": "containerd://ec3d837f64d6e03e59ab8228df85bc618313e4e46b5584c6dc01cadee6089d7b",
+      "image": "docker.io/library/busybox:1.36",
+      "imageID": "docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662",
+      "lastState": {},
+      "name": "app",
+      "ready": true,
+      "resources": {},
+      "restartCount": 0,
+      "started": true,
+      "state": {
+       "running": {
+        "startedAt": "2026-10-12T15:11:30Z"
+       }
+      },
+      "user": {
+       "linux": {
+        "gid": 0,
+        "supplementalGroups": [
+         0,
+         10
+        ],
+        "uid": 0
+       }
+      },
+      "volumeMounts": [
+       {
+        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+        "name": "kube-api-access-wmq6m",
+        "readOnly": true,
+        "recursiveReadOnly": "Disabled"
+       }
+      ]
+     }
+    ],
+    "hostIP": "172.18.0.4",
+    "hostIPs": [
+     {
+      "ip": "172.18.0.4"
+     }
+    ],
+    "observedGeneration": 1,
+    "phase": "Running",
+    "podIP": "10.244.1.5",
+    "podIPs": [
+     {
+      "ip": "10.244.1.5"
+     }
+    ],
+    "qosClass": "BestEffort",
+    "startTime": "2026-10-12T15:11:19Z"
+   }
+  },
+  {
+   "apiVersion": "v1",
+   "kind": "Pod",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:19Z",
+    "deletionGracePeriodSeconds": 30,
+    "deletionTimestamp": "2026-10-12T15:18:12Z",
+    "generateName": "pinned-5b84465d4-",
+    "generation": 2,
+    "labels": {
+     "app": "pinned",
+     "pod-template-hash": "5b84465d4"
+    },
+    "name": "pinned-5b84465d4-k7l7s",
+    "namespace": "opscope-node-down",
+    "ownerReferences": [
+     {
+      "apiVersion": "apps/v1",
+      "blockOwnerDeletion": true,
+      "controller": true,
+      "kind": "ReplicaSet",
+      "name": "pinned-5b84465d4",
+      "uid": "c41f51bc-006e-4557-952b-d774eb74129b"
+     }
+    ],
+    "resourceVersion": "1243",
+    "uid": "1b7bf558-4ee1-4974-b429-84b0b7c05e0d"
+   },
+   "spec": {
+    "containers": [
+     {
+      "command": [
+       "sleep",
+       "infinity"
+      ],
+      "image": "busybox:1.36",
+      "imagePullPolicy": "IfNotPresent",
+      "name": "app",
+      "resources": {},
+      "terminationMessagePath": "/dev/termination-log",
+      "terminationMessagePolicy": "File",
+      "volumeMounts": [
+       {
+        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+        "name": "kube-api-access-rcl75",
+        "readOnly": true
+       }
+      ]
+     }
+    ],
+    "dnsPolicy": "ClusterFirst",
+    "enableServiceLinks": true,
+    "nodeName": "opscope-g7-worker",
+    "nodeSelector": {
+     "opscope-scenario": "node-down"
+    },
+    "preemptionPolicy": "PreemptLowerPriority",
+    "priority": 0,
+    "restartPolicy": "Always",
+    "schedulerName": "default-scheduler",
+    "securityContext": {},
+    "serviceAccount": "default",
+    "serviceAccountName": "default",
+    "terminationGracePeriodSeconds": 30,
+    "tolerations": [
+     {
+      "effect": "NoExecute",
+      "key": "node.kubernetes.io/not-ready",
+      "operator": "Exists",
+      "tolerationSeconds": 300
+     },
+     {
+      "effect": "NoExecute",
+      "key": "node.kubernetes.io/unreachable",
+      "operator": "Exists",
+      "tolerationSeconds": 300
+     }
+    ],
+    "volumes": [
+     {
+      "name": "kube-api-access-rcl75",
+      "projected": {
+       "defaultMode": 420,
+       "sources": [
+        {
+         "serviceAccountToken": {
+          "expirationSeconds": 3607,
+          "path": "token"
+         }
+        },
+        {
+         "configMap": {
+          "items": [
+           {
+            "key": "ca.crt",
+            "path": "ca.crt"
+           }
+          ],
+          "name": "kube-root-ca.crt"
+         }
+        },
+        {
+         "downwardAPI": {
+          "items": [
+           {
+            "fieldRef": {
+             "apiVersion": "v1",
+             "fieldPath": "metadata.namespace"
+            },
+            "path": "namespace"
+           }
+          ]
+         }
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "status": {
+    "conditions": [
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:11:28Z",
+      "observedGeneration": 1,
+      "status": "True",
+      "type": "PodReadyToStartContainers"
+     },
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:11:19Z",
+      "observedGeneration": 1,
+      "status": "True",
+      "type": "Initialized"
+     },
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:12:42Z",
+      "observedGeneration": 1,
+      "status": "False",
+      "type": "Ready"
+     },
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:11:28Z",
+      "observedGeneration": 1,
+      "status": "True",
+      "type": "ContainersReady"
+     },
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:11:19Z",
+      "observedGeneration": 1,
+      "status": "True",
+      "type": "PodScheduled"
+     },
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:17:42Z",
+      "message": "Taint manager: deleting due to NoExecute taint",
+      "observedGeneration": 1,
+      "reason": "DeletionByTaintManager",
+      "status": "True",
+      "type": "DisruptionTarget"
+     }
+    ],
+    "containerStatuses": [
+     {
+      "containerID": "containerd://5ff18e50830d8ff5f571c623daec5490213e31bc106b20ffb900fe38418264f9",
+      "image": "docker.io/library/busybox:1.36",
+      "imageID": "docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662",
+      "lastState": {},
+      "name": "app",
+      "ready": true,
+      "resources": {},
+      "restartCount": 0,
+      "started": true,
+      "state": {
+       "running": {
+        "startedAt": "2026-10-12T15:11:28Z"
+       }
+      },
+      "user": {
+       "linux": {
+        "gid": 0,
+        "supplementalGroups": [
+         0,
+         10
+        ],
+        "uid": 0
+       }
+      },
+      "volumeMounts": [
+       {
+        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+        "name": "kube-api-access-rcl75",
+        "readOnly": true,
+        "recursiveReadOnly": "Disabled"
+       }
+      ]
+     }
+    ],
+    "hostIP": "172.18.0.4",
+    "hostIPs": [
+     {
+      "ip": "172.18.0.4"
+     }
+    ],
+    "observedGeneration": 1,
+    "phase": "Running",
+    "podIP": "10.244.1.4",
+    "podIPs": [
+     {
+      "ip": "10.244.1.4"
+     }
+    ],
+    "qosClass": "BestEffort",
+    "startTime": "2026-10-12T15:11:19Z"
+   }
+  },
+  {
+   "apiVersion": "v1",
+   "kind": "Pod",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:17:42Z",
+    "generateName": "pinned-5b84465d4-",
+    "generation": 1,
+    "labels": {
+     "app": "pinned",
+     "pod-template-hash": "5b84465d4"
+    },
+    "name": "pinned-5b84465d4-z668k",
+    "namespace": "opscope-node-down",
+    "ownerReferences": [
+     {
+      "apiVersion": "apps/v1",
+      "blockOwnerDeletion": true,
+      "controller": true,
+      "kind": "ReplicaSet",
+      "name": "pinned-5b84465d4",
+      "uid": "c41f51bc-006e-4557-952b-d774eb74129b"
+     }
+    ],
+    "resourceVersion": "1259",
+    "uid": "93c50786-0b8a-46f4-bf42-e23114f543cf"
+   },
+   "spec": {
+    "containers": [
+     {
+      "command": [
+       "sleep",
+       "infinity"
+      ],
+      "image": "busybox:1.36",
+      "imagePullPolicy": "IfNotPresent",
+      "name": "app",
+      "resources": {},
+      "terminationMessagePath": "/dev/termination-log",
+      "terminationMessagePolicy": "File",
+      "volumeMounts": [
+       {
+        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+        "name": "kube-api-access-9tl6c",
+        "readOnly": true
+       }
+      ]
+     }
+    ],
+    "dnsPolicy": "ClusterFirst",
+    "enableServiceLinks": true,
+    "nodeSelector": {
+     "opscope-scenario": "node-down"
+    },
+    "preemptionPolicy": "PreemptLowerPriority",
+    "priority": 0,
+    "restartPolicy": "Always",
+    "schedulerName": "default-scheduler",
+    "securityContext": {},
+    "serviceAccount": "default",
+    "serviceAccountName": "default",
+    "terminationGracePeriodSeconds": 30,
+    "tolerations": [
+     {
+      "effect": "NoExecute",
+      "key": "node.kubernetes.io/not-ready",
+      "operator": "Exists",
+      "tolerationSeconds": 300
+     },
+     {
+      "effect": "NoExecute",
+      "key": "node.kubernetes.io/unreachable",
+      "operator": "Exists",
+      "tolerationSeconds": 300
+     }
+    ],
+    "volumes": [
+     {
+      "name": "kube-api-access-9tl6c",
+      "projected": {
+       "defaultMode": 420,
+       "sources": [
+        {
+         "serviceAccountToken": {
+          "expirationSeconds": 3607,
+          "path": "token"
+         }
+        },
+        {
+         "configMap": {
+          "items": [
+           {
+            "key": "ca.crt",
+            "path": "ca.crt"
+           }
+          ],
+          "name": "kube-root-ca.crt"
+         }
+        },
+        {
+         "downwardAPI": {
+          "items": [
+           {
+            "fieldRef": {
+             "apiVersion": "v1",
+             "fieldPath": "metadata.namespace"
+            },
+            "path": "namespace"
+           }
+          ]
+         }
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "status": {
+    "conditions": [
+     {
+      "lastProbeTime": null,
+      "lastTransitionTime": "2026-10-12T15:17:42Z",
+      "message": "0/2 nodes are available: 2 node(s) had untolerated taint(s). no new claims to deallocate, preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling.",
+      "observedGeneration": 1,
+      "reason": "Unschedulable",
+      "status": "False",
+      "type": "PodScheduled"
+     }
+    ],
+    "phase": "Pending",
+    "qosClass": "BestEffort"
+   }
+  },
+  {
+   "apiVersion": "apps/v1",
+   "kind": "Deployment",
+   "metadata": {
+    "annotations": {
+     "deployment.kubernetes.io/revision": "1"
+    },
+    "creationTimestamp": "2026-10-12T15:11:19Z",
+    "generation": 1,
+    "name": "pinned",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "1273",
+    "uid": "b62b9e2f-3618-4497-bfb2-c11e5d67654d"
+   },
+   "spec": {
+    "progressDeadlineSeconds": 600,
+    "replicas": 2,
+    "revisionHistoryLimit": 10,
+    "selector": {
+     "matchLabels": {
+      "app": "pinned"
+     }
+    },
+    "strategy": {
+     "rollingUpdate": {
+      "maxSurge": "25%",
+      "maxUnavailable": "25%"
+     },
+     "type": "RollingUpdate"
+    },
+    "template": {
+     "metadata": {
+      "labels": {
+       "app": "pinned"
+      }
+     },
+     "spec": {
+      "containers": [
+       {
+        "command": [
+         "sleep",
+         "infinity"
+        ],
+        "image": "busybox:1.36",
+        "imagePullPolicy": "IfNotPresent",
+        "name": "app",
+        "resources": {},
+        "terminationMessagePath": "/dev/termination-log",
+        "terminationMessagePolicy": "File"
+       }
+      ],
+      "dnsPolicy": "ClusterFirst",
+      "nodeSelector": {
+       "opscope-scenario": "node-down"
+      },
+      "restartPolicy": "Always",
+      "schedulerName": "default-scheduler",
+      "securityContext": {},
+      "terminationGracePeriodSeconds": 30
+     }
+    }
+   },
+   "status": {
+    "conditions": [
+     {
+      "lastTransitionTime": "2026-10-12T15:11:19Z",
+      "lastUpdateTime": "2026-10-12T15:11:30Z",
+      "message": "ReplicaSet \"pinned-5b84465d4\" has successfully progressed.",
+      "reason": "NewReplicaSetAvailable",
+      "status": "True",
+      "type": "Progressing"
+     },
+     {
+      "lastTransitionTime": "2026-10-12T15:12:42Z",
+      "lastUpdateTime": "2026-10-12T15:12:42Z",
+      "message": "Deployment does not have minimum availability.",
+      "reason": "MinimumReplicasUnavailable",
+      "status": "False",
+      "type": "Available"
+     }
+    ],
+    "observedGeneration": 1,
+    "replicas": 2,
+    "terminatingReplicas": 2,
+    "unavailableReplicas": 2,
+    "updatedReplicas": 2
+   }
+  },
+  {
+   "apiVersion": "apps/v1",
+   "kind": "ReplicaSet",
+   "metadata": {
+    "annotations": {
+     "deployment.kubernetes.io/desired-replicas": "2",
+     "deployment.kubernetes.io/max-replicas": "3",
+     "deployment.kubernetes.io/revision": "1"
+    },
+    "creationTimestamp": "2026-10-12T15:11:19Z",
+    "generation": 1,
+    "labels": {
+     "app": "pinned",
+     "pod-template-hash": "5b84465d4"
+    },
+    "name": "pinned-5b84465d4",
+    "namespace": "opscope-node-down",
+    "ownerReferences": [
+     {
+      "apiVersion": "apps/v1",
+      "blockOwnerDeletion": true,
+      "controller": true,
+      "kind": "Deployment",
+      "name": "pinned",
+      "uid": "b62b9e2f-3618-4497-bfb2-c11e5d67654d"
+     }
+    ],
+    "resourceVersion": "1271",
+    "uid": "c41f51bc-006e-4557-952b-d774eb74129b"
+   },
+   "spec": {
+    "replicas": 2,
+    "selector": {
+     "matchLabels": {
+      "app": "pinned",
+      "pod-template-hash": "5b84465d4"
+     }
+    },
+    "template": {
+     "metadata": {
+      "labels": {
+       "app": "pinned",
+       "pod-template-hash": "5b84465d4"
+      }
+     },
+     "spec": {
+      "containers": [
+       {
+        "command": [
+         "sleep",
+         "infinity"
+        ],
+        "image": "busybox:1.36",
+        "imagePullPolicy": "IfNotPresent",
+        "name": "app",
+        "resources": {},
+        "terminationMessagePath": "/dev/termination-log",
+        "terminationMessagePolicy": "File"
+       }
+      ],
+      "dnsPolicy": "ClusterFirst",
+      "nodeSelector": {
+       "opscope-scenario": "node-down"
+      },
+      "restartPolicy": "Always",
+      "schedulerName": "default-scheduler",
+      "securityContext": {},
+      "terminationGracePeriodSeconds": 30
+     }
+    }
+   },
+   "status": {
+    "fullyLabeledReplicas": 2,
+    "observedGeneration": 1,
+    "replicas": 2,
+    "terminatingReplicas": 2
+   }
+  },
+  {
+   "apiVersion": "v1",
+   "data": {
+    "ca.crt": "-----BEGIN CERTIFICATE-----\nMIIDBTCCAe2gAwIBAgIILt7WYeKkhocwDQYJKoZIhvcNAQELBQAwFTETMBEGA1UE\nAxMKa3ViZXJuZXRlczAeFw0yNjEwMTIxNTA1MDFaFw0zNjEwMDkxNTEwMDFaMBUx\nEzARBgNVBAMTCmt1YmVybmV0ZXMwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK\nAoIBAQC2gK6Fu399J+s4EpijzDhdKwtKOnO81jcVOQayH+LPdMrtQ0Uuf7g9dCLx\nN2YMT6GpYcnmyoPi3MceEUVVoumkZ8zhI4FVx+s58zS89zfRUhdNRkqM7bZFr4nW\naifGx6BfZnHLVbgy75lO0iaoG7xJvwMhe7lV/31PlZVHDV4wJ8TiKh+O74KhgLgP\njitgCExqQU2z1qcYO3GbPwCpYwLBurt4mnVlhYr12foV44le3sIgnsW4HnI3XKlq\n9GUj2a3lpoIrnMTf1JRwbVRxWPMTQJdXEhgFWhZnRiD1gx3cPUw9HlWx8iNOiTBO\np0SIp1luhpfWeUnLAiAY4z95nxUtAgMBAAGjWTBXMA4GA1UdDwEB/wQEAwICpDAP\nBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBRrGLMfVJJn2OfHDa7x9hBQ19rU8TAV\nBgNVHREEDjAMggprdWJlcm5ldGVzMA0GCSqGSIb3DQEBCwUAA4IBAQCLh3b2kPBM\nRqXvU4FjvJ0MYT2PyBEnUWcBat8FhQAPt3oWSBv9tpEla7vn9DI/VEzJ010f8wXk\nS9lLvE9Pbk42KCBxx8lXTP81f2RsL5N/wwjUZxTYNHUmNZFc53vW6RPVnEAFWHXS\nYr7xIavHf0rzO24V8GFgEmv8zLbaLeQbUWHOF+eusH899PepEc4BszhqE3uwd08I\nDBi07Gty1WRUAs7pI93HsVZHKvxAdHd3qPscv48zK6TdcWvLWP0k1SPwx635fdXv\nRIX1KVzJxPvfB+bd9mJV72QB9uZ02bcIiTljxU5sNx8wqtko6LDwt2TrzvR7Y6Hd\nysNv7BE752Ow\n-----END CERTIFICATE-----\n"
+   },
+   "kind": "ConfigMap",
+   "metadata": {
+    "annotations": {
+     "kubernetes.io/description": "Contains a CA bundle that can be used to verify the kube-apiserver when using internal endpoints such as the internal service IP or kubernetes.default.svc. No other usage is guaranteed across distributions of Kubernetes clusters."
+    },
+    "creationTimestamp": "2026-10-12T15:11:19Z",
+    "name": "kube-root-ca.crt",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "649",
+    "uid": "367d6097-fe8f-4ea4-a810-6058272155b5"
+   }
+  },
+  {
+   "apiVersion": "v1",
+   "kind": "ServiceAccount",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:19Z",
+    "name": "default",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "648",
+    "uid": "bc0cb11d-9d73-4c36-8c1d-375554d4fd6a"
+   }
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:17:42Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "pinned-5b84465d4-dc5vs",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "1264",
+    "uid": "1e763132-666d-4aad-8b79-6f76e880f7ca"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:17:42Z",
+   "message": "0/2 nodes are available: 2 node(s) had untolerated taint(s). no new claims to deallocate, preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling.",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:17:42Z",
+    "name": "pinned-5b84465d4-dc5vs.18ddd1375fbc7d8e",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "1268",
+    "uid": "46836e67-0f36-4b69-b474-be1207b5d840"
+   },
+   "reason": "FailedScheduling",
+   "reportingComponent": "default-scheduler",
+   "reportingInstance": "",
+   "source": {
+    "component": "default-scheduler"
+   },
+   "type": "Warning"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:19Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "pinned-5b84465d4-fb2mb",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "658",
+    "uid": "d0db6167-1d14-4b19-9f68-e687c686dfd1"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:19Z",
+   "message": "Successfully assigned opscope-node-down/pinned-5b84465d4-fb2mb to opscope-g7-worker",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:19Z",
+    "name": "pinned-5b84465d4-fb2mb.18ddd0de1e5ba208",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "663",
+    "uid": "4866a689-bd93-4da7-9d2c-2d2f65c329ad"
+   },
+   "reason": "Scheduled",
+   "reportingComponent": "default-scheduler",
+   "reportingInstance": "",
+   "source": {
+    "component": "default-scheduler"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:19Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "fieldPath": "spec.containers{app}",
+    "kind": "Pod",
+    "name": "pinned-5b84465d4-fb2mb",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "662",
+    "uid": "d0db6167-1d14-4b19-9f68-e687c686dfd1"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:19Z",
+   "message": "Pulling image \"busybox:1.36\"",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:19Z",
+    "name": "pinned-5b84465d4-fb2mb.18ddd0de33b424bf",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "671",
+    "uid": "3dad2fe9-762b-4eae-b970-9dfb209cc192"
+   },
+   "reason": "Pulling",
+   "reportingComponent": "kubelet",
+   "reportingInstance": "opscope-g7-worker",
+   "source": {
+    "component": "kubelet",
+    "host": "opscope-g7-worker"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:29Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "fieldPath": "spec.containers{app}",
+    "kind": "Pod",
+    "name": "pinned-5b84465d4-fb2mb",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "662",
+    "uid": "d0db6167-1d14-4b19-9f68-e687c686dfd1"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:29Z",
+   "message": "Successfully pulled image \"busybox:1.36\" in 1.802s (10.409s including waiting). Image size: 1906887 bytes.",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:29Z",
+    "name": "pinned-5b84465d4-fb2mb.18ddd0e0a02bd6ae",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "711",
+    "uid": "b8314d9e-3353-40d4-83a4-73235f721f1a"
+   },
+   "reason": "Pulled",
+   "reportingComponent": "kubelet",
+   "reportingInstance": "opscope-g7-worker",
+   "source": {
+    "component": "kubelet",
+    "host": "opscope-g7-worker"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:29Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "fieldPath": "spec.containers{app}",
+    "kind": "Pod",
+    "name": "pinned-5b84465d4-fb2mb",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "662",
+    "uid": "d0db6167-1d14-4b19-9f68-e687c686dfd1"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:29Z",
+   "message": "Container created",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:29Z",
+    "name": "pinned-5b84465d4-fb2mb.18ddd0e0a0c848a5",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "712",
+    "uid": "4c0e7639-98a1-4027-9bc9-1715d4cacbc1"
+   },
+   "reason": "Created",
+   "reportingComponent": "kubelet",
+   "reportingInstance": "opscope-g7-worker",
+   "source": {
+    "component": "kubelet",
+    "host": "opscope-g7-worker"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:30Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "fieldPath": "spec.containers{app}",
+    "kind": "Pod",
+    "name": "pinned-5b84465d4-fb2mb",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "662",
+    "uid": "d0db6167-1d14-4b19-9f68-e687c686dfd1"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:30Z",
+   "message": "Container started",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:30Z",
+    "name": "pinned-5b84465d4-fb2mb.18ddd0e0a3ec379d",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "713",
+    "uid": "ff0d60a6-4da4-4b8b-b80a-8e200a5a15ca"
+   },
+   "reason": "Started",
+   "reportingComponent": "kubelet",
+   "reportingInstance": "opscope-g7-worker",
+   "source": {
+    "component": "kubelet",
+    "host": "opscope-g7-worker"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:12:42Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "pinned-5b84465d4-fb2mb",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "715",
+    "uid": "d0db6167-1d14-4b19-9f68-e687c686dfd1"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:12:42Z",
+   "message": "Node is not ready",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:12:42Z",
+    "name": "pinned-5b84465d4-fb2mb.18ddd0f184086400",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "840",
+    "uid": "edda2753-5d15-4cb4-8340-12da44929280"
+   },
+   "reason": "NodeNotReady",
+   "reportingComponent": "node-controller",
+   "reportingInstance": "",
+   "source": {
+    "component": "node-controller"
+   },
+   "type": "Warning"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:17:42Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "pinned-5b84465d4-fb2mb",
+    "namespace": "opscope-node-down"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:17:42Z",
+   "message": "Marking for deletion Pod opscope-node-down/pinned-5b84465d4-fb2mb",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:17:42Z",
+    "name": "pinned-5b84465d4-fb2mb.18ddd1375ec6c3a2",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "1244",
+    "uid": "e3ac19ad-0673-4bd4-ae56-d6f990569606"
+   },
+   "reason": "TaintManagerEviction",
+   "reportingComponent": "taint-eviction-controller",
+   "reportingInstance": "",
+   "source": {
+    "component": "taint-eviction-controller"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:19Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "pinned-5b84465d4-k7l7s",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "655",
+    "uid": "1b7bf558-4ee1-4974-b429-84b0b7c05e0d"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:19Z",
+   "message": "Successfully assigned opscope-node-down/pinned-5b84465d4-k7l7s to opscope-g7-worker",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:19Z",
+    "name": "pinned-5b84465d4-k7l7s.18ddd0de1e3e3962",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "661",
+    "uid": "94430f37-b47d-47b6-9215-4906ad9f78e2"
+   },
+   "reason": "Scheduled",
+   "reportingComponent": "default-scheduler",
+   "reportingInstance": "",
+   "source": {
+    "component": "default-scheduler"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:19Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "fieldPath": "spec.containers{app}",
+    "kind": "Pod",
+    "name": "pinned-5b84465d4-k7l7s",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "656",
+    "uid": "1b7bf558-4ee1-4974-b429-84b0b7c05e0d"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:19Z",
+   "message": "Pulling image \"busybox:1.36\"",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:19Z",
+    "name": "pinned-5b84465d4-k7l7s.18ddd0de33b07cdf",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "670",
+    "uid": "bef2b0ef-8e2a-4bd6-9138-b64818260920"
+   },
+   "reason": "Pulling",
+   "reportingComponent": "kubelet",
+   "reportingInstance": "opscope-g7-worker",
+   "source": {
+    "component": "kubelet",
+    "host": "opscope-g7-worker"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:28Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "fieldPath": "spec.containers{app}",
+    "kind": "Pod",
+    "name": "pinned-5b84465d4-k7l7s",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "656",
+    "uid": "1b7bf558-4ee1-4974-b429-84b0b7c05e0d"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:28Z",
+   "message": "Successfully pulled image \"busybox:1.36\" in 1.66s (8.607s including waiting). Image size: 1906887 bytes.",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:28Z",
+    "name": "pinned-5b84465d4-k7l7s.18ddd0e034c3463b",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "702",
+    "uid": "b96e51c7-09d9-4812-b148-ac70446ccc9b"
+   },
+   "reason": "Pulled",
+   "reportingComponent": "kubelet",
+   "reportingInstance": "opscope-g7-worker",
+   "source": {
+    "component": "kubelet",
+    "host": "opscope-g7-worker"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:28Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "fieldPath": "spec.containers{app}",
+    "kind": "Pod",
+    "name": "pinned-5b84465d4-k7l7s",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "656",
+    "uid": "1b7bf558-4ee1-4974-b429-84b0b7c05e0d"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:28Z",
+   "message": "Container created",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:28Z",
+    "name": "pinned-5b84465d4-k7l7s.18ddd0e0354fba73",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "703",
+    "uid": "c567a40a-ee4a-4e3c-8728-ca8a866be478"
+   },
+   "reason": "Created",
+   "reportingComponent": "kubelet",
+   "reportingInstance": "opscope-g7-worker",
+   "source": {
+    "component": "kubelet",
+    "host": "opscope-g7-worker"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:28Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "fieldPath": "spec.containers{app}",
+    "kind": "Pod",
+    "name": "pinned-5b84465d4-k7l7s",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "656",
+    "uid": "1b7bf558-4ee1-4974-b429-84b0b7c05e0d"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:28Z",
+   "message": "Container started",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:28Z",
+    "name": "pinned-5b84465d4-k7l7s.18ddd0e038c5eb85",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "704",
+    "uid": "c187cde8-d8b5-4cfa-9d07-331af6f6c9d2"
+   },
+   "reason": "Started",
+   "reportingComponent": "kubelet",
+   "reportingInstance": "opscope-g7-worker",
+   "source": {
+    "component": "kubelet",
+    "host": "opscope-g7-worker"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:12:42Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "pinned-5b84465d4-k7l7s",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "706",
+    "uid": "1b7bf558-4ee1-4974-b429-84b0b7c05e0d"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:12:42Z",
+   "message": "Node is not ready",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:12:42Z",
+    "name": "pinned-5b84465d4-k7l7s.18ddd0f183ea22b9",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "837",
+    "uid": "0759b489-814a-4085-ab0e-35bfd427215a"
+   },
+   "reason": "NodeNotReady",
+   "reportingComponent": "node-controller",
+   "reportingInstance": "",
+   "source": {
+    "component": "node-controller"
+   },
+   "type": "Warning"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:17:42Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "pinned-5b84465d4-k7l7s",
+    "namespace": "opscope-node-down"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:17:42Z",
+   "message": "Marking for deletion Pod opscope-node-down/pinned-5b84465d4-k7l7s",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:17:42Z",
+    "name": "pinned-5b84465d4-k7l7s.18ddd1375ec6c41f",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "1234",
+    "uid": "a2f2b8cc-d5b6-43b6-8d8b-fffd72835eff"
+   },
+   "reason": "TaintManagerEviction",
+   "reportingComponent": "taint-eviction-controller",
+   "reportingInstance": "",
+   "source": {
+    "component": "taint-eviction-controller"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:17:42Z",
+   "involvedObject": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "pinned-5b84465d4-z668k",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "1253",
+    "uid": "93c50786-0b8a-46f4-bf42-e23114f543cf"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:17:42Z",
+   "message": "0/2 nodes are available: 2 node(s) had untolerated taint(s). no new claims to deallocate, preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling.",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:17:42Z",
+    "name": "pinned-5b84465d4-z668k.18ddd1375f7ddf72",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "1261",
+    "uid": "547a3959-b5ed-4247-a67b-6e167ed2a3c2"
+   },
+   "reason": "FailedScheduling",
+   "reportingComponent": "default-scheduler",
+   "reportingInstance": "",
+   "source": {
+    "component": "default-scheduler"
+   },
+   "type": "Warning"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:19Z",
+   "involvedObject": {
+    "apiVersion": "apps/v1",
+    "kind": "ReplicaSet",
+    "name": "pinned-5b84465d4",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "651",
+    "uid": "c41f51bc-006e-4557-952b-d774eb74129b"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:19Z",
+   "message": "Created pod: pinned-5b84465d4-k7l7s",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:19Z",
+    "name": "pinned-5b84465d4.18ddd0de1e19722f",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "657",
+    "uid": "6f83cc96-9bab-4648-ba91-b55a6f4ea46e"
+   },
+   "reason": "SuccessfulCreate",
+   "reportingComponent": "replicaset-controller",
+   "reportingInstance": "",
+   "source": {
+    "component": "replicaset-controller"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:19Z",
+   "involvedObject": {
+    "apiVersion": "apps/v1",
+    "kind": "ReplicaSet",
+    "name": "pinned-5b84465d4",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "651",
+    "uid": "c41f51bc-006e-4557-952b-d774eb74129b"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:19Z",
+   "message": "Created pod: pinned-5b84465d4-fb2mb",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:19Z",
+    "name": "pinned-5b84465d4.18ddd0de1e39457b",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "659",
+    "uid": "ea18a11a-dc28-4611-bf41-d1c158d81770"
+   },
+   "reason": "SuccessfulCreate",
+   "reportingComponent": "replicaset-controller",
+   "reportingInstance": "",
+   "source": {
+    "component": "replicaset-controller"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:17:42Z",
+   "involvedObject": {
+    "apiVersion": "apps/v1",
+    "kind": "ReplicaSet",
+    "name": "pinned-5b84465d4",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "841",
+    "uid": "c41f51bc-006e-4557-952b-d774eb74129b"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:17:42Z",
+   "message": "Created pod: pinned-5b84465d4-z668k",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:17:42Z",
+    "name": "pinned-5b84465d4.18ddd1375f7cfb18",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "1260",
+    "uid": "62390620-aa44-427d-844d-d747ade35641"
+   },
+   "reason": "SuccessfulCreate",
+   "reportingComponent": "replicaset-controller",
+   "reportingInstance": "",
+   "source": {
+    "component": "replicaset-controller"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:17:42Z",
+   "involvedObject": {
+    "apiVersion": "apps/v1",
+    "kind": "ReplicaSet",
+    "name": "pinned-5b84465d4",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "841",
+    "uid": "c41f51bc-006e-4557-952b-d774eb74129b"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:17:42Z",
+   "message": "Created pod: pinned-5b84465d4-dc5vs",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:17:42Z",
+    "name": "pinned-5b84465d4.18ddd1375fb87ec5",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "1267",
+    "uid": "99ab5b1a-517f-4daf-b1ff-cc6fc67428a8"
+   },
+   "reason": "SuccessfulCreate",
+   "reportingComponent": "replicaset-controller",
+   "reportingInstance": "",
+   "source": {
+    "component": "replicaset-controller"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "count": 1,
+   "eventTime": null,
+   "firstTimestamp": "2026-10-12T15:11:19Z",
+   "involvedObject": {
+    "apiVersion": "apps/v1",
+    "kind": "Deployment",
+    "name": "pinned",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "650",
+    "uid": "b62b9e2f-3618-4497-bfb2-c11e5d67654d"
+   },
+   "kind": "Event",
+   "lastTimestamp": "2026-10-12T15:11:19Z",
+   "message": "Scaled up replica set pinned-5b84465d4 from 0 to 2",
+   "metadata": {
+    "creationTimestamp": "2026-10-12T15:11:19Z",
+    "name": "pinned.18ddd0de19d94a79",
+    "namespace": "opscope-node-down",
+    "resourceVersion": "652",
+    "uid": "c218ca1c-fe0a-471f-a43b-f90357eee4bb"
+   },
+   "reason": "ScalingReplicaSet",
+   "reportingComponent": "deployment-controller",
+   "reportingInstance": "",
+   "source": {
+    "component": "deployment-controller"
+   },
+   "type": "Normal"
+  },
+  {
+   "apiVersion": "v1",
+   "kind": "Namespace",
+   "metadata": {
+    "annotations": {},
+    "creationTimestamp": "2026-10-12T15:11:19Z",
+    "labels": {
+     "kubernetes.io/metadata.name": "opscope-node-down"
+    },
+    "name": "opscope-node-down",
+    "resourceVersion": "647",
+    "uid": "adc9ee68-92d3-4a23-928e-a1b131e77f8c"
+   },
+   "spec": {
+    "finalizers": [
+     "kubernetes"
+    ]
+   },
+   "status": {
+    "phase": "Active"
+   }
+  },
+  {
+   "apiVersion": "v1",
+   "kind": "Node",
+   "metadata": {
+    "annotations": {
+     "node.alpha.kubernetes.io/ttl": "0",
+     "volumes.kubernetes.io/controller-managed-attach-detach": "true"
+    },
+    "creationTimestamp": "2026-10-12T15:10:04Z",
+    "labels": {
+     "beta.kubernetes.io/arch": "arm64",
+     "beta.kubernetes.io/os": "linux",
+     "kubernetes.io/arch": "arm64",
+     "kubernetes.io/hostname": "opscope-g7-control-plane",
+     "kubernetes.io/os": "linux",
+     "node-role.kubernetes.io/control-plane": "",
+     "node.kubernetes.io/exclude-from-external-load-balancers": ""
+    },
+    "name": "opscope-g7-control-plane",
+    "resourceVersion": "1157",
+    "uid": "b19590ee-9941-46fd-843c-0b59df70d8b5"
+   },
+   "spec": {
+    "podCIDR": "10.244.0.0/24",
+    "podCIDRs": [
+     "10.244.0.0/24"
+    ],
+    "providerID": "kind://docker/opscope-g7/opscope-g7-control-plane",
+    "taints": [
+     {
+      "effect": "NoSchedule",
+      "key": "node-role.kubernetes.io/control-plane"
+     }
+    ]
+   },
+   "status": {
+    "addresses": [
+     {
+      "address": "172.18.0.3",
+      "type": "InternalIP"
+     },
+     {
+      "address": "opscope-g7-control-plane",
+      "type": "Hostname"
+     }
+    ],
+    "allocatable": {
+     "cpu": "14",
+     "ephemeral-storage": "954976684Ki",
+     "hugepages-1Gi": "0",
+     "hugepages-2Mi": "0",
+     "hugepages-32Mi": "0",
+     "hugepages-64Ki": "0",
+     "memory": "8124000Ki",
+     "pods": "110"
+    },
+    "capacity": {
+     "cpu": "14",
+     "ephemeral-storage": "954976684Ki",
+     "hugepages-1Gi": "0",
+     "hugepages-2Mi": "0",
+     "hugepages-32Mi": "0",
+     "hugepages-64Ki": "0",
+     "memory": "8124000Ki",
+     "pods": "110"
+    },
+    "conditions": [
+     {
+      "lastHeartbeatTime": "2026-10-12T15:16:43Z",
+      "lastTransitionTime": "2026-10-12T15:10:03Z",
+      "message": "kubelet has sufficient memory available",
+      "reason": "KubeletHasSufficientMemory",
+      "status": "False",
+      "type": "MemoryPressure"
+     },
+     {
+      "lastHeartbeatTime": "2026-10-12T15:16:43Z",
+      "lastTransitionTime": "2026-10-12T15:10:03Z",
+      "message": "kubelet has no disk pressure",
+      "reason": "KubeletHasNoDiskPressure",
+      "status": "False",
+      "type": "DiskPressure"
+     },
+     {
+      "lastHeartbeatTime": "2026-10-12T15:16:43Z",
+      "lastTransitionTime": "2026-10-12T15:10:03Z",
+      "message": "kubelet has sufficient PID available",
+      "reason": "KubeletHasSufficientPID",
+      "status": "False",
+      "type": "PIDPressure"
+     },
+     {
+      "lastHeartbeatTime": "2026-10-12T15:16:43Z",
+      "lastTransitionTime": "2026-10-12T15:10:24Z",
+      "message": "kubelet is posting ready status",
+      "reason": "KubeletReady",
+      "status": "True",
+      "type": "Ready"
+     }
+    ],
+    "daemonEndpoints": {
+     "kubeletEndpoint": {
+      "Port": 10250
+     }
+    },
+    "features": {
+     "supplementalGroupsPolicy": true
+    },
+    "nodeInfo": {
+     "architecture": "arm64",
+     "bootID": "953b6870-c94d-4f88-83dc-7ff6134836de",
+     "containerRuntimeVersion": "containerd://2.2.0",
+     "kernelVersion": "7.0.12-linuxkit",
+     "kubeProxyVersion": "",
+     "kubeletVersion": "v1.35.0",
+     "machineID": "6be28a2e5a6e49acb2535b2f2e45ab51",
+     "operatingSystem": "linux",
+     "osImage": "Debian GNU/Linux 12 (bookworm)",
+     "swap": {
+      "capacity": 1073737728
+     },
+     "systemUUID": "6be28a2e5a6e49acb2535b2f2e45ab51"
+    },
+    "runtimeHandlers": [
+     {
+      "features": {
+       "recursiveReadOnlyMounts": true,
+       "userNamespaces": true
+      },
+      "name": ""
+     },
+     {
+      "features": {
+       "recursiveReadOnlyMounts": true,
+       "userNamespaces": true
+      },
+      "name": "runc"
+     },
+     {
+      "features": {
+       "recursiveReadOnlyMounts": true,
+       "userNamespaces": true
+      },
+      "name": "test-handler"
+     }
+    ]
+   }
+  },
+  {
+   "apiVersion": "v1",
+   "kind": "Node",
+   "metadata": {
+    "annotations": {
+     "node.alpha.kubernetes.io/ttl": "0",
+     "volumes.kubernetes.io/controller-managed-attach-detach": "true"
+    },
+    "creationTimestamp": "2026-10-12T15:10:17Z",
+    "labels": {
+     "beta.kubernetes.io/arch": "arm64",
+     "beta.kubernetes.io/os": "linux",
+     "kubernetes.io/arch": "arm64",
+     "kubernetes.io/hostname": "opscope-g7-worker",
+     "kubernetes.io/os": "linux",
+     "opscope-scenario": "node-down"
+    },
+    "name": "opscope-g7-worker",
+    "resourceVersion": "844",
+    "uid": "1fd2000d-2eb9-4a8c-921a-5a6bd33f33f5"
+   },
+   "spec": {
+    "podCIDR": "10.244.1.0/24",
+    "podCIDRs": [
+     "10.244.1.0/24"
+    ],
+    "providerID": "kind://docker/opscope-g7/opscope-g7-worker",
+    "taints": [
+     {
+      "effect": "NoSchedule",
+      "key": "node.kubernetes.io/unreachable",
+      "timeAdded": "2026-10-12T15:12:42Z"
+     },
+     {
+      "effect": "NoExecute",
+      "key": "node.kubernetes.io/unreachable",
+      "timeAdded": "2026-10-12T15:12:42Z"
+     }
+    ]
+   },
+   "status": {
+    "addresses": [
+     {
+      "address": "172.18.0.4",
+      "type": "InternalIP"
+     },
+     {
+      "address": "opscope-g7-worker",
+      "type": "Hostname"
+     }
+    ],
+    "allocatable": {
+     "cpu": "14",
+     "ephemeral-storage": "954976684Ki",
+     "hugepages-1Gi": "0",
+     "hugepages-2Mi": "0",
+     "hugepages-32Mi": "0",
+     "hugepages-64Ki": "0",
+     "memory": "8124000Ki",
+     "pods": "110"
+    },
+    "capacity": {
+     "cpu": "14",
+     "ephemeral-storage": "954976684Ki",
+     "hugepages-1Gi": "0",
+     "hugepages-2Mi": "0",
+     "hugepages-32Mi": "0",
+     "hugepages-64Ki": "0",
+     "memory": "8124000Ki",
+     "pods": "110"
+    },
+    "conditions": [
+     {
+      "lastHeartbeatTime": "2026-10-12T15:11:49Z",
+      "lastTransitionTime": "2026-10-12T15:12:42Z",
+      "message": "Kubelet stopped posting node status.",
+      "reason": "NodeStatusUnknown",
+      "status": "Unknown",
+      "type": "MemoryPressure"
+     },
+     {
+      "lastHeartbeatTime": "2026-10-12T15:11:49Z",
+      "lastTransitionTime": "2026-10-12T15:12:42Z",
+      "message": "Kubelet stopped posting node status.",
+      "reason": "NodeStatusUnknown",
+      "status": "Unknown",
+      "type": "DiskPressure"
+     },
+     {
+      "lastHeartbeatTime": "2026-10-12T15:11:49Z",
+      "lastTransitionTime": "2026-10-12T15:12:42Z",
+      "message": "Kubelet stopped posting node status.",
+      "reason": "NodeStatusUnknown",
+      "status": "Unknown",
+      "type": "PIDPressure"
+     },
+     {
+      "lastHeartbeatTime": "2026-10-12T15:11:49Z",
+      "lastTransitionTime": "2026-10-12T15:12:42Z",
+      "message": "Kubelet stopped posting node status.",
+      "reason": "NodeStatusUnknown",
+      "status": "Unknown",
+      "type": "Ready"
+     }
+    ],
+    "daemonEndpoints": {
+     "kubeletEndpoint": {
+      "Port": 10250
+     }
+    },
+    "features": {
+     "supplementalGroupsPolicy": true
+    },
+    "nodeInfo": {
+     "architecture": "arm64",
+     "bootID": "953b6870-c94d-4f88-83dc-7ff6134836de",
+     "containerRuntimeVersion": "containerd://2.2.0",
+     "kernelVersion": "7.0.12-linuxkit",
+     "kubeProxyVersion": "",
+     "kubeletVersion": "v1.35.0",
+     "machineID": "64d6ae8c32d0454b9f05aeb12029e511",
+     "operatingSystem": "linux",
+     "osImage": "Debian GNU/Linux 12 (bookworm)",
+     "swap": {
+      "capacity": 1073737728
+     },
+     "systemUUID": "64d6ae8c32d0454b9f05aeb12029e511"
+    },
+    "runtimeHandlers": [
+     {
+      "features": {
+       "recursiveReadOnlyMounts": true,
+       "userNamespaces": true
+      },
+      "name": ""
+     },
+     {
+      "features": {
+       "recursiveReadOnlyMounts": true,
+       "userNamespaces": true
+      },
+      "name": "runc"
+     },
+     {
+      "features": {
+       "recursiveReadOnlyMounts": true,
+       "userNamespaces": true
+      },
+      "name": "test-handler"
+     }
+    ]
+   }
+  },
+  {
+   "apiVersion": "storage.k8s.io/v1",
+   "kind": "StorageClass",
+   "metadata": {
+    "annotations": {
+     "storageclass.kubernetes.io/is-default-class": "true"
+    },
+    "creationTimestamp": "2026-10-12T15:10:07Z",
+    "name": "standard",
+    "resourceVersion": "264",
+    "uid": "479fa622-6c7e-4b86-88b7-1492c4e4aba7"
+   },
+   "provisioner": "rancher.io/local-path",
+   "reclaimPolicy": "Delete",
+   "volumeBindingMode": "WaitForFirstConsumer"
+  },
+  {
+   "apiVersion": "gateway.networking.k8s.io/v1",
+   "kind": "GatewayClass",
+   "metadata": {
+    "annotations": {},
+    "creationTimestamp": "2026-10-12T15:11:18Z",
+    "generation": 1,
+    "name": "opscope-nobody",
+    "resourceVersion": "632",
+    "uid": "1089c2b9-e32e-4825-8225-b6e5611442e4"
+   },
+   "spec": {
+    "controllerName": "example.com/no-such-controller"
+   },
+   "status": {
+    "conditions": [
+     {
+      "lastTransitionTime": "1970-01-01T00:00:00Z",
+      "message": "Waiting for controller",
+      "reason": "Pending",
+      "status": "Unknown",
+      "type": "Accepted"
+     }
+    ]
+   }
+  }
+ ],
+ "kind": "List"
+}

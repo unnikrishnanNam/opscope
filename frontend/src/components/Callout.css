@@ -62,6 +62,11 @@
   white-space: nowrap;
 }
 
+/* Code in a message from the server may be a whole command: see Message. */
+.callout-word {
+  white-space: nowrap;
+}
+
 /* Paragraphs and code blocks inside a callout get room between them. */
 .callout-text > * + * {
   margin-top: var(--space-2);

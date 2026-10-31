@@ -12,6 +12,8 @@ import (
 	"sort"
 	"time"
 
+	"opscope/internal/kube"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
@@ -49,9 +51,9 @@ var kinds = map[string]kindInfo{
 	"jobs":           {group("batch", "v1", "jobs"), "Job", true},
 	"cronjobs":       {group("batch", "v1", "cronjobs"), "CronJob", true},
 	"ingresses":      {group("networking.k8s.io", "v1", "ingresses"), "Ingress", true},
-	"gateways":       {gatewayAPI("gateways"), "Gateway", true},
-	"httproutes":     {gatewayAPI("httproutes"), "HTTPRoute", true},
-	"gatewayclasses": {gatewayAPI("gatewayclasses"), "GatewayClass", false},
+	"gateways":       {kube.GatewayAPI("gateways"), "Gateway", true},
+	"httproutes":     {kube.GatewayAPI("httproutes"), "HTTPRoute", true},
+	"gatewayclasses": {kube.GatewayAPI("gatewayclasses"), "GatewayClass", false},
 }
 
 // resourceForKind finds the URL name for a kind, so owners like

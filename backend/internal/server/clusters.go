@@ -8,6 +8,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"opscope/internal/clusters"
+	"opscope/internal/snapshot"
 )
 
 // maxKubeconfigBytes limits how much a client can upload in one request.
@@ -70,7 +71,9 @@ func addCluster(manager *clusters.Manager) http.HandlerFunc {
 }
 
 // DELETE /api/clusters/{id}
-func removeCluster(manager *clusters.Manager) http.HandlerFunc {
+//
+// Its snapshot is dropped too, so what was read from it isn't kept in memory.
+func removeCluster(manager *clusters.Manager, snapshots *snapshot.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		err := manager.Remove(r.PathValue("id"))
 		switch {
@@ -79,6 +82,11 @@ func removeCluster(manager *clusters.Manager) http.HandlerFunc {
 		case err != nil:
 			writeError(w, http.StatusBadRequest, err.Error())
 		default:
+			known := map[string]bool{}
+			for _, c := range manager.List() {
+				known[c.ID] = true
+			}
+			snapshots.Forget(known)
 			w.WriteHeader(http.StatusNoContent)
 		}
 	}
@@ -89,6 +97,7 @@ type clusterStatus struct {
 	*clusters.Cluster
 	Reachable bool   `json:"reachable"`
 	Version   string `json:"version,omitempty"`
+	Via       string `json:"via,omitempty"` // where it was reached, when not at Server (a kind node)
 	Error     string `json:"error,omitempty"`
 	Detail    string `json:"detail,omitempty"`
 }
@@ -112,6 +121,7 @@ func getCluster(manager *clusters.Manager) http.HandlerFunc {
 		} else {
 			status.Reachable = true
 			status.Version = version
+			status.Via = cluster.Via()
 		}
 		writeJSON(w, http.StatusOK, status)
 	}

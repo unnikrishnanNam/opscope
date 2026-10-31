@@ -20,8 +20,8 @@ export function ClustersProvider({ children }) {
 //   data      [...clusters] (null while loading)
 //   error, loading, reload   for the list itself
 //   statuses  { [id]: status } from GET /api/clusters/{id}: reachable,
-//             version, or error and detail. A cluster that hasn't answered
-//             yet has no entry.
+//             version and via, or error and detail. A cluster that hasn't
+//             answered yet has no entry.
 //   recheck   checks every cluster again now (a "Try again" button)
 export function useClusters() {
   return useContext(ClustersContext);

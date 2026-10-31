@@ -78,6 +78,7 @@ can't be reached has `reachable: false` and an explanation:
 | ----------- | ------------------------------------------------------------ |
 | `reachable` | Whether the API server answered                              |
 | `version`   | The Kubernetes version, when reachable (`v1.31.4`)           |
+| `via`       | Where it was reached, when not at `server` (a kind node)     |
 | `error`     | A readable explanation, when not                             |
 | `detail`    | The original error, when not                                 |
 
@@ -204,6 +205,203 @@ A pod's logs as plain text, sent with `Cache-Control: no-store`.
 Without `follow`, a request is cut off after 30 seconds. A request the API server rejects (no
 previous run, a container that doesn't exist) returns `400` with its message.
 
+## Topology and diagnosis
+
+### `GET /api/clusters/{id}/topology`
+
+A graph of objects and what they need, for the whole cluster, one namespace, one app or one
+object's neighbourhood. Opscope reads the whole cluster at once for it and uses that reading for up
+to 10 seconds, so several requests in a row read the cluster only once. It also reads each cluster
+in the background (see [Background snapshots](deployment.md#background-snapshots)).
+
+| Parameter   | Effect                                                                                  |
+| ----------- | --------------------------------------------------------------------------------------- |
+| `namespace` | A namespace: everything in it, what points at it from elsewhere, and what all of that needs |
+| `app`       | With `namespace`, one app of that namespace                                             |
+| `focus`     | One object's ID (`pods/shop/web-1`, `nodes/worker-1`) and everything within `depth` edges of it, not going on through a node, a namespace or a class that many objects share |
+| `depth`     | With `focus`, from 1 to 5; default 2                                                    |
+| `expand`    | Workloads whose pods are shown one by one, as comma-separated IDs, or `all`; for the whole cluster, namespaces (`namespaces/blog`) shown open although nothing is wrong in them |
+| `problems`  | `true`: only objects that aren't `ok`, and what points at them                          |
+
+Without `namespace` or `focus`, the whole cluster (below). An unknown `focus` answers `404`, and
+`app` without `namespace` answers `400`.
+
+```json
+{
+  "nodes": [
+    { "id": "deployments/shop/api", "resource": "deployments", "kind": "Deployment", "namespace": "shop",
+      "name": "api", "app": "api", "state": "failing", "status": "0/2", "message": "None of its pods are ready." },
+    { "id": "pods:replicasets/shop/api-7d9f", "resource": "pods", "kind": "Pod", "namespace": "shop",
+      "name": "api", "app": "api", "state": "failing", "status": "0/2 ready",
+      "message": "secret \"stripe\" not found",
+      "pods": { "owner": "deployments/shop/api", "ready": 0, "total": 2,
+                "members": ["pods/shop/api-7d9f-a", "pods/shop/api-7d9f-b"] } },
+    { "id": "secrets/shop/stripe", "resource": "secrets", "kind": "Secret", "namespace": "shop",
+      "name": "stripe", "app": "api", "state": "missing", "status": "Missing",
+      "message": "It's referred to, but doesn't exist." }
+  ],
+  "edges": [
+    { "from": "deployments/shop/api", "to": "pods:replicasets/shop/api-7d9f", "type": "owns" },
+    { "from": "pods:replicasets/shop/api-7d9f", "to": "secrets/shop/stripe", "type": "uses",
+      "via": ["container api: env STRIPE_KEY"] }
+  ],
+  "apps": [{ "name": "api", "state": "failing", "workloads": 1 }],
+  "findings": [
+    { "id": "pod.config|pods/shop/api-7d9f-a|secrets/shop/stripe", "rule": "pod.config",
+      "object": "pods/shop/api-7d9f-a", "severity": "failing", "confidence": "certain",
+      "title": "Container api can't start: it needs Secret stripe", "blames": ["secrets/shop/stripe"],
+      "related": [], "evidence": [], "next": [] }
+  ],
+  "snapshot": { "taken": "2026-10-11T10:00:00Z", "skipped": [{ "resource": "secrets", "code": "forbidden" }] }
+}
+```
+
+A node's `id` is its resource type, namespace and name, as in the detail page's URL. Pods of one
+workload are grouped into one node whose `id` starts with `pods:` and which has `pods` set, unless
+`expand` asks for them. `apps`, the namespace's apps, is returned for a namespace or an app (apps
+of nothing but unused configuration are left out). `snapshot` says when the cluster
+was read and which resource types couldn't be (as in `/names`); objects of those types are
+`unknown` rather than `missing`. `findings` are the diagnosis's findings about every object shown,
+the pods in a group included, as in the [diagnosis](#get-apiclustersiddiagnosisresourcenamespacename)
+steps but without nesting; following `blames` from one leads to its root causes. What a finding
+blames is always in the view: when nothing else would put it there (a ResourceQuota that stops a
+ReplicaSet), it's added with a `blames` edge.
+
+**The whole cluster** is drawn by namespace. Each app is one node (`resource` `apps`, `kind`
+`App`, `id` `apps/<namespace>/<app>`) with a summary as its `status` ("3 workloads, 1 failing")
+and its namespace as `group`; `groups` lists those namespaces with their worst state. A namespace
+with nothing wrong in it is one node instead (`resource` `namespaces`, `status` "4 apps") unless
+`expand` names it. Gateways, GatewayClasses and IngressClasses are nodes of their own, shared by
+apps, and every node (machine) is there. The edges join these: an app's routes attach to a
+Gateway, its Ingress uses a class, a Gateway owns the app that runs it, an app routes to another;
+`via` names the objects inside the app. Only root causes come as `findings`, and an app's or a
+folded namespace's `members` lists the objects whose findings it shows, so each finding belongs to
+a node (a missing StorageClass belongs to the apps whose claims need it).
+
+```json
+{
+  "nodes": [
+    { "id": "apps/shop/checkout", "resource": "apps", "kind": "App", "namespace": "shop", "name": "checkout",
+      "app": "checkout", "state": "failing", "status": "1 workload, 1 failing", "group": "namespaces/shop",
+      "members": ["secrets/shop/stripe-key"] },
+    { "id": "namespaces/blog", "resource": "namespaces", "kind": "Namespace", "name": "blog", "state": "ok",
+      "status": "2 apps" },
+    { "id": "gateways/infra/main", "resource": "gateways", "kind": "Gateway", "namespace": "infra",
+      "name": "main", "state": "ok", "status": "Programmed" }
+  ],
+  "edges": [
+    { "from": "namespaces/blog", "to": "gateways/infra/main", "type": "attaches", "via": ["HTTPRoute blog"] }
+  ],
+  "groups": [{ "id": "namespaces/shop", "name": "shop", "state": "failing", "apps": 1 }],
+  "findings": [{ "id": "missing|secrets/shop/stripe-key|", "rule": "missing", "object": "secrets/shop/stripe-key", "...": "..." }],
+  "snapshot": { "taken": "2026-10-12T10:00:00Z", "skipped": [] }
+}
+```
+
+| `state`       | Meaning                                                                           |
+| ------------- | --------------------------------------------------------------------------------- |
+| `ok`          | Working                                                                           |
+| `progressing` | Starting, rolling out or scaling, for less than 5 minutes                         |
+| `degraded`    | Working, but not fully: some replicas not ready, a node under pressure            |
+| `failing`     | Not working                                                                       |
+| `missing`     | Referred to by another object, but doesn't exist                                  |
+| `unknown`     | Referred to, but Opscope can't read that resource type                            |
+
+An edge points from an object to something it needs. `via` says where the references are (at most
+five, then "and N more"), and `optional` is `true` when every reference is optional, so a missing
+target breaks nothing.
+
+| `type`      | From → to                                                                   |
+| ----------- | --------------------------------------------------------------------------- |
+| `owns`      | Deployment → ReplicaSet → pods, CronJob → Job → pods, and other owners      |
+| `runs-on`   | Pod → node                                                                  |
+| `uses`      | Pod or workload → ConfigMap, Secret, claim, service account; claim → volume → StorageClass; Ingress → IngressClass, TLS Secret; Gateway → certificate Secret |
+| `selects`   | Service or PodDisruptionBudget → pods                                       |
+| `routes-to` | Ingress or HTTPRoute → Service                                              |
+| `attaches`  | HTTPRoute → Gateway → GatewayClass                                          |
+| `permits`   | HTTPRoute → the ReferenceGrant that lets it reach a Service in another namespace; a missing one is named `(none)` |
+| `scales`    | HorizontalPodAutoscaler → what it scales                                    |
+| `blames`    | Only in views: a finding about the first object blames the second, and no other edge joins them |
+
+### `GET /api/clusters/{id}/diagnosis/{resource}/{namespace}/{name}`
+### `GET /api/clusters/{id}/diagnosis/{resource}/{name}`
+
+Why one object is failing, from the same reading of the cluster as `/topology`. The second form is
+for cluster-wide kinds (`nodes`, `gatewayclasses`). An object Opscope doesn't know answers `404`.
+
+```json
+{
+  "object": { "id": "deployments/shop/api", "kind": "Deployment", "state": "failing", "status": "0/1" },
+  "steps": [
+    {
+      "id": "workload.unavailable|deployments/shop/api|pods/shop/api-7d9f-a",
+      "rule": "workload.unavailable", "object": "deployments/shop/api",
+      "severity": "failing", "confidence": "certain",
+      "title": "Its only replica isn't ready",
+      "evidence": [], "blames": ["pods/shop/api-7d9f-a"],
+      "next": [{ "label": "Events", "object": "deployments/shop/api", "tab": "events" }],
+      "objects": ["deployments/shop/api"], "root": false,
+      "causes": [
+        {
+          "rule": "pod.config", "title": "Container api can't start: it needs Secret stripe",
+          "detail": "Kubernetes can't find it, so the container isn't created.",
+          "evidence": [{ "source": "container", "text": "api: CreateContainerConfigError: secret \"stripe\" not found" }],
+          "blames": ["secrets/shop/stripe"], "objects": ["pods/shop/api-7d9f-a"], "root": false,
+          "causes": [
+            {
+              "rule": "missing", "title": "Secret shop/stripe doesn't exist", "root": true,
+              "next": [{ "label": "kubectl get", "command": "kubectl get secrets -n shop" }]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "impact": [],
+  "nodes": { "pods/shop/api-7d9f-a": { "id": "pods/shop/api-7d9f-a", "kind": "Pod", "status": "CreateContainerConfigError" } },
+  "snapshot": { "taken": "2026-10-11T10:00:00Z", "skipped": [] }
+}
+```
+
+(Some fields are left out above for length; every step has all of them.)
+
+| Field      | Contents                                                                                     |
+| ---------- | -------------------------------------------------------------------------------------------- |
+| `steps`    | The object's findings, worst first. Each has its `causes`: the findings of the objects it `blames`, and so on |
+| `root`     | `true` when nothing a step blames has a finding of its own: a root cause. One reached along two paths (a node that's down, through its pods and through their replacements) is under both, with the same `id` |
+| `objects`  | What a step is about. Alike findings are merged: pods failing the same way are one step      |
+| `severity` | `failing`, `degraded`, or `info` for something worth knowing that isn't a fault              |
+| `confidence` | `certain` (from structured status), `likely` (read from event or message text), `possible` |
+| `next`     | Links to an Opscope page (`object`, `tab`, `query`) or a read-only kubectl `command`. Only `get`, `describe` and `logs` are ever suggested |
+| `related`  | Only on `unexplained` findings, which no rule could explain: unhealthy neighbours that may be involved, a guess |
+| `impact`   | Objects whose problems lead to this one; pods are left out when their workload is listed     |
+| `nodes`    | Every object the steps name, as in `/topology`, to show and link them                        |
+
+### `GET /api/clusters/{id}/problems`
+
+The root causes of what's wrong, in one namespace (`namespace`) or the whole cluster, for the
+overview. Each is a finding, as in the diagnosis, that nothing else explains, with what it affects.
+Alike root causes are one problem: two pods crashing the same way are one, with both in `objects`.
+
+```json
+{
+  "problems": [
+    {
+      "rule": "missing", "severity": "failing", "confidence": "certain",
+      "title": "Secret shop/stripe doesn't exist",
+      "objects": ["secrets/shop/stripe"],
+      "affects": [{ "id": "deployments/shop/api", "kind": "Deployment", "state": "failing", "status": "0/1" }]
+    }
+  ],
+  "nodes": { "secrets/shop/stripe": { "id": "secrets/shop/stripe", "kind": "Secret", "state": "missing" } },
+  "snapshot": { "taken": "2026-10-11T10:00:00Z", "skipped": [] }
+}
+```
+
+(Each problem also has every field of a diagnosis step's finding.) The worst come first, then those
+that affect the most. A problem belongs to a namespace when it, or anything it affects, is in it: a
+node that's down is a problem in every namespace with pods on it. Notes (`info`) aren't problems.
+
 ## Usage
 
 Usage comes from metrics-server. Without it, these endpoints answer `404` with
@@ -270,4 +468,8 @@ curl -s "http://localhost:8080/api/clusters/multipass/pods?namespace=kube-system
 
 ```bash
 curl -sN "http://localhost:8080/api/clusters/multipass/pods/web/api-7d9f/logs?tail=100&follow=true"
+```
+
+```bash
+curl -s "http://localhost:8080/api/clusters/multipass/topology?namespace=web&problems=true"
 ```

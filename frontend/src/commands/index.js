@@ -3,6 +3,7 @@ import { help } from "./sources/help.js";
 import { namespaces } from "./sources/namespaces.js";
 import { objects } from "./sources/objects.js";
 import { pages } from "./sources/pages.js";
+import { problems } from "./sources/problems.js";
 import { theme } from "./sources/theme.js";
 
 // Every global command source, in one list. A global source offers commands
@@ -14,4 +15,4 @@ import { theme } from "./sources/theme.js";
 // here. The order here is the order of their groups in the palette when
 // nothing has been typed yet.
 
-export const globalSources = [pages, namespaces, clusters, theme, help, objects];
+export const globalSources = [pages, problems, namespaces, clusters, theme, help, objects];
