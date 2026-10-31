@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -112,5 +113,32 @@ func TestClusterErrorsKeepTheirMeaning(t *testing.T) {
 		if rec.Code != tt.want {
 			t.Errorf("%v: status %d, want %d", tt.err, rec.Code, tt.want)
 		}
+	}
+}
+
+// Off by default: a fixed answer, whatever the cluster, and no kubelet call.
+func TestVolumeUsageOff(t *testing.T) {
+	rec := get(newTestServer(t), "/api/clusters/any/metrics/volumes")
+
+	if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), `"code":"volume_usage_off"`) {
+		t.Fatalf("got %d %s, want 404 volume_usage_off", rec.Code, rec.Body.String())
+	}
+}
+
+func TestVolumeUsageErrors(t *testing.T) {
+	cluster := &clusters.Cluster{Server: "https://example:6443"}
+	forbidden := apierrors.NewForbidden(schema.GroupResource{Resource: "nodes/proxy"}, "a", errors.New("RBAC"))
+
+	rec := httptest.NewRecorder()
+	writeVolumeUsageError(rec, fmt.Errorf("%w: %w", metrics.ErrVolumeUsageForbidden, forbidden), cluster)
+	if rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), `"code":"volume_usage_forbidden"`) {
+		t.Errorf("node proxy forbidden: got %d %s", rec.Code, rec.Body.String())
+	}
+
+	// Not allowed to list pods is an ordinary "not allowed", without the code.
+	rec = httptest.NewRecorder()
+	writeVolumeUsageError(rec, apierrors.NewForbidden(schema.GroupResource{Resource: "pods"}, "", errors.New("RBAC")), cluster)
+	if rec.Code != http.StatusForbidden || strings.Contains(rec.Body.String(), "volume_usage_forbidden") {
+		t.Errorf("pods forbidden: got %d %s", rec.Code, rec.Body.String())
 	}
 }

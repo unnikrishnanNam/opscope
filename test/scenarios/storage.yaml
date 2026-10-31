@@ -1,0 +1,156 @@
+# Storage scenarios: the cases Opscope's storage pages should explain.
+# Run them on a throwaway kind cluster; see README.md in this folder.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: storage-test
+---
+# A StatefulSet with a claim template: claims data-db-0 and data-db-1.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db
+  namespace: storage-test
+spec:
+  serviceName: db
+  replicas: 2
+  selector:
+    matchLabels: { app: db }
+  template:
+    metadata:
+      labels: { app: db }
+    spec:
+      containers:
+        - name: db
+          image: registry.k8s.io/pause:3.10
+          volumeMounts:
+            - { name: data, mountPath: /data }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests: { storage: 1Gi }
+---
+# A pod with a generic ephemeral volume, a ConfigMap, a Secret and memory-backed scratch space.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: storage-test
+data:
+  app.yaml: "debug: false"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secret
+  namespace: storage-test
+stringData:
+  token: not-a-real-token
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: worker
+  namespace: storage-test
+spec:
+  containers:
+    - name: worker
+      image: registry.k8s.io/pause:3.10
+      volumeMounts:
+        - { name: scratch, mountPath: /scratch }
+        - { name: config, mountPath: /etc/app/app.yaml, subPath: app.yaml }
+        - { name: secret, mountPath: /run/secret, readOnly: true }
+        - { name: cache, mountPath: /cache }
+  volumes:
+    - name: scratch
+      ephemeral:
+        volumeClaimTemplate:
+          spec:
+            accessModes: [ReadWriteOnce]
+            resources:
+              requests: { storage: 256Mi }
+    - name: config
+      configMap: { name: app-config }
+    - name: secret
+      secret: { secretName: app-secret }
+    - name: cache
+      emptyDir: { medium: Memory, sizeLimit: 64Mi }
+---
+# Pending: WaitForFirstConsumer, and no pod uses it yet.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: unused
+  namespace: storage-test
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: { storage: 2Gi }
+---
+# Pending: asks for a StorageClass that doesn't exist.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: missing-class
+  namespace: storage-test
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: does-not-exist
+  resources:
+    requests: { storage: 1Gi }
+---
+# A static volume with Retain, bound to a claim. Deleting the claim leaves the
+# volume Released, with its data and the old claim's name:
+#   kubectl -n storage-test delete pvc retained-claim
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: retained
+spec:
+  capacity: { storage: 1Gi }
+  accessModes: [ReadWriteOnce]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath: { path: /tmp/retained }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: retained-claim
+  namespace: storage-test
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: manual
+  resources:
+    requests: { storage: 1Gi }
+---
+# A claim deleted while a pod still uses it stays Terminating until the pod
+# goes (the kubernetes.io/pvc-protection finalizer):
+#   kubectl -n storage-test delete pvc in-use --wait=false
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: in-use
+  namespace: storage-test
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: { storage: 64Mi }
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: holder
+  namespace: storage-test
+spec:
+  containers:
+    - name: holder
+      image: registry.k8s.io/pause:3.10
+      volumeMounts:
+        - { name: data, mountPath: /data }
+  volumes:
+    - name: data
+      persistentVolumeClaim: { claimName: in-use }

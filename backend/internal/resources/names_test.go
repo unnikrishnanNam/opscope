@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -23,6 +24,8 @@ func someObjects() *fake.Clientset {
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "db-password", Namespace: "data"}},
 		&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "worker-1"}},
 		&corev1.Event{ObjectMeta: metav1.ObjectMeta{Name: "api-1.1", Namespace: "web"}},
+		&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "db", Namespace: "data"}},
+		&storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: "standard"}},
 	)
 }
 
@@ -40,9 +43,11 @@ func TestListNames(t *testing.T) {
 		{Resource: "gatewayclasses", Name: "nginx"},
 		{Resource: "gateways", Namespace: "web", Name: "main"},
 		{Resource: "nodes", Name: "worker-1"},
+		{Resource: "persistentvolumeclaims", Namespace: "data", Name: "db"},
 		{Resource: "pods", Namespace: "web", Name: "api-1"},
 		{Resource: "secrets", Namespace: "data", Name: "db-password"},
 		{Resource: "services", Namespace: "web", Name: "api"},
+		{Resource: "storageclasses", Name: "standard"},
 	}
 	// Namespaces are listed too; the fake has none, so they don't show here.
 	if !reflect.DeepEqual(index.Objects, want) {
@@ -80,7 +85,7 @@ func TestListNamesWithoutGatewayAPI(t *testing.T) {
 	if want := []string{"gatewayclasses", "gateways", "httproutes"}; !slices.Equal(skipped, want) {
 		t.Errorf("skipped = %v, want %v", skipped, want)
 	}
-	if len(index.Objects) != 4 {
+	if len(index.Objects) != 6 {
 		t.Errorf("the other kinds should still be there: %+v", index.Objects)
 	}
 }

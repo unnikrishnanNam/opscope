@@ -72,6 +72,12 @@ func addSections(d *Detail, resource string, obj *unstructured.Unstructured) err
 		return httpRouteSections(d, obj)
 	case "gatewayclasses":
 		return gatewayClassSections(d, obj)
+	case "persistentvolumeclaims":
+		return claimSections(d, obj)
+	case "persistentvolumes":
+		return volumeSections(d, obj)
+	case "storageclasses":
+		return storageClassSections(d, obj)
 	}
 	return nil
 }
@@ -85,6 +91,40 @@ func convert(obj *unstructured.Unstructured, into any) error {
 func (d *Detail) add(label, value string) {
 	if value != "" {
 		d.Fields = append(d.Fields, Field{Label: label, Value: value})
+	}
+}
+
+// addLink appends a fact that names another object, shown as a link to it.
+func (d *Detail) addLink(label, value string, link *Link) {
+	if value != "" {
+		d.Fields = append(d.Fields, Field{Label: label, Value: value, Link: link})
+	}
+}
+
+// Cell is one table cell for addRow: its text, and the object it names, if any.
+type Cell struct {
+	Text string
+	Link *Link
+}
+
+func text(s string) Cell { return Cell{Text: s} }
+
+// addRow adds a row of cells. Links are only recorded once a cell has
+// one, so tables without links keep the plain shape (see Table).
+func (t *Table) addRow(cells ...Cell) {
+	row := make([]string, len(cells))
+	links := make([]*Link, len(cells))
+	linked := false
+	for i, c := range cells {
+		row[i], links[i] = c.Text, c.Link
+		linked = linked || c.Link != nil
+	}
+	if linked && t.Links == nil {
+		t.Links = make([][]*Link, len(t.Rows)) // earlier rows: no links
+	}
+	t.Rows = append(t.Rows, row)
+	if t.Links != nil {
+		t.Links = append(t.Links, links)
 	}
 }
 
@@ -117,6 +157,7 @@ func podSections(d *Detail, obj *unstructured.Unstructured) error {
 	for _, c := range pod.Spec.Containers {
 		d.Containers = append(d.Containers, withStatus(container(c, ""), statuses[c.Name]))
 	}
+	d.addTable(podVolumes(&pod))
 	return nil
 }
 
@@ -229,6 +270,7 @@ func statefulSetSections(d *Detail, obj *unstructured.Unstructured) error {
 	d.add("Update strategy", string(sts.Spec.UpdateStrategy.Type))
 	d.add("Selector", selectorText(sts.Spec.Selector))
 	d.Containers = templateContainers(sts.Spec.Template.Spec)
+	d.addTable(claimTemplates(&sts))
 	return nil
 }
 

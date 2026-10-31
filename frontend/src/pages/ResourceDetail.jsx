@@ -1,7 +1,7 @@
 import { Link, useLocation, useOutletContext, useParams, useSearchParams } from "react-router";
 import { useApi } from "../api.js";
 import { useCommands } from "../commands/registry.jsx";
-import { age } from "../format.js";
+import { age, size } from "../format.js";
 import { detailPath, nsQuery } from "../sections.js";
 import { Callout } from "../components/Callout.jsx";
 import { Card, Section } from "../components/Card.jsx";
@@ -15,11 +15,16 @@ import { PageHeader } from "../components/PageHeader.jsx";
 import SecretKeys from "../components/SecretKeys.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
 import { Tag } from "../components/Tag.jsx";
+import { UsageBar, VolumeUsageNote } from "../components/Usage.jsx";
 import Tabs from "../components/Tabs.jsx";
+import { UNMEASURED_TEXT, USAGE_OFF, VOLUME_USAGE_NOTES, inodesText, spaceText, usageByClaim } from "../volumeUsage.js";
 import { detailCommands } from "./detailCommands.js";
 import "./ResourceDetail.css";
 
 const REFRESH_MS = 10_000;
+// The kubelet measures volumes about once a minute, and Opscope keeps its
+// answer for 30 seconds.
+const VOLUME_USAGE_REFRESH_MS = 30_000;
 
 // The page for one object, e.g. /c/lab/workloads/pods/web/api-1.
 // The backend decides which sections apply; this page shows whichever are
@@ -119,6 +124,65 @@ export default function ResourceDetail({ page }) {
   );
 }
 
+// usageClaim is the claim whose volume usage this page shows: the claim
+// itself, or a volume's claim. Only while it has a volume: bound, or being
+// deleted while a pod still uses it (Terminating).
+function usageClaim(d, resource) {
+  const field = (label) => d.fields.find((f) => f.label === label);
+  const status = field("Status")?.value;
+  if (resource === "persistentvolumeclaims" && field("Volume") && ["Bound", "Terminating"].includes(status)) {
+    return { namespace: d.namespace, name: d.name };
+  }
+  if (resource === "persistentvolumes" && status === "Bound") return field("Claim")?.link ?? null;
+  return null;
+}
+
+// VolumeUsage: how full a claim's volume is, read from the kubelets when
+// volume usage is on, or a note saying why it isn't shown.
+function VolumeUsage({ cluster, claim, block }) {
+  const path = `/clusters/${cluster.id}/metrics/volumes?namespace=${encodeURIComponent(claim.namespace)}`;
+  const { data, error } = useApi(path, { refreshMs: VOLUME_USAGE_REFRESH_MS, stopOn: USAGE_OFF });
+  const u = usageByClaim(data)[`${claim.namespace}/${claim.name}`];
+
+  let body;
+  if (VOLUME_USAGE_NOTES.includes(error?.code)) {
+    body = <VolumeUsageNote error={error} />;
+  } else if (error) {
+    body = (
+      <Callout compact tone="warning" detail={error.detail}>
+        Usage isn't available right now: {error.message}
+      </Callout>
+    );
+  } else if (!data) {
+    body = <Skeleton height={40} />;
+  } else if (u?.capacity) {
+    body = (
+      <div className="volume-usage">
+        <UsageBar used={u.capacity - u.available} total={u.capacity} width="100%" label={spaceText(u)} />
+        <FactGrid>
+          <Fact label="Used">{size(u.used)}</Fact>
+          <Fact label="Free">{size(u.available)}</Fact>
+          <Fact label="Filesystem size">{size(u.capacity)}</Fact>
+          <Fact label="Inodes">{inodesText(u)}</Fact>
+        </FactGrid>
+      </div>
+    );
+  } else if (u?.unread) {
+    body = (
+      <Callout compact tone="warning" detail={u.unread.error}>
+        Couldn't read usage from node {u.unread.node} just now.
+      </Callout>
+    );
+  } else if (u?.unmeasured) {
+    body = <Callout compact>{UNMEASURED_TEXT}</Callout>;
+  } else if (block) {
+    body = <Callout compact>This is a raw block device, with no filesystem to measure.</Callout>;
+  } else {
+    body = <Callout compact>No running pod mounts this claim. Usage is only measured while one does.</Callout>;
+  }
+  return <Section title="Usage">{body}</Section>;
+}
+
 function DetailSkeleton() {
   return (
     <div className="detail-sections" aria-hidden="true">
@@ -130,9 +194,17 @@ function DetailSkeleton() {
   );
 }
 
+// ObjectLink: text that names another object (a claim's volume, a pod's
+// ConfigMap), as a link to its page when Opscope has one.
+function ObjectLink({ cluster, link, text, search }) {
+  const path = link && detailPath(cluster.id, link.resource, link.namespace, link.name);
+  return path ? <Link to={path + search}>{text}</Link> : text;
+}
+
 function Summary({ d, cluster, resource }) {
   const search = nsQuery(useLocation().search);
   const facts = d.fields.filter((f) => f.label !== "Status"); // already in the header
+  const claim = usageClaim(d, resource);
 
   return (
     <div className="detail-sections">
@@ -141,7 +213,7 @@ function Summary({ d, cluster, resource }) {
           <FactGrid>
             {facts.map((f) => (
               <Fact key={f.label} label={f.label}>
-                {f.value || <span className="cell-empty">–</span>}
+                {f.value ? <ObjectLink cluster={cluster} link={f.link} text={f.value} search={search} /> : <span className="cell-empty">–</span>}
               </Fact>
             ))}
             {d.owners.map((o) => {
@@ -154,6 +226,14 @@ function Summary({ d, cluster, resource }) {
             })}
           </FactGrid>
         </Card>
+      )}
+
+      {claim && (
+        <VolumeUsage
+          cluster={cluster}
+          claim={claim}
+          block={d.fields.find((f) => f.label === "Volume mode")?.value === "Block"}
+        />
       )}
 
       {resource === "secrets" && (
@@ -196,7 +276,17 @@ function Summary({ d, cluster, resource }) {
 
       {d.tables.map((t) => (
         <Section key={t.title} title={t.title}>
-          <SimpleTable label={t.title} columns={t.columns.map((label) => ({ label }))} rows={t.rows} />
+          <SimpleTable
+            label={t.title}
+            columns={t.columns.map((label) => ({ label }))}
+            // Plain strings stay strings, so empty cells still get their dash.
+            rows={t.rows.map((row, r) =>
+              row.map((cell, c) => {
+                const link = t.links?.[r]?.[c];
+                return link && cell ? <ObjectLink cluster={cluster} link={link} text={cell} search={search} /> : cell;
+              }),
+            )}
+          />
         </Section>
       ))}
 

@@ -33,7 +33,7 @@ metadata:
   name: opscope-read
 rules:
   - apiGroups: [""]
-    resources: [namespaces, nodes, pods, services, configmaps, events]
+    resources: [namespaces, nodes, pods, services, configmaps, events, persistentvolumeclaims, persistentvolumes]
     verbs: [get, list]
   - apiGroups: [""]
     resources: [pods/log] # the Logs tab
@@ -46,6 +46,9 @@ rules:
     verbs: [get, list]
   - apiGroups: [networking.k8s.io]
     resources: [ingresses]
+    verbs: [get, list]
+  - apiGroups: [storage.k8s.io]
+    resources: [storageclasses]
     verbs: [get, list]
   - apiGroups: [gateway.networking.k8s.io] # Gateway API; harmless if it isn't installed
     resources: [gateways, httproutes, gatewayclasses]
@@ -104,6 +107,10 @@ spec:
               value: "true"
             - name: OPSCOPE_CLUSTER_NAME
               value: "this cluster"
+            # Optional: show how full each volume is. Also apply volume-usage.yaml;
+            # see "Volume usage" in docs/deployment.md for what it allows.
+            # - name: OPSCOPE_VOLUME_USAGE
+            #   value: "true"
           ports:
             - name: http
               containerPort: 8080

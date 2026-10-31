@@ -105,6 +105,7 @@ cluster it runs in, using its own service account:
 | --------------------- | ------------------------------------------------------------------------------------------ |
 | `opscope.yaml`        | The `opscope` namespace, a service account, a read-only ClusterRole and its binding, the Deployment and a ClusterIP Service |
 | `secrets-access.yaml` | Optional: a second ClusterRole that allows reading Secrets (see [Secret access](#secret-access)) |
+| `volume-usage.yaml`   | Optional: a ClusterRole that allows reading volume usage from the kubelets (see [Volume usage](#volume-usage)) |
 
 The manifests in each release tag use that release's published image, so you can apply them
 straight from GitHub:
@@ -117,8 +118,8 @@ kubectl apply -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.2.
 kubectl apply -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.2.0/deploy/kubernetes/secrets-access.yaml
 ```
 
-or, from a clone of the repository, `kubectl apply -f deploy/kubernetes/`. Then open Opscope through
-a port-forward:
+or, from a clone of the repository, `kubectl apply -f deploy/kubernetes/opscope.yaml` (applying the
+whole folder also applies the optional files). Then open Opscope through a port-forward:
 
 ```bash
 kubectl -n opscope port-forward svc/opscope 8080:80
@@ -188,9 +189,12 @@ rather than watching.
 | `apps`                      | deployments, statefulsets, daemonsets                 | Workloads              |
 | `batch`                     | jobs, cronjobs                                        | Workloads              |
 | `networking.k8s.io`         | ingresses                                             | Networking             |
+| core (`""`)                 | persistentvolumeclaims, persistentvolumes             | Storage                |
+| `storage.k8s.io`            | storageclasses                                        | Storage                |
 | `gateway.networking.k8s.io` | gateways, httproutes, gatewayclasses                  | Gateway API (optional) |
 | `metrics.k8s.io`            | nodes, pods                                           | CPU and memory usage   |
 | core (`""`)                 | secrets (`secrets-access.yaml` only)                  | Secrets pages, Reveal  |
+| core (`""`)                 | nodes/proxy (`get`, `volume-usage.yaml` only)         | Volume usage (opt-in)  |
 
 The same applies to a kubeconfig used from outside the cluster: Opscope can show only what that
 user is allowed to read. Anything it can't read is reported on the page that needs it, and the rest
@@ -210,6 +214,44 @@ kubectl delete -f deploy/kubernetes/secrets-access.yaml
 ```
 
 The Secrets pages then say that this user isn't allowed to read them.
+
+### Volume usage
+
+Kubernetes doesn't record how full a volume is; only the kubelet on the node where it's mounted
+knows. With volume usage on, the PersistentVolumeClaims list gets a "Used" column, claim and volume
+pages show used and free space and inodes, and the overview counts claims that are 90% full or
+more. It's off by default, because of the permission it needs.
+
+Opscope reads each node's stats through the API server (`/api/v1/nodes/{node}/proxy/stats/summary`),
+which needs `get` on `nodes/proxy`. Kubernetes has no narrower permission for this route:
+`nodes/proxy` reaches the kubelet's whole API, including the parts that run commands in containers.
+Opscope only ever asks for the stats summary, but the permission itself allows more, so, like
+Secret access, it's worth turning on deliberately. Two steps turn it on:
+
+1. Set `OPSCOPE_VOLUME_USAGE=true` (`-e OPSCOPE_VOLUME_USAGE=true` with Docker, or the commented
+   lines in `opscope.yaml`). Without it, Opscope never calls the node proxy, whatever its
+   credentials allow.
+2. Grant the permission. In a cluster, apply `volume-usage.yaml`. With a kubeconfig, the user's own
+   permissions decide; cluster admins usually have it.
+
+If the setting is on but the permission is missing, the pages say which permission is needed, and
+everything else keeps working.
+
+A few things to know:
+
+- Usage is only known for claims mounted by a running pod; the kubelet measures nothing else.
+- The kubelet measures CSI volumes (most cloud and network storage) and `local` volumes, but not
+  hostPath ones. Local clusters often provision claims as hostPath folders (the local-path
+  provisioner on kind and k3s, for example); those claims show "Not measured".
+- The kubelet measures volumes about once a minute. Opscope asks only the nodes that run pods with
+  claims, and keeps each node's answer for 30 seconds.
+- Raw block volumes (`volumeMode: Block`) have no filesystem to measure.
+
+To turn it off, remove the setting and the permission:
+
+```bash
+kubectl delete -f deploy/kubernetes/volume-usage.yaml
+```
 
 ## Exposing Opscope
 
@@ -234,6 +276,7 @@ Opscope is configured with environment variables:
 | `OPSCOPE_CONTEXT`      | current context    | Which context of that file to use                                 |
 | `OPSCOPE_IN_CLUSTER`   | (off)              | `true`: use the pod's service account, when running in a pod      |
 | `OPSCOPE_CLUSTER_NAME` | context name       | Display name for the environment or in-cluster cluster            |
+| `OPSCOPE_VOLUME_USAGE` | (off)              | `true`: show how full volumes are (see [Volume usage](#volume-usage)) |
 | `DATA_DIR`             | `../data`          | Where clusters added in the UI are saved (`/data` in the image)   |
 | `STATIC_DIR`           | `../frontend/dist` | Folder with the built web UI (`/app/web` in the image)            |
 

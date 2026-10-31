@@ -187,6 +187,16 @@
   color: var(--text-muted);
 }
 
+/* A long value cut to a sensible width (provisioned volume names are 40
+   characters), with the whole value in its title. */
+.cell-truncate {
+  display: inline-block;
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+
 .data-table td.muted-cell {
   color: var(--text-muted);
 }
@@ -200,11 +210,14 @@
   background: none;
 }
 
-/* SimpleTable: detail page tables hold longer text, so cells wrap. */
+/* SimpleTable: detail page tables hold longer text, so cells wrap between
+   words. A word too long for its cell (a long path) is broken, but short
+   words never are; a table that still doesn't fit scrolls sideways in its
+   box, like the lists. */
 .simple-table td {
   white-space: normal;
   vertical-align: top;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .simple-table td.nowrap,

@@ -2,8 +2,9 @@
 // URL (/api/clusters/{id}/pods). See DataTable.jsx for what each field means.
 import StatusBadge, { Fraction } from "./components/StatusBadge.jsx";
 import { Tag } from "./components/Tag.jsx";
-import { age, bytes, cores, cpu, duration } from "./format.js";
+import { age, bytes, cores, cpu, duration, size } from "./format.js";
 import { Sparkline, UsageBar } from "./components/Usage.jsx";
+import { NEARLY_FULL, UNMEASURED_TEXT, inodesFull, inodesText, spaceFull, spaceText } from "./volumeUsage.js";
 
 // Columns that most tables share.
 const name = { key: "name", label: "Name", className: "name" };
@@ -23,6 +24,20 @@ const gatewayStatus = {
   key: "status",
   label: "Status",
   render: (row) => <StatusBadge status={row.status} title={row.message} />,
+};
+
+// Storage columns several kinds share.
+const accessModes = {
+  key: "accessModes",
+  label: "Access",
+  className: "mono",
+  render: (row) => <span title={accessModeNames(row.accessModes)}>{row.accessModes.join(", ") || "–"}</span>,
+  sortValue: (row) => row.accessModes.join(","),
+};
+const storageClass = {
+  key: "storageClass",
+  label: "StorageClass",
+  render: (row) => row.storageClass || <span className="muted">–</span>,
 };
 
 export const columns = {
@@ -154,6 +169,93 @@ export const columns = {
       sortValue: (row) => row.addresses.join(","),
     },
     { key: "tls", label: "TLS", render: (row) => (row.tls ? "Yes" : <span className="muted">No</span>) },
+    created,
+  ],
+
+  persistentvolumeclaims: [
+    name,
+    namespace,
+    status,
+    { key: "volume", label: "Volume", className: "mono", render: (row) => <Truncated text={row.volume} /> },
+    {
+      key: "capacity",
+      label: "Capacity",
+      className: "num",
+      // Until it's bound there's only the request; say so rather than pass it off as provisioned.
+      render: (row) =>
+        row.volume ? (
+          <span title={row.requested !== row.capacity ? `${size(row.requested)} requested` : undefined}>
+            {size(row.capacity)}
+          </span>
+        ) : (
+          <span className="muted" title="Requested; no volume yet">
+            {size(row.requested)}
+          </span>
+        ),
+    },
+    {
+      key: "used",
+      label: "Used",
+      usage: true, // only with volume usage on
+      render: (row) => <ClaimUsage row={row} />,
+      sortValue: (row) => (row.usage?.capacity ? spaceFull(row.usage) : undefined),
+    },
+    accessModes,
+    storageClass,
+    created,
+  ],
+
+  persistentvolumes: [
+    name,
+    {
+      key: "status",
+      label: "Status",
+      render: (row) => <StatusBadge status={row.status} title={row.message} />,
+    },
+    { key: "claim", label: "Claim", className: "mono", render: (row) => <Truncated text={row.claim} /> },
+    { key: "capacity", label: "Capacity", className: "num", render: (row) => size(row.capacity) },
+    accessModes,
+    {
+      key: "reclaimPolicy",
+      label: "Reclaim",
+      // What happens to the data once its claim is deleted.
+      render: (row) => <span title={reclaimText[row.reclaimPolicy]}>{row.reclaimPolicy}</span>,
+    },
+    storageClass,
+    { key: "source", label: "Source", render: (row) => row.source || <span className="muted">–</span> },
+    created,
+  ],
+
+  storageclasses: [
+    {
+      ...name,
+      render: (row) => (
+        <>
+          {row.name}
+          {row.default && (
+            <Tag className="tag-gap" title="Claims that don't name a StorageClass get this one">
+              Default
+            </Tag>
+          )}
+        </>
+      ),
+    },
+    { key: "provisioner", label: "Provisioner", className: "mono" },
+    {
+      key: "reclaimPolicy",
+      label: "Reclaim",
+      render: (row) => <span title={reclaimText[row.reclaimPolicy]}>{row.reclaimPolicy}</span>,
+    },
+    {
+      key: "bindingMode",
+      label: "Binding",
+      render: (row) => <span title={bindingText[row.bindingMode]}>{row.bindingMode}</span>,
+    },
+    {
+      key: "allowExpansion",
+      label: "Expandable",
+      render: (row) => (row.allowExpansion ? "Yes" : <span className="muted">No</span>),
+    },
     created,
   ],
 
@@ -347,6 +449,87 @@ function NodeUsage({ usage, field, total, format, what }) {
     <span className="usage-cell">
       <UsageBar used={usage[field]} total={usage[total]} label={`${format(usage[field])} of ${format(usage[total])} used`} />
       <Sparkline points={usage.history} field={field} format={format} what={what} />
+    </span>
+  );
+}
+
+// How full a claim's volume is, or why there's no number for it.
+function ClaimUsage({ row }) {
+  const u = row.usage;
+  if (u?.capacity) {
+    const inodes = inodesFull(u);
+    return (
+      <span className="usage-cell">
+        <UsageBar used={u.capacity - u.available} total={u.capacity} label={`${spaceText(u)}; ${inodesText(u)}`} />
+        {inodes >= NEARLY_FULL && (
+          <span className="status status-bad" title={inodesText(u)}>
+            inodes {inodes}%
+          </span>
+        )}
+      </span>
+    );
+  }
+  if (u?.unread) {
+    return (
+      <span className="muted" title={`Couldn't read node ${u.unread.node}: ${u.unread.error}`}>
+        –
+      </span>
+    );
+  }
+  if (u?.unmeasured) {
+    return (
+      <span className="muted" title={UNMEASURED_TEXT}>
+        Not measured
+      </span>
+    );
+  }
+  if (row.volumeMode === "Block") {
+    return (
+      <span className="muted" title="A raw block device has no filesystem to measure">
+        Block
+      </span>
+    );
+  }
+  if (row.status === "Bound") {
+    return (
+      <span className="muted" title="No running pod uses this claim, and usage is only measured while one does">
+        Not mounted
+      </span>
+    );
+  }
+  return <span className="muted">–</span>;
+}
+
+// What the short access modes mean, for hovering over "RWO".
+const accessModeText = {
+  RWO: "ReadWriteOnce: read-write from one node",
+  ROX: "ReadOnlyMany: read-only from many nodes",
+  RWX: "ReadWriteMany: read-write from many nodes",
+  RWOP: "ReadWriteOncePod: read-write from one pod",
+};
+
+export function accessModeNames(modes) {
+  return modes.map((m) => accessModeText[m] ?? m).join("\n");
+}
+
+const reclaimText = {
+  Delete: "The volume and its data are deleted when the claim is deleted",
+  Retain: "The volume and its data are kept when the claim is deleted",
+  Recycle: "The volume is wiped and reused when the claim is deleted (deprecated)",
+};
+
+const bindingText = {
+  Immediate: "A volume is made as soon as a claim asks for one",
+  WaitForFirstConsumer: "A volume is made only once a pod uses the claim, on that pod's node",
+};
+
+// A long value, cut with an ellipsis when it's wider than the column
+// should be, with the whole value on hover; or a dash.
+function Truncated({ text }) {
+  if (!text) return <span className="muted">–</span>;
+  return (
+    <span className="cell-truncate" title={text}>
+      {text}
     </span>
   );
 }

@@ -3,6 +3,8 @@ package resources
 import (
 	"context"
 	"errors"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 // Overview is the summary shown on a cluster's front page.
@@ -11,6 +13,9 @@ type Overview struct {
 	Nodes      NodeSummary     `json:"nodes"`
 	Pods       PodSummary      `json:"pods"`
 	Workloads  []WorkloadCount `json:"workloads"`
+	// PersistentVolumeClaims and PersistentVolumes; null when there are
+	// neither, or Opscope isn't allowed to list them.
+	Storage []WorkloadCount `json:"storage"`
 	// Gateways and HTTPRoutes; null when the cluster doesn't have Gateway API.
 	GatewayAPI []WorkloadCount `json:"gatewayAPI"`
 }
@@ -27,15 +32,17 @@ type PodSummary struct {
 
 // WorkloadCount says how many of one workload type exist and how many need
 // a look. "Unhealthy" means fewer replicas ready than wanted, or for jobs,
-// a failed job. CronJobs are never counted as unhealthy here.
+// a failed job. CronJobs are never counted as unhealthy here. The same shape
+// counts other kinds too: claims that aren't bound, volumes released or
+// failed, Gateways not programmed.
 type WorkloadCount struct {
 	Resource  string `json:"resource"` // matches the API name, e.g. "deployments"
 	Total     int    `json:"total"`
 	Unhealthy int    `json:"unhealthy"`
 }
 
-// GetOverview builds the summary by reusing the listers. Nodes and the
-// namespace count always cover the whole cluster; everything else follows
+// GetOverview builds the summary by reusing the listers. Nodes, volumes and
+// the namespace count always cover the whole cluster; everything else follows
 // q.Namespace.
 //
 // The calls run one after another. That's a handful of requests, and it
@@ -106,6 +113,11 @@ func GetOverview(ctx context.Context, clients Clients, q Query) (*Overview, erro
 	result.Workloads = append(result.Workloads, countWorkloads("cronjobs", cronJobs,
 		func(CronJob) bool { return false }))
 
+	result.Storage, err = storageCounts(ctx, clients, q)
+	if err != nil {
+		return nil, err
+	}
+
 	// Gateway API is optional: a cluster without it simply gets no counts.
 	gateways, err := listGateways(ctx, clients.Dynamic, q)
 	if errors.Is(err, ErrGatewayAPINotInstalled) {
@@ -124,6 +136,38 @@ func GetOverview(ctx context.Context, clients Clients, q Query) (*Overview, erro
 	}
 
 	return result, nil
+}
+
+// storageCounts counts claims that aren't bound (Pending or Lost) and
+// volumes that were released or failed. A Terminating claim is still bound
+// and has its own badge on the list, so it isn't counted here. Storage was added after the rest, so credentials that
+// could read the overview before may not be allowed to list it; then it's
+// left out rather than failing the whole page. A cluster with no claims and
+// no volumes gets no counts either, like one without Gateway API.
+func storageCounts(ctx context.Context, clients Clients, q Query) ([]WorkloadCount, error) {
+	claims, err := listPersistentVolumeClaims(ctx, clients.Kube, q)
+	if apierrors.IsForbidden(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	volumes, err := listPersistentVolumes(ctx, clients.Kube, q)
+	if apierrors.IsForbidden(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if len(claims) == 0 && len(volumes) == 0 {
+		return nil, nil
+	}
+	return []WorkloadCount{
+		countWorkloads("persistentvolumeclaims", claims,
+			func(c PersistentVolumeClaim) bool { return c.Status == "Pending" || c.Status == "Lost" }),
+		countWorkloads("persistentvolumes", volumes,
+			func(v PersistentVolume) bool { return v.Status == "Released" || v.Status == "Failed" }),
+	}, nil
 }
 
 // countWorkloads counts rows, and the rows for which unhealthy returns true.

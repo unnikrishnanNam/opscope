@@ -8,7 +8,8 @@ import Button from "../components/Button.jsx";
 import { Callout } from "../components/Callout.jsx";
 import DataTable from "../components/DataTable.jsx";
 import { PageHeader } from "../components/PageHeader.jsx";
-import { MetricsUnavailable } from "../components/Usage.jsx";
+import { MetricsUnavailable, UnreadNodesNote, VolumeUsageNote } from "../components/Usage.jsx";
+import { USAGE_OFF, VOLUME_USAGE_NOTES, usageByClaim } from "../volumeUsage.js";
 import { RefreshIcon } from "../components/icons.jsx";
 import { detailPath, nsQuery } from "../sections.js";
 import "./ResourceList.css";
@@ -35,9 +36,9 @@ export default function ResourceList({ page }) {
   const path = reachable ? `/clusters/${cluster.id}/${page.resource}${query}` : null;
   const { data, error, loading, updatedAt, reload } = useApi(path, { refreshMs: REFRESH_MS });
 
-  // Live usage, for pages that show it (nodes and pods).
+  // Live usage, for pages that show it (nodes, pods, and claims when volume usage is on).
   const metricsPath = page.metrics && reachable ? `/clusters/${cluster.id}/metrics/${page.metrics}${query}` : null;
-  const usage = useApi(metricsPath, { refreshMs: METRICS_REFRESH_MS });
+  const usage = useApi(metricsPath, { refreshMs: METRICS_REFRESH_MS, stopOn: USAGE_OFF });
   const rows = data && withUsage(data, usage.data, page.metrics);
 
   // The refresh button only spins for a refresh someone asked for, not for
@@ -53,7 +54,10 @@ export default function ResourceList({ page }) {
   }
 
   // With one namespace selected, a namespace column would say the same thing on every row.
-  const columns = allColumns[page.resource].filter((col) => !(namespace && col.key === "namespace"));
+  // Columns that only show usage are left out when there's none to show.
+  const columns = allColumns[page.resource].filter(
+    (col) => !(namespace && col.key === "namespace") && !(col.usage && usage.error),
+  );
   const noun = page.label.toLowerCase();
   // Two answers aren't failures: an optional feature that isn't installed,
   // and RBAC that doesn't allow this kind (often on purpose, for Secrets).
@@ -89,7 +93,9 @@ export default function ResourceList({ page }) {
       )}
 
       {usage.error?.code === "metrics_unavailable" && <MetricsUnavailable compact={page.metrics === "pods"} />}
-      {usage.error && usage.error.code !== "metrics_unavailable" && (
+      <VolumeUsageNote error={usage.error} />
+      {page.metrics === "volumes" && <UnreadNodesNote report={usage.data} />}
+      {usage.error && !NOTED.includes(usage.error.code) && (
         <Callout compact tone="warning">
           Usage isn't available right now: {usage.error.message}
         </Callout>
@@ -125,14 +131,20 @@ export default function ResourceList({ page }) {
   );
 }
 
+// Usage errors that get their own note above the table.
+const NOTED = ["metrics_unavailable", ...VOLUME_USAGE_NOTES];
+
 // withUsage attaches live usage to each row as `row.usage` (undefined when
 // there's no number for it, e.g. a pod that just started).
-//   nodes: metrics is { nodes: [...], nodeHistory: { name: [...] } }
-//   pods:  metrics is [{ namespace, name, cpu, memory }, ...]
+//   nodes:   metrics is { nodes: [...], nodeHistory: { name: [...] } }
+//   pods:    metrics is [{ namespace, name, cpu, memory }, ...]
+//   volumes: metrics is { volumes: [...], unread: [...] } (see volumeUsage.js)
 function withUsage(rows, metrics, kind) {
   if (!metrics) return rows;
-  const byKey = {};
-  if (kind === "nodes") {
+  let byKey = {};
+  if (kind === "volumes") {
+    byKey = usageByClaim(metrics);
+  } else if (kind === "nodes") {
     for (const n of metrics.nodes) byKey[n.name] = { ...n, history: metrics.nodeHistory[n.name] };
   } else {
     for (const p of metrics) byKey[`${p.namespace}/${p.name}`] = p;

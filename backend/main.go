@@ -35,13 +35,15 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	cfg := server.Config{
-		Version:   version,
-		StaticDir: getEnv("STATIC_DIR", "../frontend/dist"),
+		Version:     version,
+		StaticDir:   getEnv("STATIC_DIR", "../frontend/dist"),
+		VolumeUsage: os.Getenv("OPSCOPE_VOLUME_USAGE") == "true",
 	}
 	addr := ":" + getEnv("PORT", "8080")
 	dataDir := getEnv("DATA_DIR", "../data")
 
-	logger.Info("starting opscope", "addr", addr, "version", version, "static_dir", cfg.StaticDir, "data_dir", dataDir)
+	logger.Info("starting opscope", "addr", addr, "version", version, "static_dir", cfg.StaticDir, "data_dir", dataDir,
+		"volume_usage", cfg.VolumeUsage)
 
 	manager := clusters.NewManager(dataDir)
 

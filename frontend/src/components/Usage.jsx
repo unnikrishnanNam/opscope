@@ -93,6 +93,43 @@ export function Sparkline({ points, field, format, width = 96, height = 24, what
   );
 }
 
+// VolumeUsageNote: why volume usage isn't shown, from the error the usage
+// endpoint answered with. Off is a choice, so it reads as information, with
+// what turning it on involves; on without the permission is a warning.
+// Other errors return nothing (the page reports those itself).
+export function VolumeUsageNote({ error }) {
+  if (error?.code === "volume_usage_off") {
+    return (
+      <Callout compact>
+        Used space is off. With <code>OPSCOPE_VOLUME_USAGE=true</code>, Opscope reads how full each volume is from the
+        kubelet on each node, which needs read access to the kubelet API. See “Volume usage” in the deployment docs.
+      </Callout>
+    );
+  }
+  if (error?.code === "volume_usage_forbidden") {
+    return (
+      <Callout compact tone="warning" detail={error.detail}>
+        Volume usage is on, but Opscope isn't allowed to read it: it needs <code>get</code> on{" "}
+        <code>nodes/proxy</code>. In a cluster, apply <code>deploy/kubernetes/volume-usage.yaml</code>.
+      </Callout>
+    );
+  }
+  return null;
+}
+
+// UnreadNodesNote: nodes whose volume usage couldn't be read this time.
+export function UnreadNodesNote({ report }) {
+  const unread = report?.unread ?? [];
+  if (unread.length === 0) return null;
+  const names = unread.map((n) => n.node).join(", ");
+  return (
+    <Callout compact tone="warning" detail={unread.map((n) => `${n.node}: ${n.error}`).join("\n")}>
+      Couldn't read volume usage from {unread.length === 1 ? `node ${names}` : `${unread.length} nodes (${names})`}, so
+      the claims mounted there show no usage for now.
+    </Callout>
+  );
+}
+
 // MetricsUnavailable: what to do when a cluster has no metrics-server.
 // `compact` is a one-line note, for places where usage is a side detail.
 export function MetricsUnavailable({ compact = false }) {

@@ -17,7 +17,7 @@ Opscope can read; see [Exposing Opscope](deployment.md#exposing-opscope).
   `POST` and `DELETE` on `/api/clusters`, and they change Opscope's own list of clusters, not a
   cluster.
 - `{id}` is a cluster's id from `GET /api/clusters`.
-- CPU is in millicores and memory in bytes. Times are RFC 3339.
+- CPU is in millicores, and memory and storage in bytes. Times are RFC 3339.
 - Request bodies are limited to 1 MiB.
 
 ### Errors
@@ -36,13 +36,15 @@ error as `detail`:
 | `404`  | No such cluster, resource type, object or endpoint                                |
 | `502`  | The cluster couldn't be reached or failed to answer                               |
 
-Two optional features answer `404` with a `code` rather than failing, so a client can tell "not
-installed" from an error:
+Optional features answer with a `code` rather than failing, so a client can tell "not installed"
+or "turned off" from an error:
 
-| `code`                | Meaning                                                              |
-| --------------------- | -------------------------------------------------------------------- |
-| `not_installed`       | The cluster has no Gateway API (`gateway.networking.k8s.io/v1`)      |
-| `metrics_unavailable` | The cluster has no working metrics-server                            |
+| Status | `code`                   | Meaning                                                          |
+| ------ | ------------------------ | ---------------------------------------------------------------- |
+| `404`  | `not_installed`          | The cluster has no Gateway API (`gateway.networking.k8s.io/v1`)  |
+| `404`  | `metrics_unavailable`    | The cluster has no working metrics-server                        |
+| `404`  | `volume_usage_off`       | Volume usage is off (`OPSCOPE_VOLUME_USAGE` isn't `true`)        |
+| `403`  | `volume_usage_forbidden` | Volume usage is on, but Opscope may not `get` `nodes/proxy`      |
 
 ## Health
 
@@ -130,14 +132,17 @@ Counts for the overview page. `namespace` limits the namespaced counts.
   "nodes": { "total": 3, "ready": 3 },
   "pods": { "total": 54, "byStatus": { "Running": 52, "CrashLoopBackOff": 2 } },
   "workloads": [{ "resource": "deployments", "total": 20, "unhealthy": 1 }],
+  "storage": [{ "resource": "persistentvolumeclaims", "total": 8, "unhealthy": 1 }],
   "gatewayAPI": [{ "resource": "gateways", "total": 2, "unhealthy": 0 }]
 }
 ```
 
 `unhealthy` counts what needs a look: workloads with fewer replicas ready than wanted, failed Jobs,
-Gateways that aren't `Programmed` and HTTPRoutes that aren't `Accepted`. CronJobs are never counted as
-unhealthy.
-`gatewayAPI` is `null` when the cluster has no Gateway API.
+claims that are `Pending` or `Lost`, volumes that are `Released` or `Failed`, Gateways that aren't
+`Programmed` and HTTPRoutes that aren't `Accepted`. CronJobs are never counted as unhealthy.
+PersistentVolumes, like nodes, are counted across the whole cluster whatever the `namespace`.
+`storage` is `null` when the cluster has no claims and no volumes, or Opscope isn't allowed to list
+them. `gatewayAPI` is `null` when the cluster has no Gateway API.
 
 ### `GET /api/clusters/{id}/names`
 
@@ -158,23 +163,24 @@ at all can be read.
 ### `GET /api/clusters/{id}/{resource}/{name}`
 
 One object, for its detail page. The second form is for cluster-wide kinds (`nodes`, `namespaces`,
-`gatewayclasses`).
+`persistentvolumes`, `storageclasses`, `gatewayclasses`).
 
 | Field                      | Contents                                                          |
 | -------------------------- | ----------------------------------------------------------------- |
 | `name`, `namespace`, `created`, `kind`, `uid` | Identity                                       |
 | `labels`, `annotations`    | As on the object                                                  |
 | `owners`                   | Owner references (`kind`, `name`, and `resource` when Opscope has a page for it) |
-| `fields`                   | Short facts (`label`, `value`), such as a pod's node              |
+| `fields`                   | Short facts (`label`, `value`), such as a pod's node, and `link` when the value names another object |
 | `containers`               | For pods and anything with a pod template                         |
 | `conditions`               | From `status.conditions`                                          |
-| `tables`                   | Kind-specific lists, such as a Service's ports                    |
+| `tables`                   | Kind-specific lists, such as a Service's ports or a pod's volumes; `links` matches `rows` cell by cell, where a cell names another object |
 | `data`                     | ConfigMap entries                                                 |
 | `secretKeys`               | Secret key names only                                             |
 | `events`                   | Events about the object                                           |
 | `yaml`                     | The object as YAML                                                |
 
-Sections that don't apply to a kind are empty. For Secrets, the YAML has every value replaced with
+A `link` is `{ "resource": "persistentvolumes", "name": "pvc-1a2b" }`, with `namespace` for
+namespaced kinds. Sections that don't apply to a kind are empty. For Secrets, the YAML has every value replaced with
 `(hidden, about N bytes)` and leaves out kubectl's `last-applied-configuration` annotation, which
 would otherwise contain the values.
 
@@ -206,7 +212,7 @@ previous run, a container that doesn't exist) returns `400` with its message.
 
 ## Usage
 
-Usage comes from metrics-server. Without it, these endpoints answer `404` with
+CPU and memory usage comes from metrics-server. Without it, these endpoints answer `404` with
 `metrics_unavailable`.
 
 ### `GET /api/clusters/{id}/metrics/nodes`
@@ -232,28 +238,53 @@ Usage per pod, with its containers added together. `namespace` limits it to one 
 [{ "namespace": "web", "name": "api-7d9f", "cpu": 12, "memory": 73400320 }]
 ```
 
+### `GET /api/clusters/{id}/metrics/volumes`
+
+How full each claim's volume is, from the kubelets. Off unless Opscope runs with
+`OPSCOPE_VOLUME_USAGE=true`; see [Volume usage](deployment.md#volume-usage) for what that needs.
+`namespace` limits it to one namespace.
+
+```json
+{
+  "volumes": [{ "namespace": "data", "name": "postgres-data", "used": 2254857830, "capacity": 10726932480, "available": 8455118848, "inodesUsed": 1204, "inodes": 655360 }],
+  "unread": [{ "node": "worker-2", "error": "context deadline exceeded", "claims": ["data/logs"] }],
+  "unmeasured": ["web/uploads"]
+}
+```
+
+| Field        | Contents                                                                            |
+| ------------ | ----------------------------------------------------------------------------------- |
+| `volumes`    | Claims with numbers. `capacity` is the filesystem's size, which can differ a little from the claim's |
+| `unread`     | Nodes that couldn't be read, with the claims mounted there                          |
+| `unmeasured` | Claims that are mounted, but the kubelet gave no numbers (hostPath volumes, or just mounted) |
+
+A claim in none of the lists isn't mounted by a running pod; the kubelet only measures mounted
+volumes. Each node's answer is kept for 30 seconds.
 ## Resource types
 
 The values of `{resource}`:
 
-| `{resource}`     | Kind         | Scope     | API group                   | Detail page |
-| ---------------- | ------------ | --------- | --------------------------- | ----------- |
-| `namespaces`     | Namespace    | cluster   | core                        | yes         |
-| `nodes`          | Node         | cluster   | core                        | yes         |
-| `events`         | Event        | namespace | core                        | no          |
-| `pods`           | Pod          | namespace | core                        | yes         |
-| `deployments`    | Deployment   | namespace | `apps`                      | yes         |
-| `statefulsets`   | StatefulSet  | namespace | `apps`                      | yes         |
-| `daemonsets`     | DaemonSet    | namespace | `apps`                      | yes         |
-| `jobs`           | Job          | namespace | `batch`                     | yes         |
-| `cronjobs`       | CronJob      | namespace | `batch`                     | yes         |
-| `configmaps`     | ConfigMap    | namespace | core                        | yes         |
-| `secrets`        | Secret       | namespace | core                        | yes         |
-| `services`       | Service      | namespace | core                        | yes         |
-| `ingresses`      | Ingress      | namespace | `networking.k8s.io`         | yes         |
-| `gateways`       | Gateway      | namespace | `gateway.networking.k8s.io` | yes         |
-| `httproutes`     | HTTPRoute    | namespace | `gateway.networking.k8s.io` | yes         |
-| `gatewayclasses` | GatewayClass | cluster   | `gateway.networking.k8s.io` | yes         |
+| `{resource}`             | Kind                  | Scope     | API group                   | Detail page |
+| ------------------------ | --------------------- | --------- | --------------------------- | ----------- |
+| `namespaces`             | Namespace             | cluster   | core                        | yes         |
+| `nodes`                  | Node                  | cluster   | core                        | yes         |
+| `events`                 | Event                 | namespace | core                        | no          |
+| `pods`                   | Pod                   | namespace | core                        | yes         |
+| `deployments`            | Deployment            | namespace | `apps`                      | yes         |
+| `statefulsets`           | StatefulSet           | namespace | `apps`                      | yes         |
+| `daemonsets`             | DaemonSet             | namespace | `apps`                      | yes         |
+| `jobs`                   | Job                   | namespace | `batch`                     | yes         |
+| `cronjobs`               | CronJob               | namespace | `batch`                     | yes         |
+| `configmaps`             | ConfigMap             | namespace | core                        | yes         |
+| `secrets`                | Secret                | namespace | core                        | yes         |
+| `services`               | Service               | namespace | core                        | yes         |
+| `ingresses`              | Ingress               | namespace | `networking.k8s.io`         | yes         |
+| `gateways`               | Gateway               | namespace | `gateway.networking.k8s.io` | yes         |
+| `httproutes`             | HTTPRoute             | namespace | `gateway.networking.k8s.io` | yes         |
+| `gatewayclasses`         | GatewayClass          | cluster   | `gateway.networking.k8s.io` | yes         |
+| `persistentvolumeclaims` | PersistentVolumeClaim | namespace | core                        | yes         |
+| `persistentvolumes`      | PersistentVolume      | cluster   | core                        | yes         |
+| `storageclasses`         | StorageClass          | cluster   | `storage.k8s.io`            | yes         |
 
 The list is defined in `backend/internal/resources/resources.go` (`Listers`) and, for detail
 pages, `detail.go`.
