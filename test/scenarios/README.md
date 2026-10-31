@@ -9,8 +9,12 @@ cluster you care about.
 ```bash
 kind create cluster --name opscope-storage --kubeconfig /tmp/opscope-storage.kubeconfig
 export KUBECONFIG=/tmp/opscope-storage.kubeconfig
-kubectl apply -f test/scenarios/storage.yaml
+until kubectl apply -f test/scenarios/storage.yaml; do sleep 2; done
 ```
+
+On a new cluster the first try can be refused for the two pods: the namespace's `default` service
+account is created a moment after the namespace, and a pod can't be made before it exists. The
+loop applies again until it's accepted.
 
 Once the pods are running, two deletions finish the setup:
 

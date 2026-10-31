@@ -8,6 +8,10 @@ import { percent, size } from "./format.js";
 // VolumeUsageNote explains.
 export const VOLUME_USAGE_NOTES = ["volume_usage_off", "volume_usage_forbidden"];
 
+// For useApi's stopOn: off is a server setting, so asking again until
+// Opscope restarts would only get the same answer.
+export const USAGE_OFF = ["volume_usage_off"];
+
 // At this fullness (space or inodes), a claim counts as nearly full. Same
 // threshold as the red usage bar.
 export const NEARLY_FULL = 90;

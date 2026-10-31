@@ -17,7 +17,7 @@ import StatusBadge from "../components/StatusBadge.jsx";
 import { Tag } from "../components/Tag.jsx";
 import { UsageBar, VolumeUsageNote } from "../components/Usage.jsx";
 import Tabs from "../components/Tabs.jsx";
-import { UNMEASURED_TEXT, VOLUME_USAGE_NOTES, inodesText, spaceText, usageByClaim } from "../volumeUsage.js";
+import { UNMEASURED_TEXT, USAGE_OFF, VOLUME_USAGE_NOTES, inodesText, spaceText, usageByClaim } from "../volumeUsage.js";
 import { detailCommands } from "./detailCommands.js";
 import "./ResourceDetail.css";
 
@@ -141,7 +141,7 @@ function usageClaim(d, resource) {
 // volume usage is on, or a note saying why it isn't shown.
 function VolumeUsage({ cluster, claim, block }) {
   const path = `/clusters/${cluster.id}/metrics/volumes?namespace=${encodeURIComponent(claim.namespace)}`;
-  const { data, error } = useApi(path, { refreshMs: VOLUME_USAGE_REFRESH_MS });
+  const { data, error } = useApi(path, { refreshMs: VOLUME_USAGE_REFRESH_MS, stopOn: USAGE_OFF });
   const u = usageByClaim(data)[`${claim.namespace}/${claim.name}`];
 
   let body;

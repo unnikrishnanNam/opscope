@@ -176,7 +176,7 @@ export const columns = {
     name,
     namespace,
     status,
-    { key: "volume", label: "Volume", className: "mono", render: (row) => row.volume || <span className="muted">–</span> },
+    { key: "volume", label: "Volume", className: "mono", render: (row) => <Truncated text={row.volume} /> },
     {
       key: "capacity",
       label: "Capacity",
@@ -212,7 +212,7 @@ export const columns = {
       label: "Status",
       render: (row) => <StatusBadge status={row.status} title={row.message} />,
     },
-    { key: "claim", label: "Claim", className: "mono", render: (row) => row.claim || <span className="muted">–</span> },
+    { key: "claim", label: "Claim", className: "mono", render: (row) => <Truncated text={row.claim} /> },
     { key: "capacity", label: "Capacity", className: "num", render: (row) => size(row.capacity) },
     accessModes,
     {
@@ -453,7 +453,6 @@ function NodeUsage({ usage, field, total, format, what }) {
   );
 }
 
-// What the short access modes mean, for hovering over "RWO".
 // How full a claim's volume is, or why there's no number for it.
 function ClaimUsage({ row }) {
   const u = row.usage;
@@ -501,6 +500,7 @@ function ClaimUsage({ row }) {
   return <span className="muted">–</span>;
 }
 
+// What the short access modes mean, for hovering over "RWO".
 const accessModeText = {
   RWO: "ReadWriteOnce: read-write from one node",
   ROX: "ReadOnlyMany: read-only from many nodes",
@@ -522,6 +522,17 @@ const bindingText = {
   Immediate: "A volume is made as soon as a claim asks for one",
   WaitForFirstConsumer: "A volume is made only once a pod uses the claim, on that pod's node",
 };
+
+// A long value, cut with an ellipsis when it's wider than the column
+// should be, with the whole value on hover; or a dash.
+function Truncated({ text }) {
+  if (!text) return <span className="muted">–</span>;
+  return (
+    <span className="cell-truncate" title={text}>
+      {text}
+    </span>
+  );
+}
 
 // A list of short values (IPs, ports, hosts) on one line, or a dash.
 function List({ items }) {

@@ -105,6 +105,7 @@ frontend/                 React app (Vite, plain JavaScript)
   src/kit/                the component kit at /kit (development only)
   src/format.js           ages, durations, sizes
   src/volumeUsage.js      how full a claim's volume is, from the volume usage endpoint
+  src/sort.js             how table rows sort when a column header is clicked
   src/kubectl.js          read-only kubectl commands for one object, for copying
   src/theme.js            light, dark or system theme, remembered in the browser
   src/toast.js            short confirmations ("Copied …")

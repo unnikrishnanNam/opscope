@@ -511,3 +511,29 @@ read-only).
   screenshots weren't retaken.
 - The kind cluster `opscope-storage` is still there, for the review; delete it with
   `kind delete cluster --name opscope-storage` when it's no longer needed.
+
+### Final check (2026-10-31)
+
+A last round over everything, before opening the pull request, on multipass (read-only) and a kind
+cluster rebuilt from `test/scenarios/` (deleted afterwards). Seven issues came up, all fixed:
+
+- **Sorting with empty values:** descending order put rows without a value first, so sorting
+  claims by Used, fullest first, started with every claim that has no number. Empty values now
+  stay last both ways. This was in the shared table sort, so pod CPU and memory sort better too.
+  The sort moved to `frontend/src/sort.js`, with tests.
+- **Wide storage tables:** with real names, the claims and volumes lists were 18–28 px wider than
+  their box at 1440 px, hiding Age. A claim's volume and a volume's claim are now cut at 22
+  characters with an ellipsis, and the full name shows on hover.
+- **Overview bars:** a row where everything needs attention still started with a 3 px green
+  segment. The healthy segment is now left out when nothing is healthy (shared with the other
+  overview rows).
+- **Words broken mid-word in detail tables** ("Ephem/eral", "fille/r"): detail tables break only
+  words too long for their cell, and a table that still doesn't fit scrolls sideways in its box,
+  like the lists. Checked on storage, pod, container and service tables at 375, 900 and 1440 px.
+- **Scenarios on a new cluster:** the first apply could be refused for the two pods while the
+  namespace's `default` service account was being created. The README now applies in a retry loop
+  and says why.
+- **Polling while usage is off:** the pages asked every 15 or 30 seconds and got the same 404.
+  `useApi` takes `stopOn` codes, and the usage requests stop at `volume_usage_off`, which only
+  changes when Opscope restarts. Refresh still asks again.
+- A comment in `columns.jsx` had ended up above the wrong function.

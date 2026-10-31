@@ -9,7 +9,7 @@ import { Callout } from "../components/Callout.jsx";
 import DataTable from "../components/DataTable.jsx";
 import { PageHeader } from "../components/PageHeader.jsx";
 import { MetricsUnavailable, UnreadNodesNote, VolumeUsageNote } from "../components/Usage.jsx";
-import { VOLUME_USAGE_NOTES, usageByClaim } from "../volumeUsage.js";
+import { USAGE_OFF, VOLUME_USAGE_NOTES, usageByClaim } from "../volumeUsage.js";
 import { RefreshIcon } from "../components/icons.jsx";
 import { detailPath, nsQuery } from "../sections.js";
 import "./ResourceList.css";
@@ -38,7 +38,7 @@ export default function ResourceList({ page }) {
 
   // Live usage, for pages that show it (nodes, pods, and claims when volume usage is on).
   const metricsPath = page.metrics && reachable ? `/clusters/${cluster.id}/metrics/${page.metrics}${query}` : null;
-  const usage = useApi(metricsPath, { refreshMs: METRICS_REFRESH_MS });
+  const usage = useApi(metricsPath, { refreshMs: METRICS_REFRESH_MS, stopOn: USAGE_OFF });
   const rows = data && withUsage(data, usage.data, page.metrics);
 
   // The refresh button only spins for a refresh someone asked for, not for

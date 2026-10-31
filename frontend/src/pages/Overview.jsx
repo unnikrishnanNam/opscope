@@ -14,7 +14,7 @@ import Tooltip from "../components/Tooltip.jsx";
 import { Sparkline, UsageBar } from "../components/Usage.jsx";
 import { CpuIcon, MemoryIcon, NodesIcon, PodsIcon, RefreshIcon, SuccessIcon, WarningIcon } from "../components/icons.jsx";
 import { allPages, detailPath, nsQuery } from "../sections.js";
-import { isNearlyFull } from "../volumeUsage.js";
+import { USAGE_OFF, isNearlyFull } from "../volumeUsage.js";
 import "./Overview.css";
 
 const REFRESH_MS = 10_000;
@@ -63,6 +63,7 @@ export default function Overview({ page }) {
   const hasClaims = overview.data?.storage?.find((s) => s.resource === "persistentvolumeclaims")?.total > 0;
   const volumes = useApi(base && hasClaims && `${base}/metrics/volumes${query}`, {
     refreshMs: VOLUME_USAGE_REFRESH_MS,
+    stopOn: USAGE_OFF,
   });
 
   const o = overview.data && { ...overview.data, storage: withMeasuredClaims(overview.data.storage, volumes.data) };
@@ -396,7 +397,9 @@ function ResourceGroup({ title, items, to }) {
                 <span className="resource-bar" aria-hidden="true">
                   {w.total > 0 && (
                     <>
-                      <span className={kind.problem ? "tone-ok" : "tone-neutral"} style={{ flexGrow: w.total - bad }} />
+                      {w.total > bad && (
+                        <span className={kind.problem ? "tone-ok" : "tone-neutral"} style={{ flexGrow: w.total - bad }} />
+                      )}
                       {bad > 0 && <span className={`tone-${tone}`} style={{ flexGrow: bad }} />}
                     </>
                   )}

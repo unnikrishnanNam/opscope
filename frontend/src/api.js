@@ -37,8 +37,10 @@ export async function api(path, { method = "GET", body } = {}) {
 
 // useApi loads `path` when a component appears (and when `path` changes).
 // Pass `null` as the path to skip loading. With `refreshMs` it reloads on a
-// timer. Returns { data, error, loading, updatedAt, reload }.
-export function useApi(path, { refreshMs } = {}) {
+// timer, until an error with one of the `stopOn` codes comes back: an answer
+// that asking again won't change, like a feature turned off on the server.
+// Returns { data, error, loading, updatedAt, reload }.
+export function useApi(path, { refreshMs, stopOn } = {}) {
   const [state, setState] = useState({ path, data: null, error: null, loading: true, updatedAt: null });
   const [reloads, setReloads] = useState(0);
 
@@ -54,17 +56,19 @@ export function useApi(path, { refreshMs } = {}) {
       s.path === path ? { ...s, loading: true } : { path, data: null, error: null, loading: true, updatedAt: null },
     );
 
+    let timer = null;
     async function load() {
       try {
         const data = await api(path);
         if (!cancelled) setState({ path, data, error: null, loading: false, updatedAt: new Date() });
       } catch (error) {
         if (!cancelled) setState((s) => ({ ...s, error, loading: false }));
+        if (stopOn?.includes(error.code)) clearInterval(timer);
       }
     }
 
     load();
-    const timer = refreshMs ? setInterval(load, refreshMs) : null;
+    timer = refreshMs ? setInterval(load, refreshMs) : null;
     return () => {
       cancelled = true;
       clearInterval(timer);

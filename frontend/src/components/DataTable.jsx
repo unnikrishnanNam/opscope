@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useCommands } from "../commands/registry.jsx";
+import { sortRows } from "../sort.js";
 import Button from "./Button.jsx";
 import { EmptyState } from "./Callout.jsx";
 import { SearchInput } from "./Field.jsx";
@@ -249,28 +250,6 @@ function filterRows(rows, columns, filter) {
       return typeof value === "string" && value.toLowerCase().includes(needle);
     }),
   );
-}
-
-function sortRows(rows, columns, sort) {
-  if (!sort) return rows;
-  const column = columns.find((c) => c.key === sort.key);
-  const valueOf = column?.sortValue ?? ((row) => row[sort.key]);
-
-  // Copy first: .sort() changes the array in place, and rows belongs to someone else.
-  return [...rows].sort((a, b) => {
-    const result = compare(valueOf(a), valueOf(b));
-    return sort.ascending ? result : -result;
-  });
-}
-
-// Numbers compare as numbers, text as text ("pod-2" before "pod-10"),
-// and empty values always go last.
-function compare(a, b) {
-  if (a == null && b == null) return 0;
-  if (a == null) return 1;
-  if (b == null) return -1;
-  if (typeof a === "number" && typeof b === "number") return a - b;
-  return String(a).localeCompare(String(b), undefined, { numeric: true });
 }
 
 function countLabel(shown, total, noun) {
