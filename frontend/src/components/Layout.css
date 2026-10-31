@@ -19,7 +19,12 @@
   flex-direction: column;
 }
 
+/* position: relative makes this the box that absolutely positioned content
+   (like screen-reader-only text) is placed in. Without it, such content
+   further down a long page is placed against the whole page, which then
+   grows and scrolls past the end of the content. */
 .shell-content {
+  position: relative;
   flex: 1;
   overflow: auto;
   padding: var(--space-8);
