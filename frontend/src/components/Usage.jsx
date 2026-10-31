@@ -102,7 +102,7 @@ export function VolumeUsageNote({ error }) {
     return (
       <Callout compact>
         Used space is off. With <code>OPSCOPE_VOLUME_USAGE=true</code>, Opscope reads how full each volume is from the
-        kubelet on each node, which needs read access to the kubelet API. See “Volume usage” in the deployment docs.
+        kubelet on each node, which needs read access to the kubelet API. See “Volume usage” in the deployment guide.
       </Callout>
     );
   }

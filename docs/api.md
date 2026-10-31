@@ -8,7 +8,7 @@ asks for.
 > an Opscope version if you depend on it.
 
 The API has no authentication of its own, like the UI. Anyone who can reach it can read everything
-Opscope can read; see [Exposing Opscope](deployment.md#exposing-opscope).
+Opscope can read; see [Giving people access](deployment.md#giving-people-access).
 
 ## Conventions
 
