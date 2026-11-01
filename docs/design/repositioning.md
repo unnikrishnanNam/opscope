@@ -1,7 +1,7 @@
 # Opscope: Repositioning
 
 > **Design record.** The plan and working notes for repositioning Opscope as a tool for day-to-day
-> operations, phases D0–D6, completed on 2026-10-09 and to be released with the next version. It is
+> operations, phases D0–D6, completed on 2026-10-09 and released as v1.3.0. It is
 > kept unchanged as a record of how and why Opscope was built, so it describes the project as it
 > was then, not as it is now. For current documentation, see the [README](../../README.md).
 
