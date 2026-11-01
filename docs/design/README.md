@@ -10,8 +10,8 @@ describe how Opscope got there.
 | [build-phases.md](build-phases.md)        | The first build: clusters, resources, details, logs, usage, packaging | v1.0.0 |
 | [ui-redesign.md](ui-redesign.md)          | The interface: brand, light and dark themes, every page rebuilt | v1.1.0   |
 | [command-palette.md](command-palette.md)  | The command palette, the command registry, keyboard shortcuts | v1.2.0   |
-| [repositioning.md](repositioning.md)      | Opscope as an operations tool: licence, documentation, positioning | Next release |
-| [storage.md](storage.md)                  | Storage pages: PersistentVolumeClaims, PersistentVolumes, StorageClasses, volume usage | Next release |
+| [repositioning.md](repositioning.md)      | Opscope as an operations tool: licence, documentation, positioning | v1.3.0   |
+| [storage.md](storage.md)                  | Storage pages: PersistentVolumeClaims, PersistentVolumes, StorageClasses, volume usage | v1.3.0   |
 
 ## When to write one
 

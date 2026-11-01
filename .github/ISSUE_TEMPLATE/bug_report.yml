@@ -40,7 +40,7 @@ body:
     attributes:
       label: Opscope version
       description: Shown at the bottom of the sidebar, or returned by `/api/health`.
-      placeholder: v1.2.0
+      placeholder: v1.3.0
     validations:
       required: true
 

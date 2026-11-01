@@ -51,7 +51,7 @@ or "turned off" from an error:
 ### `GET /api/health`
 
 ```json
-{ "status": "ok", "version": "v1.2.0" }
+{ "status": "ok", "version": "v1.3.0" }
 ```
 
 Used by the Kubernetes liveness and readiness probes. It doesn't contact any cluster.

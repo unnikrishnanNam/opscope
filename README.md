@@ -71,7 +71,7 @@ clusters, and cleaning up.
 In the cluster Opscope should show:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.2.0/deploy/kubernetes/opscope.yaml
+kubectl apply -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.3.0/deploy/kubernetes/opscope.yaml
 ```
 
 ```bash
