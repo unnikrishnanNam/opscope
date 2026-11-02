@@ -1,0 +1,393 @@
+# Opscope: Live data
+
+Every page in Opscope today asks the cluster for its data when it loads, and again every 10
+seconds. Two pages open on the same cluster make two sets of calls, and each page can show a
+slightly different moment. This record adds one **collector** per connected cluster, inside the same
+server, which lists and then watches the kinds Opscope shows and keeps them in a **watch cache**.
+Pages read from the cache, and the browser is told when something changed instead of asking on a
+timer. An in-process **bus** carries every change, so later engines (Topology, the Issues feed, the
+Change log) can subscribe without touching the collectors.
+
+Users get faster pages that update as the cluster changes. Nothing else about Opscope changes: it
+stays read-only, one image and one process, and every page shows the same data as in v1.3.0. The
+only new permission is `watch`, a read verb; without it, Opscope polls and says so.
+
+This is v1.4.0 in the engine release plan. Phases are numbered **L0–L7** so they don't mix with the
+build phases 0–8 or the D, G, P, R and S phases. The work is split over several branches, one per
+feature (see [Branches](#branches)); each phase is reviewed before it is committed, and the next
+phase starts only after that.
+
+**Status (2026-11-02):** planned.
+
+**Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
+
+---
+
+## Decisions
+
+- **One collector per connected cluster, started and stopped by `clusters.Manager`.** A cluster
+  loaded from the environment or from `data/` starts its collector at startup; one added in the UI
+  starts it when it's added; removing a cluster stops it and drops its cache. Collectors start
+  eagerly, not when a page first opens, because the Change log (v1.7) must record changes while
+  nobody is looking.
+- **client-go informers, no new dependency.** Typed shared informers for the built-in kinds, the
+  dynamic informer for Gateway API. Both are in `k8s.io/client-go`, which Opscope already uses.
+  Informers use clients without the 10-second request timeout (a timeout covers the whole response
+  and would cut every watch), like the log-stream client does today. No periodic resync: it only
+  replays objects that didn't change.
+- **The cached objects are trimmed before they're stored,** with an informer transform:
+  - `managedFields` keeps only each entry's manager, operation and time, without `fieldsV1` (the
+    bulk of it). The Change log needs the manager names for actor attribution in v1.7.
+  - **Secrets keep their type and key names, never their values.** The values are dropped in the
+    transform, before the object reaches the cache or the bus, so "Secret values are never cached"
+    stays true. Revealing a value stays a direct, one-key call (see Open questions, 1).
+  - ConfigMaps keep their key names and a content hash, not their values: the list only shows key
+    names, the detail page reads the object directly, and the Change log (v1.7) tracks ConfigMap
+    content by hash.
+- **Pages read from the cache; three things stay direct.** Lists, the overview, the `/names` index,
+  the related lists on detail pages (events for an object, pods using a claim, claims made from a
+  StatefulSet, volumes, StorageClass lookups) and the node and pod lists that usage reads all come
+  from the cache. The detail page's object itself, its YAML view, logs and revealing a Secret value
+  stay direct, on-request calls, as the engine plan's contract 5 says. Metrics from metrics-server
+  and volume usage from the kubelets stay polled: neither has a watch.
+- **The row code doesn't change, only where the objects come from.** Each list function reads its
+  objects from a `Source` instead of a client. The watch cache is one `Source`; a direct `Source`
+  that lists from the cluster, as v1.3 does, is the other. Both run through the same flattening
+  code, so a test can check that they give the same rows.
+- **The mode is chosen per kind and per cluster, and the collector says which:**
+
+  | Mode            | When                                                | What pages get                  |
+  | --------------- | --------------------------------------------------- | ------------------------------- |
+  | `watch`         | `list` and `watch` allowed                          | Live data from the cache        |
+  | `poll`          | `list` allowed, `watch` forbidden                   | The cache, relisted every 30 s  |
+  | `direct`        | listing across all namespaces is forbidden          | v1.3 behaviour: a list per request, in the selected namespace |
+  | `not_installed` | the kind isn't in the cluster (Gateway API)         | The existing calm note          |
+  | `forbidden`     | `list` forbidden altogether (often Secrets)         | The existing permission message |
+
+  The collector finds the mode with a `list` (limit 1) and a short `watch` before it starts an
+  informer, and checks again every 5 minutes for kinds that weren't available, so installing Gateway
+  API or granting a permission is picked up without a restart. `direct` keeps Opscope working for a
+  kubeconfig user who may read only some namespaces.
+- **A kill switch: `OPSCOPE_LIVE=false`** turns collectors off and every kind runs in `direct`
+  mode, exactly as v1.3.0. It is the fallback the engine plan asks for when loading changes, and it
+  is how L3 compares the two paths on a real cluster (see Open questions, 2).
+- **Before a kind's first sync, a request waits up to 5 seconds,** then reads that kind directly for
+  that one request. A slow first sync never shows an empty page.
+- **The UID is in every row (contract 1).** `Meta` gains `uid`, so every list row, the `/names`
+  index and the frontend's row keys have it. History in later releases is keyed by UID, because
+  names come back when an object is recreated and UIDs don't.
+- **Engine queries take a time (contract 2).** `Query` gains `At time.Time`; zero means now, and
+  anything else is refused with `ErrNoHistory` until the Time machine (v1.8). The HTTP API doesn't
+  take `?at=` yet.
+- **The bus is plain Go:** typed events, one buffered channel per subscriber, no broker. A
+  publisher never blocks; a subscriber that falls behind loses events and is sent a `Gap` that says
+  so, rather than slowing the collector. v1.4 defines `ObjectChanged` and `CollectorGap`; the other
+  event types in the engine plan come with their engines.
+- **Reconnects are recorded, never hidden.** When a watch breaks and the informer has to relist,
+  the changes in between are collapsed into one. The collector publishes a `CollectorGap` with the
+  time range, so the Change log can show a gap marker instead of implying a complete history.
+- **The browser is told what changed, then asks for it.** One server-sent events stream per
+  cluster (standard library) sends `changed` messages naming a resource and namespace, at most once
+  a second per resource. The page fetches the list again from the cache. This keeps one way of
+  building rows, sorting and filtering, and the stream stays small whatever the cluster's size.
+  Pushing row diffs was considered and rejected: it would need a second, incremental copy of every
+  list's logic in the frontend.
+- **One stream per browser tab, not per page.** Browsers allow only six connections per host over
+  HTTP/1.1, which a port-forward uses. Every component shares the tab's stream, and the stream
+  closes while the tab is hidden.
+- **Polling stays as the fallback in the browser.** When the stream is down, or a kind is in `poll`
+  or `direct` mode, `useApi` keeps its timer as today. A reconnect fetches everything on screen
+  again, so a message missed while disconnected never leaves a page out of date.
+- **The page says how fresh it is.** A small indicator in the top bar reads "Live", "Every 30 s"
+  or "Reconnecting", and explains on hover which kinds aren't live and why (for example, "watch
+  isn't allowed for pods"). It's built in `/kit` first.
+- **`watch` joins `get` and `list` in the ClusterRole.** It is a read verb, but it changes what
+  Opscope asks for, so the permissions table in `docs/deployment.md`, the principles in
+  `CONTRIBUTING.md` and the README say so in the same branch. `secrets-access.yaml` gains `watch`
+  too; without it Secrets run in `poll` mode.
+- **Memory is measured, and the manifest follows the numbers.** The cache holds every object of the
+  listed kinds, so L6 measures memory per 1,000 objects and on the test clusters, and updates the
+  manifest's requests and limits (256Mi today) and a sizing table in `docs/deployment.md`.
+
+## Design
+
+### Packages
+
+```
+backend/internal/bus/         typed events and subscriptions; standard library only
+backend/internal/collector/   one Collector per cluster: probes, informers, transforms, modes, status
+backend/internal/resources/   unchanged rows; list functions read from a Source
+```
+
+`clusters.Manager` gets two hooks, called when a cluster is added and when it's removed, so the
+collectors package can follow it without the clusters package importing it.
+
+### One kind table
+
+Today the kinds live in three places: `Listers` (lists), `kinds` in `detail.go` (detail pages) and
+the ClusterRole. The collector needs a fourth list: what to watch. Rather than add it, the
+collector reads the same table as the listers, so adding a resource type is still one entry in Go
+(plus the ClusterRole and the docs, as `CONTRIBUTING.md` says). Each entry already has, or gains:
+the URL name, the GroupVersionResource, whether it's namespaced, and an optional transform.
+
+### Source
+
+```go
+// Source is where list functions read objects from: the watch cache, or
+// the cluster directly when the cache can't serve that kind (see modes).
+type Source interface {
+	// List returns the objects of one kind: typed objects for built-in
+	// kinds (*corev1.Pod, ...), *unstructured.Unstructured for Gateway API.
+	// The objects are shared and must not be changed.
+	List(ctx context.Context, resource string, q Query) ([]runtime.Object, error)
+}
+
+type Query struct {
+	Namespace string    // "" means all namespaces
+	Type      string    // events only: "Warning" or "Normal"; "" means both
+	At        time.Time // zero means now; anything else is ErrNoHistory until v1.8
+}
+```
+
+A list function changes only at its top:
+
+```go
+func listPods(ctx context.Context, src Source, q Query) ([]Pod, error) {
+	pods, err := listOf[*corev1.Pod](ctx, src, "pods", q)
+	// ... the same flattening as today
+}
+```
+
+### Bus events
+
+```go
+// ObjectChanged is published for every add, update and delete the collector sees.
+type ObjectChanged struct {
+	Cluster         string
+	Resource        string // the URL name, e.g. "pods"
+	Type            ChangeType // Added, Updated or Deleted
+	UID             string
+	Namespace, Name string
+	ResourceVersion string
+	Old, New        runtime.Object // trimmed as in the cache; nil for Added / Deleted
+	Seen            time.Time      // when Opscope saw it, not when it happened
+}
+
+// CollectorGap says that changes to Resource between From and To may have
+// been collapsed or missed: a watch broke and was relisted, the cluster was
+// unreachable, or the collector was stopped. Resource is "" for all kinds.
+type CollectorGap struct {
+	Cluster, Resource string
+	From, To          time.Time
+	Reason            string // "relist", "unreachable", "stopped", "subscriber_lagged"
+}
+```
+
+An update whose resourceVersion didn't change isn't published.
+
+### API
+
+| Endpoint                                  | What it returns                                                     |
+| ----------------------------------------- | ------------------------------------------------------------------- |
+| `GET /api/clusters/{id}/{resource}`       | Unchanged, plus `uid` on every row                                  |
+| `GET /api/clusters/{id}/names`            | Unchanged, plus `uid` on every object                               |
+| `GET /api/clusters/{id}/live`             | The collector's state, per kind (below)                             |
+| `GET /api/clusters/{id}/live/stream`      | Server-sent events: `changed`, `status`, and a heartbeat every 15 s |
+
+```jsonc
+// GET /api/clusters/{id}/live
+{
+  "enabled": true,           // false when OPSCOPE_LIVE=false
+  "state": "live",           // live, partial (some kinds not live), connecting, unreachable, off
+  "kinds": [
+    { "resource": "pods", "mode": "watch", "synced": true, "objects": 412, "lastChange": "2026-11-02T10:04:11Z" },
+    { "resource": "secrets", "mode": "forbidden" },
+    { "resource": "gateways", "mode": "not_installed" }
+  ]
+}
+```
+
+```
+event: changed
+data: {"resource":"pods","namespaces":["default","shop"]}
+
+event: status
+data: {"state":"partial"}
+```
+
+The stream sets `Cache-Control: no-cache` and `X-Accel-Buffering: no`, so an nginx Ingress in
+front of Opscope doesn't hold messages back.
+
+### Frontend
+
+- `src/live.js`: one `EventSource` per cluster for the tab, shared through React context; closed
+  while the tab is hidden, reopened (with a full refetch) when it's shown again.
+- `useApi(path, { live: "pods", refreshMs })`: refetches when a `changed` message matches the
+  resource (and the namespace, when the path has one), at most once every 2 seconds; falls back to
+  `refreshMs` when the stream is down or the kind isn't in `watch` mode.
+- Lists and the overview use `live`. Detail pages keep polling in v1.4, because their object is
+  read directly; their related lists are cheap now that they come from the cache.
+- `LiveStatus` in the top bar, built in `/kit` first: "Live", "Every 30 s", "Reconnecting", with
+  the reasons on hover. No animation, so reduced motion needs no special case.
+
+## Branches
+
+Each branch starts from `main` after the one before it is merged, so later branches build on the
+earlier ones. Docs change in the same branch as the code they describe.
+
+| Branch                      | Phases | What it adds                                           |
+| --------------------------- | ------ | ------------------------------------------------------ |
+| `docs/live-data`            | L0     | This record                                            |
+| `feature/object-uids`       | L1     | UIDs in rows and the name index                        |
+| `feature/watch-cache`       | L2–L4  | Bus, collectors, listers on the cache, permissions and fallbacks |
+| `feature/live-updates`      | L5     | The event stream, live pages, the freshness indicator  |
+| `feature/live-scenarios`    | L6     | New test scenarios, memory measurements, sizing        |
+| `fix/<name>`, one per fix   | –      | Bugs found on the way, or reported after v1.3.0        |
+| `release/v1.4.0`            | L7     | Version bumps, final checks, release notes             |
+
+## Phase L0: Plan
+
+Goal: this record is reviewed and merged before the work starts.
+
+- [x] Record written on `docs/live-data` and reviewed
+- [ ] Open questions answered and moved into Decisions
+- [ ] Merged into `main`
+
+## Phase L1: Object UIDs
+
+Branch `feature/object-uids`. Goal: every row and every indexed name carries its UID.
+
+- [ ] `uid` on `Meta`, filled by `metaOf` and the Gateway API rows
+- [ ] `uid` on `ObjectName` in the `/names` index
+- [ ] Frontend: table rows and palette results keyed by UID where they're keyed by name today
+- [ ] Go tests check the UID for every kind; `docs/api.md` mentions it
+- [ ] No visible change in the UI, checked in the browser
+
+## Phase L2: Bus and collectors
+
+Branch `feature/watch-cache`. Goal: a collector runs for every connected cluster and keeps a synced
+cache, alongside the existing code; no page reads from it yet.
+
+- [ ] `internal/bus`: `ObjectChanged`, `CollectorGap`, subscribe and unsubscribe, a non-blocking
+      publish, `Gap` for a subscriber that fell behind
+- [ ] `internal/collector`: informers for every kind in the kind table, on clients without the
+      request timeout, no periodic resync
+- [ ] Transforms: trimmed `managedFields`, Secrets without values, ConfigMaps with key names and a
+      content hash; a test that fails if a Secret value reaches the cache or the bus
+- [ ] Collectors start and stop with `clusters.Manager` (startup, add, remove) and stop on shutdown
+- [ ] Every add, update and delete published on the bus; updates with an unchanged
+      resourceVersion skipped
+- [ ] `GET /api/clusters/{id}/live` with the state per kind
+- [ ] `OPSCOPE_LIVE=false` turns collectors off
+- [ ] Go tests with client-go fakes: sync, events, stop frees the cache, two clusters at once
+
+## Phase L3: Listers on the cache
+
+Goal: every page reads from the cache and shows the same data as v1.3.0.
+
+- [ ] `Source` and `Query.At`; list functions read from a `Source`; `ErrNoHistory` for a non-zero
+      `At`
+- [ ] The cache `Source` and the direct `Source`, with the 5-second wait for a kind's first sync
+- [ ] The overview, the `/names` index, detail pages' related lists and usage's node and pod lists
+      read from the cache; the detail object, YAML, logs and Secret values stay direct
+- [ ] A Go test that runs every list through both sources and compares the rows
+- [ ] On the test clusters, every endpoint gives the same answer with `OPSCOPE_LIVE=false` and with
+      collectors on (two servers, ports 8090 and 8091), with two clusters connected
+- [ ] No change in the browser: light and dark, keyboard, 375 px and wide
+
+## Phase L4: Permissions and fallbacks
+
+Goal: without `watch`, or with only some namespaces readable, Opscope still works and says how.
+
+- [ ] Probe per kind (`list` with limit 1, then a short `watch`) and the modes `watch`, `poll`,
+      `direct`, `not_installed` and `forbidden`; probing again every 5 minutes
+- [ ] `poll` relists every 30 seconds into the same cache and publishes the differences
+- [ ] `CollectorGap` on relist, while a cluster is unreachable, and when a collector stops
+- [ ] An unreachable cluster backs off and reconnects without filling the log
+- [ ] `watch` in `deploy/kubernetes/opscope.yaml` and `secrets-access.yaml`
+- [ ] `docs/deployment.md` (permissions table, "it polls rather than watching" replaced, the
+      modes), `CONTRIBUTING.md` (principles, adding a resource type) and the README
+- [ ] Go tests with fakes for every mode, and for a mode changing when a permission is granted
+- [ ] Checked on a kind cluster with a role that allows `list` but not `watch`, and with a
+      namespace-only role
+
+## Phase L5: Live pages
+
+Branch `feature/live-updates`. Goal: lists and the overview update within a couple of seconds of a
+change, without a timer.
+
+- [ ] `GET /api/clusters/{id}/live/stream`: `changed` at most once a second per resource, `status`,
+      a heartbeat every 15 s; closes cleanly when the client goes or the server stops
+- [ ] `src/live.js`: one stream per cluster per tab, paused while the tab is hidden, a full refetch
+      on reconnect
+- [ ] `useApi` `live` option with the 2-second limit and the polling fallback; lists and the overview
+      use it
+- [ ] `LiveStatus` in `/kit` (every state, both themes), then in the top bar
+- [ ] Works through `kubectl port-forward` and the Vite dev proxy
+- [ ] Frontend tests for matching messages to paths and for the fallback
+- [ ] `docs/api.md` for both `live` endpoints
+- [ ] Browser checks: light and dark, keyboard, screen reader label, 375 px and wide
+
+## Phase L6: Scenarios and sizing
+
+Branch `feature/live-scenarios`. Goal: checked against failure cases, with published memory numbers.
+
+- [ ] `test/scenarios/workloads.yaml`: a CrashLoopBackOff pod, an OOMKilled pod, an
+      ImagePullBackOff pod, and a Service whose selector matches nothing, with a table in the README
+      of what each page should show
+- [ ] On a kind cluster: each scenario appears and changes live (restart counts rise without a
+      reload)
+- [ ] A Go benchmark that fills the cache with realistic objects and reports memory per 1,000
+      objects per kind
+- [ ] Memory measured on the scenario cluster and on multipass (read-only), with one and with two
+      clusters connected; the run's length agreed before it starts
+- [ ] The manifest's requests and limits updated, and a sizing table in `docs/deployment.md`
+
+## Phase L7: Release
+
+Branch `release/v1.4.0`. Goal: v1.4.0 is ready to tag.
+
+- [ ] Bugs found on the way fixed on their own `fix/` branches and merged
+- [ ] README feature list, screenshots that show the indicator
+- [ ] Every check CI runs: `make test`, `go vet`, `gofmt`, the frontend build, `make docker-build`
+- [ ] Full browser pass: light and dark, keyboard only, 375 px and wide, with and without
+      metrics-server and Gateway API, two clusters connected
+- [ ] Image tag in `deploy/kubernetes/opscope.yaml` and the manifest URLs in the README and
+      `docs/deployment.md` set to v1.4.0
+- [ ] Status line, design record table, release notes drafted (the tag is pushed by the maintainer)
+
+## Not in this release
+
+- **Topology (v1.5)** builds on the cache and the bus. Before it starts, its record writes down why
+  the G0–G7 attempt was removed.
+- **Opscope's own `/metrics` for Prometheus** (collector lag, cache size): planned with the
+  storage design's cloud-native work (see Open questions, 3).
+- **Watching only some namespaces** (`OPSCOPE_NAMESPACES`): added only if L6's numbers show the
+  need. Until then, a user who can't list across namespaces gets `direct` mode.
+- **Live detail pages:** detail pages keep polling; a later release can listen for their own object.
+
+## Open questions
+
+1. **Secrets in the cache.** Watching Secrets means their values reach Opscope's memory on every
+   change, and are dropped in the transform before they're stored. The alternative is to keep
+   Secrets in `direct` mode (as v1.3: values read only when the Secrets page loads), at the cost of
+   no live Secrets list and no Secret metadata for the Change log until v1.7 solves it. Proposed:
+   watch them, values dropped in the transform, documented plainly in `docs/deployment.md`.
+2. **Kill switch.** Proposed: keep `OPSCOPE_LIVE=false`, documented as a fallback, for at least
+   v1.4 and v1.5. Or leave it undocumented, for testing only?
+3. **`/metrics` endpoint.** Proposed: not in v1.4; it comes with the Helm chart and multiple
+   replicas (v1.8). Bring it forward if you'd rather measure the collectors with it in L6.
+4. **Events in the cache.** Events change constantly on busy clusters and are the largest kind by
+   count. Proposed: cache them like the rest (the overview's warnings then update live), and move
+   them back to `direct` if L6 shows they cost too much memory.
+
+## Phase notes
+
+### L0: Plan (2026-11-02)
+
+- Written from the engine release plan (v1.4: Live data) and the storage design. The storage
+  design's work starts in v1.7, so nothing in v1.4 needs a store; the cache lives in memory.
+- Branched from `main` at `f6b4174` (v1.3.0). There were no open issues after v1.3.0, so there is
+  no backlog to clear first; the only open pull request is a Dependabot update of the CI actions.
+- The plan was approved as written. The four open questions are still to be answered; L1 doesn't
+  depend on any of them, L2 needs 1, 2 and 4, and L6 needs 3.
