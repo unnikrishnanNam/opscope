@@ -13,11 +13,12 @@ import (
 
 // The command palette searches every object in a cluster by name. Rather
 // than make the browser load every table, ListNames lists them all here and
-// returns only kind, namespace and name, which is all a search needs.
+// returns only kind, namespace, name and UID, which is all a search needs.
 
 // ObjectName is one object in the index.
 type ObjectName struct {
 	Resource  string `json:"resource"` // the API name, e.g. "pods"
+	UID       string `json:"uid"`
 	Namespace string `json:"namespace,omitempty"`
 	Name      string `json:"name"`
 }
@@ -92,7 +93,7 @@ func ListNames(ctx context.Context, clients Clients) (*NameIndex, error) {
 		default:
 			read++
 			for _, m := range metas(r.rows) {
-				index.Objects = append(index.Objects, ObjectName{Resource: kind, Namespace: m.Namespace, Name: m.Name})
+				index.Objects = append(index.Objects, ObjectName{Resource: kind, UID: m.UID, Namespace: m.Namespace, Name: m.Name})
 			}
 		}
 	}

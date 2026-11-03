@@ -13,9 +13,9 @@ stays read-only, one image and one process, and every page shows the same data a
 only new permission is `watch`, a read verb; without it, Opscope polls and says so.
 
 This is v1.4.0 in the engine release plan. Phases are numbered **L0–L7** so they don't mix with the
-build phases 0–8 or the D, G, P, R and S phases. The work is split over several branches, one per
-feature (see [Branches](#branches)); each phase is reviewed before it is committed, and the next
-phase starts only after that.
+build phases 0–8 or the D, G, P, R and S phases. All work happens on the `docs/live-data` branch,
+one commit per phase; each phase is reviewed before it is committed, and the next phase starts only
+after that.
 
 **Status (2026-11-02):** planned.
 
@@ -103,7 +103,7 @@ phase starts only after that.
   isn't allowed for pods"). It's built in `/kit` first.
 - **`watch` joins `get` and `list` in the ClusterRole.** It is a read verb, but it changes what
   Opscope asks for, so the permissions table in `docs/deployment.md`, the principles in
-  `CONTRIBUTING.md` and the README say so in the same branch. `secrets-access.yaml` gains `watch`
+  `CONTRIBUTING.md` and the README say so in the same phase. `secrets-access.yaml` gains `watch`
   too; without it Secrets run in `poll` mode.
 - **Memory is measured, and the manifest follows the numbers.** The cache holds every object of the
   listed kinds, so L6 measures memory per 1,000 objects and on the test clusters, and updates the
@@ -230,42 +230,28 @@ front of Opscope doesn't hold messages back.
 - `LiveStatus` in the top bar, built in `/kit` first: "Live", "Every 30 s", "Reconnecting", with
   the reasons on hover. No animation, so reduced motion needs no special case.
 
-## Branches
-
-Each branch starts from `main` after the one before it is merged, so later branches build on the
-earlier ones. Docs change in the same branch as the code they describe.
-
-| Branch                      | Phases | What it adds                                           |
-| --------------------------- | ------ | ------------------------------------------------------ |
-| `docs/live-data`            | L0     | This record                                            |
-| `feature/object-uids`       | L1     | UIDs in rows and the name index                        |
-| `feature/watch-cache`       | L2–L4  | Bus, collectors, listers on the cache, permissions and fallbacks |
-| `feature/live-updates`      | L5     | The event stream, live pages, the freshness indicator  |
-| `feature/live-scenarios`    | L6     | New test scenarios, memory measurements, sizing        |
-| `fix/<name>`, one per fix   | –      | Bugs found on the way, or reported after v1.3.0        |
-| `release/v1.4.0`            | L7     | Version bumps, final checks, release notes             |
-
 ## Phase L0: Plan
 
 Goal: this record is reviewed and merged before the work starts.
 
 - [x] Record written on `docs/live-data` and reviewed
 - [ ] Open questions answered and moved into Decisions
-- [ ] Merged into `main`
+- [~] ~~Merged into `main`~~ Kept on this branch with the rest of v1.4.0 (see notes)
 
 ## Phase L1: Object UIDs
 
-Branch `feature/object-uids`. Goal: every row and every indexed name carries its UID.
+Goal: every row and every indexed name carries its UID.
 
-- [ ] `uid` on `Meta`, filled by `metaOf` and the Gateway API rows
-- [ ] `uid` on `ObjectName` in the `/names` index
-- [ ] Frontend: table rows and palette results keyed by UID where they're keyed by name today
-- [ ] Go tests check the UID for every kind; `docs/api.md` mentions it
-- [ ] No visible change in the UI, checked in the browser
+- [x] `uid` on `Meta`, filled by `metaOf` and the Gateway API rows
+- [x] `uid` on `ObjectName` in the `/names` index
+- [~] Frontend: table rows ~~and palette results~~ keyed by UID where they're keyed by name today;
+      event lists too, palette results stay keyed by name (see notes)
+- [x] Go tests check the UID for every kind; `docs/api.md` mentions it
+- [x] No visible change in the UI, checked in the browser
 
 ## Phase L2: Bus and collectors
 
-Branch `feature/watch-cache`. Goal: a collector runs for every connected cluster and keeps a synced
+Goal: a collector runs for every connected cluster and keeps a synced
 cache, alongside the existing code; no page reads from it yet.
 
 - [ ] `internal/bus`: `ObjectChanged`, `CollectorGap`, subscribe and unsubscribe, a non-blocking
@@ -313,7 +299,7 @@ Goal: without `watch`, or with only some namespaces readable, Opscope still work
 
 ## Phase L5: Live pages
 
-Branch `feature/live-updates`. Goal: lists and the overview update within a couple of seconds of a
+Goal: lists and the overview update within a couple of seconds of a
 change, without a timer.
 
 - [ ] `GET /api/clusters/{id}/live/stream`: `changed` at most once a second per resource, `status`,
@@ -330,7 +316,7 @@ change, without a timer.
 
 ## Phase L6: Scenarios and sizing
 
-Branch `feature/live-scenarios`. Goal: checked against failure cases, with published memory numbers.
+Goal: checked against failure cases, with published memory numbers.
 
 - [ ] `test/scenarios/workloads.yaml`: a CrashLoopBackOff pod, an OOMKilled pod, an
       ImagePullBackOff pod, and a Service whose selector matches nothing, with a table in the README
@@ -345,9 +331,9 @@ Branch `feature/live-scenarios`. Goal: checked against failure cases, with publi
 
 ## Phase L7: Release
 
-Branch `release/v1.4.0`. Goal: v1.4.0 is ready to tag.
+Goal: v1.4.0 is ready to tag.
 
-- [ ] Bugs found on the way fixed on their own `fix/` branches and merged
+- [ ] Bugs found on the way fixed, one commit each
 - [ ] README feature list, screenshots that show the indicator
 - [ ] Every check CI runs: `make test`, `go vet`, `gofmt`, the frontend build, `make docker-build`
 - [ ] Full browser pass: light and dark, keyboard only, 375 px and wide, with and without
@@ -391,3 +377,24 @@ Branch `release/v1.4.0`. Goal: v1.4.0 is ready to tag.
   no backlog to clear first; the only open pull request is a Dependabot update of the CI actions.
 - The plan was approved as written. The four open questions are still to be answered; L1 doesn't
   depend on any of them, L2 needs 1, 2 and 4, and L6 needs 3.
+- Changed after review (2026-11-03): the plan first split v1.4.0 over six branches, one per
+  feature. All of it now stays on `docs/live-data`, one commit per phase, and reaches `main` as a
+  whole.
+
+### L1: Object UIDs (2026-11-03)
+
+- `Meta` has `uid` first, filled by `metaOf`. The Gateway API rows decode their metadata into the
+  same `metav1.ObjectMeta`, so they needed no change of their own.
+- The detail view already had its own `uid` field next to the embedded `Meta`. It's folded into
+  `Meta` now, so the detail JSON has `uid` once, as before.
+- Changed from the plan: palette results stay keyed by name. Their ids are what the palette
+  remembers as recent, and a recent entry should still find "web" after it's deleted and made
+  again; the detail URL is by name too. Table rows and event lists use the UID as their React key,
+  and fall back to namespace and name for rows without one (the `/kit` samples).
+- Tests: `TestEveryRowHasItsUID` gives one object of every listed kind a UID named after its
+  resource and checks that each lister returns it; the `/names` test and the Secret detail test
+  check UIDs too. Both fail when `metaOf` leaves the UID out, checked by removing it once.
+- Checked against multipass (read-only): all 178 objects in `/names` and every row of the lists
+  tried have a `uid`, and a pod's UID matches `kubectl get -o jsonpath='{.metadata.uid}'` in its row
+  and its detail view. In the browser, the overview, pods list, a pod's detail page and palette
+  search look as before in dark and light at 375 px, with no React key warnings in the console.

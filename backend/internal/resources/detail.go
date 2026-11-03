@@ -77,7 +77,6 @@ var ErrUnknownKind = errors.New("no detail view for this resource type")
 type Detail struct {
 	Meta
 	Kind        string            `json:"kind"`
-	UID         string            `json:"uid"`
 	Labels      map[string]string `json:"labels"`
 	Annotations map[string]string `json:"annotations"`
 	Owners      []Owner           `json:"owners"`
@@ -162,12 +161,12 @@ func GetDetail(ctx context.Context, clients Clients, resource, namespace, name s
 
 	d := &Detail{
 		Meta: Meta{
+			UID:       string(obj.GetUID()),
 			Name:      obj.GetName(),
 			Namespace: obj.GetNamespace(),
 			Created:   obj.GetCreationTimestamp().Time,
 		},
 		Kind:        info.Kind,
-		UID:         string(obj.GetUID()),
 		Labels:      emptyIfNil(obj.GetLabels()),
 		Annotations: emptyIfNil(obj.GetAnnotations()),
 		Owners:      []Owner{},

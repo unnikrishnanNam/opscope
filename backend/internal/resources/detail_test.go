@@ -35,7 +35,7 @@ func TestSecretDetailHidesValues(t *testing.T) {
 	clients := detailClients(t, map[string]runtime.Object{
 		"secrets": &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "web", Name: "db",
+				Namespace: "web", Name: "db", UID: "u-db",
 				Annotations: map[string]string{
 					// kubectl apply stores the whole Secret here, values included.
 					"kubectl.kubernetes.io/last-applied-configuration": `{"data":{"password":"aHVudGVyMg=="}}`,
@@ -50,6 +50,9 @@ func TestSecretDetailHidesValues(t *testing.T) {
 	d, err := GetDetail(context.Background(), clients, "secrets", "web", "db")
 	if err != nil {
 		t.Fatal(err)
+	}
+	if d.UID != "u-db" {
+		t.Errorf("uid = %q, want u-db", d.UID)
 	}
 	for _, leak := range []string{"hunter2", "aHVudGVyMg"} {
 		if strings.Contains(d.YAML, leak) {

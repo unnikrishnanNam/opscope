@@ -76,14 +76,18 @@ func asDynamicLister[T any](list func(context.Context, dynamic.Interface, Query)
 
 // Meta holds the fields every row has. Row types embed it, and Go's JSON
 // encoder writes embedded fields as if they were declared in the row itself.
+//
+// UID is what identifies an object over time: a name comes back when an
+// object is deleted and made again, its UID doesn't.
 type Meta struct {
+	UID       string    `json:"uid"`
 	Name      string    `json:"name"`
 	Namespace string    `json:"namespace,omitempty"`
 	Created   time.Time `json:"created"`
 }
 
 func metaOf(obj metav1.ObjectMeta) Meta {
-	return Meta{Name: obj.Name, Namespace: obj.Namespace, Created: obj.CreationTimestamp.Time}
+	return Meta{UID: string(obj.UID), Name: obj.Name, Namespace: obj.Namespace, Created: obj.CreationTimestamp.Time}
 }
 
 // sortKey is used by sortRows. Every row type gets it through the embedded Meta.

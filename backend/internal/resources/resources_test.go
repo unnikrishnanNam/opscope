@@ -12,9 +12,12 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -235,6 +238,57 @@ func TestEveryListerWorksOnAnEmptyCluster(t *testing.T) {
 	for name, lister := range Listers {
 		if _, err := lister(context.Background(), clients, Query{}); err != nil {
 			t.Errorf("%s: %v", name, err)
+		}
+	}
+}
+
+// Every row carries its object's UID, whichever lister made it. One object
+// of each kind, each with a UID named after its resource, makes a row that
+// lost or swapped its UID easy to spot.
+func TestEveryRowHasItsUID(t *testing.T) {
+	uid := func(resource string) types.UID { return types.UID("uid-" + resource) }
+	named := func(resource, namespace string) metav1.ObjectMeta {
+		return metav1.ObjectMeta{Namespace: namespace, Name: "one", UID: uid(resource)}
+	}
+	kube := fake.NewClientset(
+		&corev1.Namespace{ObjectMeta: named("namespaces", "")},
+		&corev1.Node{ObjectMeta: named("nodes", "")},
+		&corev1.Event{ObjectMeta: named("events", "web")},
+		&corev1.Pod{ObjectMeta: named("pods", "web")},
+		&appsv1.Deployment{ObjectMeta: named("deployments", "web")},
+		&appsv1.StatefulSet{ObjectMeta: named("statefulsets", "web")},
+		&appsv1.DaemonSet{ObjectMeta: named("daemonsets", "web")},
+		&batchv1.Job{ObjectMeta: named("jobs", "web")},
+		&batchv1.CronJob{ObjectMeta: named("cronjobs", "web")},
+		&corev1.ConfigMap{ObjectMeta: named("configmaps", "web")},
+		&corev1.Secret{ObjectMeta: named("secrets", "web")},
+		&corev1.Service{ObjectMeta: named("services", "web")},
+		&networkingv1.Ingress{ObjectMeta: named("ingresses", "web")},
+		&corev1.PersistentVolumeClaim{ObjectMeta: named("persistentvolumeclaims", "web")},
+		&corev1.PersistentVolume{ObjectMeta: named("persistentvolumes", "")},
+		&storagev1.StorageClass{ObjectMeta: named("storageclasses", "")},
+	)
+	var gatewayObjects []*unstructured.Unstructured
+	for _, o := range []struct{ kind, resource, namespace string }{
+		{"Gateway", "gateways", "web"},
+		{"HTTPRoute", "httproutes", "web"},
+		{"GatewayClass", "gatewayclasses", ""},
+	} {
+		obj := object(o.kind, o.namespace, "one", nil)
+		obj.SetUID(uid(o.resource))
+		gatewayObjects = append(gatewayObjects, obj)
+	}
+	clients := Clients{Kube: kube, Dynamic: fakeDynamic(gatewayObjects...)}
+
+	for resource, lister := range Listers {
+		rows, err := lister(context.Background(), clients, Query{})
+		if err != nil {
+			t.Errorf("%s: %v", resource, err)
+			continue
+		}
+		got := metas(rows)
+		if len(got) != 1 || got[0].UID != string(uid(resource)) {
+			t.Errorf("%s: rows %+v, want one with uid %q", resource, got, uid(resource))
 		}
 	}
 }

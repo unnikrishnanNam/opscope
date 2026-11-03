@@ -112,8 +112,9 @@ started.
 
 ### `GET /api/clusters/{id}/{resource}`
 
-One row per object of a resource type, with the columns its table shows. Every row has `name`,
-`namespace` (namespaced kinds only) and `created`.
+One row per object of a resource type, with the columns its table shows. Every row has `uid`,
+`name`, `namespace` (namespaced kinds only) and `created`. The `uid` is the object's
+`metadata.uid`: unlike the name, it isn't reused when an object is deleted and made again.
 
 | Parameter    | Effect                                                         |
 | ------------ | -------------------------------------------------------------- |
@@ -146,11 +147,11 @@ them. `gatewayAPI` is `null` when the cluster has no Gateway API.
 
 ### `GET /api/clusters/{id}/names`
 
-Every object's resource type, namespace and name, for search. Events are not included.
+Every object's resource type, UID, namespace and name, for search. Events are not included.
 
 ```json
 {
-  "objects": [{ "resource": "pods", "namespace": "web", "name": "api-7d9f" }],
+  "objects": [{ "resource": "pods", "uid": "6f1c0d2e-…", "namespace": "web", "name": "api-7d9f" }],
   "skipped": [{ "resource": "secrets", "code": "forbidden" }]
 }
 ```
