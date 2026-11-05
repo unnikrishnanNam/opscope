@@ -161,3 +161,41 @@ func TestEnvClusterCannotBeRemoved(t *testing.T) {
 		t.Fatal("expected removing an environment cluster to fail")
 	}
 }
+
+// Watch replays the clusters already known, then reports each one added,
+// loaded and removed, so a collector can follow the manager.
+func TestWatchFollowsClusters(t *testing.T) {
+	api := fakeAPIServer(t)
+	dataDir := t.TempDir()
+	path := filepath.Join(t.TempDir(), "kubeconfig")
+	os.WriteFile(path, kubeconfig("https://good.example:6443", ""), 0o600)
+
+	manager := NewManager(dataDir)
+	if _, err := manager.LoadFromFile(path, "", "env"); err != nil {
+		t.Fatal(err)
+	}
+
+	var events []string
+	manager.Watch(
+		func(c *Cluster) { events = append(events, "added "+c.ID) },
+		func(id string) { events = append(events, "removed "+id) },
+	)
+	if _, err := manager.Add("lab", kubeconfig(api.URL, ""), "good"); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.Remove("lab"); err != nil {
+		t.Fatal(err)
+	}
+	// A saved cluster loaded later is reported too.
+	if _, err := manager.Add("saved", kubeconfig(api.URL, ""), "good"); err != nil {
+		t.Fatal(err)
+	}
+	reloaded := NewManager(dataDir)
+	reloaded.Watch(func(c *Cluster) { events = append(events, "loaded "+c.ID) }, func(string) {})
+	reloaded.LoadSaved()
+
+	want := "added env, added lab, removed lab, added saved, loaded saved"
+	if got := strings.Join(events, ", "); got != want {
+		t.Errorf("events = %s\nwant %s", got, want)
+	}
+}

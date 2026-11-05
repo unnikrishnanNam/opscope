@@ -38,9 +38,10 @@ type Cluster struct {
 	Context string `json:"context"`
 	Server  string `json:"server"`
 
-	Client  *kubernetes.Clientset `json:"-"` // typed client for built-in kinds
-	Dynamic dynamic.Interface     `json:"-"` // dynamic client for custom resources (Gateway API)
-	Stream  *kubernetes.Clientset `json:"-"` // typed client without a timeout, for log streams
+	Client        *kubernetes.Clientset `json:"-"` // typed client for built-in kinds
+	Dynamic       dynamic.Interface     `json:"-"` // dynamic client for custom resources (Gateway API)
+	Stream        *kubernetes.Clientset `json:"-"` // typed client without a timeout, for log streams and watches
+	StreamDynamic dynamic.Interface     `json:"-"` // dynamic client without a timeout, for watches
 }
 
 // savedCluster is the file format for clusters added in the UI.
@@ -57,6 +58,13 @@ type Manager struct {
 	mu       sync.RWMutex
 	clusters map[string]*Cluster
 	dir      string // folder where UI-added clusters are saved
+	watchers []watcher
+}
+
+// watcher is a pair of functions from Watch.
+type watcher struct {
+	added   func(*Cluster)
+	removed func(id string)
 }
 
 // NewManager creates an empty manager that saves clusters in dataDir/clusters.
@@ -93,17 +101,18 @@ func (m *Manager) LoadFromFile(path, contextName, name string) (*Cluster, error)
 		name = config.CurrentContext
 	}
 	cluster := &Cluster{
-		ID:      slugify(name),
-		Name:    name,
-		Source:  SourceEnv,
-		Context: config.CurrentContext,
-		Server:  server,
-		Client:  clients.kube,
-		Dynamic: clients.dyn,
-		Stream:  clients.stream,
+		ID:            slugify(name),
+		Name:          name,
+		Source:        SourceEnv,
+		Context:       config.CurrentContext,
+		Server:        server,
+		Client:        clients.kube,
+		Dynamic:       clients.dyn,
+		Stream:        clients.stream,
+		StreamDynamic: clients.streamDyn,
 	}
 	m.mu.Lock()
-	m.clusters[cluster.ID] = cluster
+	m.put(cluster)
 	m.mu.Unlock()
 	return cluster, nil
 }
@@ -127,17 +136,18 @@ func (m *Manager) LoadInCluster(name string) (*Cluster, error) {
 		name = "in-cluster"
 	}
 	cluster := &Cluster{
-		ID:      slugify(name),
-		Name:    name,
-		Source:  SourceEnv,
-		Context: "(service account)",
-		Server:  server,
-		Client:  clients.kube,
-		Dynamic: clients.dyn,
-		Stream:  clients.stream,
+		ID:            slugify(name),
+		Name:          name,
+		Source:        SourceEnv,
+		Context:       "(service account)",
+		Server:        server,
+		Client:        clients.kube,
+		Dynamic:       clients.dyn,
+		Stream:        clients.stream,
+		StreamDynamic: clients.streamDyn,
 	}
 	m.mu.Lock()
-	m.clusters[cluster.ID] = cluster
+	m.put(cluster)
 	m.mu.Unlock()
 	return cluster, nil
 }
@@ -182,16 +192,17 @@ func (m *Manager) loadSavedFile(file string) error {
 	if _, taken := m.clusters[saved.ID]; taken {
 		return fmt.Errorf("id %q is already used by the environment cluster, skipping", saved.ID)
 	}
-	m.clusters[saved.ID] = &Cluster{
-		ID:      saved.ID,
-		Name:    saved.Name,
-		Source:  SourceUI,
-		Context: saved.Context,
-		Server:  server,
-		Client:  clients.kube,
-		Dynamic: clients.dyn,
-		Stream:  clients.stream,
-	}
+	m.put(&Cluster{
+		ID:            saved.ID,
+		Name:          saved.Name,
+		Source:        SourceUI,
+		Context:       saved.Context,
+		Server:        server,
+		Client:        clients.kube,
+		Dynamic:       clients.dyn,
+		Stream:        clients.stream,
+		StreamDynamic: clients.streamDyn,
+	})
 	return nil
 }
 
@@ -227,14 +238,15 @@ func (m *Manager) Add(name string, kubeconfig []byte, contextName string) (*Clus
 		return nil, err
 	}
 	cluster := &Cluster{
-		ID:      id,
-		Name:    name,
-		Source:  SourceUI,
-		Context: config.CurrentContext,
-		Server:  server,
-		Client:  clients.kube,
-		Dynamic: clients.dyn,
-		Stream:  clients.stream,
+		ID:            id,
+		Name:          name,
+		Source:        SourceUI,
+		Context:       config.CurrentContext,
+		Server:        server,
+		Client:        clients.kube,
+		Dynamic:       clients.dyn,
+		Stream:        clients.stream,
+		StreamDynamic: clients.streamDyn,
 	}
 
 	// Only save clusters we can actually talk to.
@@ -251,7 +263,7 @@ func (m *Manager) Add(name string, kubeconfig []byte, contextName string) (*Clus
 	}
 
 	m.mu.Lock()
-	m.clusters[id] = cluster
+	m.put(cluster)
 	m.mu.Unlock()
 	return cluster, nil
 }
@@ -285,7 +297,32 @@ func (m *Manager) Remove(id string) error {
 		return err
 	}
 	delete(m.clusters, id)
+	for _, w := range m.watchers {
+		w.removed(id)
+	}
 	return nil
+}
+
+// put adds or replaces a cluster and tells the watchers. m.mu must be held.
+func (m *Manager) put(cluster *Cluster) {
+	m.clusters[cluster.ID] = cluster
+	for _, w := range m.watchers {
+		w.added(cluster)
+	}
+}
+
+// Watch calls added for every cluster known now and for each one loaded or
+// added later (also when one replaces another with the same id), and
+// removed for each one removed. Both run with the manager locked, so they
+// see every change in order and none is missed between the two; they must
+// be quick and must not call the manager.
+func (m *Manager) Watch(added func(*Cluster), removed func(id string)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.watchers = append(m.watchers, watcher{added, removed})
+	for _, cluster := range m.clusters {
+		added(cluster)
+	}
 }
 
 // ErrNotFound is returned when no cluster has the given id.

@@ -8,10 +8,13 @@ package resources
 
 import (
 	"context"
+	"maps"
+	"slices"
 	"sort"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 )
@@ -56,6 +59,42 @@ var Listers = map[string]Lister{
 	"gateways":       asDynamicLister(listGateways),
 	"httproutes":     asDynamicLister(listHTTPRoutes),
 	"gatewayclasses": asDynamicLister(listGatewayClasses),
+}
+
+// Kind is one resource type in Listers and where it lives in the
+// Kubernetes API: what a collector watches so the lists can be served.
+type Kind struct {
+	Resource   string // the URL name, e.g. "pods"
+	GVR        schema.GroupVersionResource
+	Namespaced bool
+	Custom     bool // a custom resource (Gateway API), read with the dynamic client
+}
+
+// listOnly are listed kinds without a detail view, so they aren't in kinds.
+var listOnly = map[string]kindInfo{
+	"events": {core("events"), "Event", true},
+}
+
+// Kinds returns every resource type in Listers, sorted by name. A lister
+// without an entry in kinds or listOnly is a mistake caught by the tests.
+func Kinds() []Kind {
+	var out []Kind
+	for _, resource := range slices.Sorted(maps.Keys(Listers)) {
+		info, ok := kinds[resource]
+		if !ok {
+			info, ok = listOnly[resource]
+		}
+		if !ok {
+			continue
+		}
+		out = append(out, Kind{
+			Resource:   resource,
+			GVR:        info.GVR,
+			Namespaced: info.Namespaced,
+			Custom:     info.GVR.Group == gatewayAPI("").Group,
+		})
+	}
+	return out
 }
 
 // asLister wraps a typed list function (returning e.g. []Pod) so it fits in

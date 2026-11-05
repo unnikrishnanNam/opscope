@@ -38,9 +38,14 @@ after that.
 - **The cached objects are trimmed before they're stored,** with an informer transform:
   - `managedFields` keeps only each entry's manager, operation and time, without `fieldsV1` (the
     bulk of it). The Change log needs the manager names for actor attribution in v1.7.
-  - **Secrets keep their type and key names, never their values.** The values are dropped in the
-    transform, before the object reaches the cache or the bus, so "Secret values are never cached"
-    stays true. Revealing a value stays a direct, one-key call (see Open questions, 1).
+  - **Secrets keep their type and key names, never their values.** Secrets are watched like the
+    other kinds, so their values do reach Opscope's memory on every change, as they do today
+    whenever the Secrets page loads. The transform drops them, with kubectl's
+    `last-applied-configuration` annotation (which holds them too), before the object reaches the
+    cache or the bus, so "Secret values are never cached" stays true. Revealing a value stays a
+    direct, one-key call. `docs/deployment.md` says this plainly. Keeping Secrets in `direct` mode
+    was considered and rejected: no live Secrets list, and no Secret metadata for the Change log in
+    v1.7. (Answered in review, 2026-11-05.)
   - ConfigMaps keep their key names and a content hash, not their values: the list only shows key
     names, the detail page reads the object directly, and the Change log (v1.7) tracks ConfigMap
     content by hash.
@@ -170,12 +175,14 @@ type ObjectChanged struct {
 	Namespace, Name string
 	ResourceVersion string
 	Old, New        runtime.Object // trimmed as in the cache; nil for Added / Deleted
+	Initial         bool           // from the collector's first list: where it started, not a change
 	Seen            time.Time      // when Opscope saw it, not when it happened
 }
 
 // CollectorGap says that changes to Resource between From and To may have
 // been collapsed or missed: a watch broke and was relisted, the cluster was
-// unreachable, or the collector was stopped. Resource is "" for all kinds.
+// unreachable, or the collector was stopped. Resource is "" for all kinds, and
+// Cluster is "" for all clusters (a lagging subscriber can have missed anything).
 type CollectorGap struct {
 	Cluster, Resource string
 	From, To          time.Time
@@ -183,7 +190,8 @@ type CollectorGap struct {
 }
 ```
 
-An update whose resourceVersion didn't change isn't published.
+An update whose resourceVersion didn't change isn't published. A subscriber that fell behind gets
+its gap together with the next event that fits, never alone, so every queue holds at least two.
 
 ### API
 
@@ -254,18 +262,18 @@ Goal: every row and every indexed name carries its UID.
 Goal: a collector runs for every connected cluster and keeps a synced
 cache, alongside the existing code; no page reads from it yet.
 
-- [ ] `internal/bus`: `ObjectChanged`, `CollectorGap`, subscribe and unsubscribe, a non-blocking
+- [x] `internal/bus`: `ObjectChanged`, `CollectorGap`, subscribe and unsubscribe, a non-blocking
       publish, `Gap` for a subscriber that fell behind
-- [ ] `internal/collector`: informers for every kind in the kind table, on clients without the
+- [x] `internal/collector`: informers for every kind in the kind table, on clients without the
       request timeout, no periodic resync
-- [ ] Transforms: trimmed `managedFields`, Secrets without values, ConfigMaps with key names and a
+- [x] Transforms: trimmed `managedFields`, Secrets without values, ConfigMaps with key names and a
       content hash; a test that fails if a Secret value reaches the cache or the bus
-- [ ] Collectors start and stop with `clusters.Manager` (startup, add, remove) and stop on shutdown
-- [ ] Every add, update and delete published on the bus; updates with an unchanged
+- [x] Collectors start and stop with `clusters.Manager` (startup, add, remove) and stop on shutdown
+- [x] Every add, update and delete published on the bus; updates with an unchanged
       resourceVersion skipped
-- [ ] `GET /api/clusters/{id}/live` with the state per kind
-- [ ] `OPSCOPE_LIVE=false` turns collectors off
-- [ ] Go tests with client-go fakes: sync, events, stop frees the cache, two clusters at once
+- [x] `GET /api/clusters/{id}/live` with the state per kind
+- [x] `OPSCOPE_LIVE=false` turns collectors off
+- [x] Go tests with client-go fakes: sync, events, stop frees the cache, two clusters at once
 
 ## Phase L3: Listers on the cache
 
@@ -354,11 +362,8 @@ Goal: v1.4.0 is ready to tag.
 
 ## Open questions
 
-1. **Secrets in the cache.** Watching Secrets means their values reach Opscope's memory on every
-   change, and are dropped in the transform before they're stored. The alternative is to keep
-   Secrets in `direct` mode (as v1.3: values read only when the Secrets page loads), at the cost of
-   no live Secrets list and no Secret metadata for the Change log until v1.7 solves it. Proposed:
-   watch them, values dropped in the transform, documented plainly in `docs/deployment.md`.
+1. ~~**Secrets in the cache.**~~ Answered: watched, values dropped in the transform (see
+   Decisions).
 2. **Kill switch.** Proposed: keep `OPSCOPE_LIVE=false`, documented as a fallback, for at least
    v1.4 and v1.5. Or leave it undocumented, for testing only?
 3. **`/metrics` endpoint.** Proposed: not in v1.4; it comes with the Helm chart and multiple
@@ -398,3 +403,53 @@ Goal: v1.4.0 is ready to tag.
   tried have a `uid`, and a pod's UID matches `kubectl get -o jsonpath='{.metadata.uid}'` in its row
   and its detail view. In the browser, the overview, pods list, a pod's detail page and palette
   search look as before in dark and light at 375 px, with no React key warnings in the console.
+
+### L2: Bus and collectors (2026-11-05)
+
+- Open question 1 answered in review: Secrets are watched, values dropped in the transform. Moved
+  into Decisions. Questions 2 and 4 are still open; L2 is built the way they propose
+  (`OPSCOPE_LIVE=false` exists but isn't documented yet, and Events are cached), and either is a
+  small change if the answer differs.
+- `internal/bus` is standard library only. Found while testing: a lagging subscriber was first sent
+  its gap alone when one slot was free, which filled that slot and lost the next event, so a reader
+  keeping pace one event at a time never caught up. The gap now goes only together with the next
+  event, and every queue holds at least two.
+- `internal/collector` runs one informer per kind rather than one shared factory, so L4 can stop
+  and restart a kind on its own. The typed informers still come from client-go's factory
+  (`ForResource`), one factory per kind; Gateway API uses the dynamic informer. The kind list is
+  `resources.Kinds()`, built from `Listers` and the detail `kinds` (Events, which have no detail
+  page, are in a small `listOnly` table), with a test that every lister has an entry.
+- Added to the bus event: `Initial`, for the objects of a collector's first list. They're published
+  as adds, but they're the state it started from, not changes; the Change log will skip them.
+- Transforms: `managedFields` keeps manager, operation, API version, time and subresource. Secrets
+  keep type and key names; values, `stringData` and the `last-applied-configuration` annotation
+  go. ConfigMaps keep key names; values go, and the cached copy gets an `opscope/content-hash`
+  annotation (SHA-256 over every key and value, length-prefixed so no two contents run together).
+  The transform is idempotent, as client-go asks.
+- client-go's default watch-error handler logs every failed list or watch at error level, which
+  would fill the log for an unreachable cluster or a kind it doesn't have. The collector keeps the
+  error for the status instead and logs it at debug level. The modes in L4 build on this.
+- Clusters gained a dynamic client without a timeout (`StreamDynamic`), next to the typed
+  `Stream` one. Both stream clients now get Opscope's request limit (50 a second, bursts of 100);
+  before, they were copied before it was set and had client-go's 5 a second, which would make a
+  collector's start take several seconds.
+- `clusters.Manager.Watch` calls the collectors on every add, load and removal, with the manager
+  locked so no change is missed between replaying the existing clusters and the next one.
+- `go mod tidy` added `github.com/pmezard/go-difflib` as an indirect module. It comes with
+  client-go's `tools/cache`, the informers' own package, so it's part of the Kubernetes client
+  libraries, not a new choice.
+- `GET /api/clusters/{id}/live` works now; it goes into `docs/api.md` with the stream in L5, as
+  planned. In L2 every kind's mode is `watch`, and a kind that can't be listed shows its error
+  while the state is `partial`; L4 turns those into `not_installed`, `forbidden` and the rest.
+- Tests: the bus (fan-out, close, gaps, concurrent use under `-race`), the transforms (managers
+  kept, Secret values and the annotation gone, ConfigMap hash stable, changed by every kind of
+  edit, unchanged by trimming twice), and the collector on client-go fakes (sync and counts,
+  initial adds, add / update / delete, an update with the same resourceVersion skipped, a Secret
+  value never in any event or the cache, stop, two clusters on one bus, a kind that can't be
+  listed). Removing the Secret transform or the resourceVersion check makes them fail, checked
+  once each. The manager test covers Watch. All pass ten times in a row with `-race`.
+- Checked against multipass (read-only): every kind synced within a few seconds of starting, and
+  the count of each of the 16 kinds that have objects there matches `kubectl get -A`. Adding the
+  same kubeconfig again as a second cluster started a second collector, which synced; removing it
+  stopped it. No client-go messages in the log. With `OPSCOPE_LIVE=false`, `/live` says `off` and
+  no collector starts. Pages don't read from the cache yet (L3), so they're unchanged.

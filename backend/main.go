@@ -16,7 +16,9 @@ import (
 	"syscall"
 	"time"
 
+	"opscope/internal/bus"
 	"opscope/internal/clusters"
+	"opscope/internal/collector"
 	"opscope/internal/metrics"
 	"opscope/internal/server"
 )
@@ -41,11 +43,24 @@ func main() {
 	}
 	addr := ":" + getEnv("PORT", "8080")
 	dataDir := getEnv("DATA_DIR", "../data")
+	// Collectors keep a watch cache per cluster; OPSCOPE_LIVE=false turns
+	// them off, and every page then calls the cluster as in v1.3.
+	live := os.Getenv("OPSCOPE_LIVE") != "false"
 
 	logger.Info("starting opscope", "addr", addr, "version", version, "static_dir", cfg.StaticDir, "data_dir", dataDir,
-		"volume_usage", cfg.VolumeUsage)
+		"volume_usage", cfg.VolumeUsage, "live", live)
+
+	// ctx is cancelled when the process gets SIGTERM (what Kubernetes and
+	// `docker stop` send) or SIGINT (Ctrl+C in a terminal).
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
 
 	manager := clusters.NewManager(dataDir)
+
+	// One collector per cluster, started as each cluster is loaded below or
+	// added in the UI, and stopped when it's removed or ctx is cancelled.
+	collectors := collector.NewSet(ctx, live, bus.New(), logger)
+	collectors.Follow(manager)
 
 	// 1. Clusters from the environment. A broken setting here is a mistake
 	//    by whoever started Opscope, so we stop with a clear message instead
@@ -75,11 +90,6 @@ func main() {
 
 	logger.Info("clusters ready", "count", len(manager.List()))
 
-	// ctx is cancelled when the process gets SIGTERM (what Kubernetes and
-	// `docker stop` send) or SIGINT (Ctrl+C in a terminal).
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-	defer stop()
-
 	// Sample CPU and memory usage in the background, for the sparklines.
 	// It stops when ctx is cancelled.
 	history := metrics.NewHistory()
@@ -87,7 +97,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           server.New(cfg, manager, history, logger),
+		Handler:           server.New(cfg, manager, collectors, history, logger),
 		ReadHeaderTimeout: 10 * time.Second, // don't let a slow client hold a connection open forever
 	}
 

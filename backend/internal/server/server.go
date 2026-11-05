@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"opscope/internal/clusters"
+	"opscope/internal/collector"
 	"opscope/internal/metrics"
 )
 
@@ -23,7 +24,7 @@ type Config struct {
 }
 
 // New returns an http.Handler with every route registered.
-func New(cfg Config, manager *clusters.Manager, history *metrics.History, logger *slog.Logger) http.Handler {
+func New(cfg Config, manager *clusters.Manager, live *collector.Set, history *metrics.History, logger *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
 
 	// API routes. Go 1.22+ lets us put the HTTP method and {placeholders}
@@ -46,6 +47,9 @@ func New(cfg Config, manager *clusters.Manager, history *metrics.History, logger
 
 	// Every object's name, for the command palette (also beats {resource}).
 	mux.HandleFunc("GET /api/clusters/{id}/names", listNames(manager))
+
+	// The cluster's collector: what its watch cache holds (also beats {resource}).
+	mux.HandleFunc("GET /api/clusters/{id}/live", getLiveStatus(manager, live))
 
 	// Live CPU and memory usage from metrics-server.
 	mux.HandleFunc("GET /api/clusters/{id}/metrics/nodes", getNodeMetrics(manager, history))

@@ -507,3 +507,28 @@ func TestListIngresses(t *testing.T) {
 		t.Errorf("unexpected ingress row: %+v", ing)
 	}
 }
+
+// Every lister has an API address, so the collector watches every kind the
+// lists read.
+func TestEveryListerHasAKind(t *testing.T) {
+	got := map[string]Kind{}
+	for _, k := range Kinds() {
+		got[k.Resource] = k
+	}
+	for resource := range Listers {
+		k, ok := got[resource]
+		if !ok {
+			t.Errorf("%s: no entry in kinds or listOnly", resource)
+			continue
+		}
+		if k.GVR.Resource != resource {
+			t.Errorf("%s: GVR %v names another resource", resource, k.GVR)
+		}
+	}
+	if !got["gateways"].Custom || got["pods"].Custom {
+		t.Error("only Gateway API kinds are custom")
+	}
+	if !got["events"].Namespaced || got["nodes"].Namespaced {
+		t.Error("events are namespaced, nodes aren't")
+	}
+}
