@@ -21,11 +21,13 @@ import (
 
 // Query holds the URL options a lister may use.
 type Query struct {
-	Namespace string // "" means all namespaces
-	Type      string // events only: "Warning" or "Normal"; "" means both
+	Namespace string    // "" means all namespaces
+	Type      string    // events only: "Warning" or "Normal"; "" means both
+	At        time.Time // the moment to read; zero means now, the only one there is yet (see ErrNoHistory)
 }
 
-// Clients holds the two ways of talking to a cluster. Listers take
+// Clients holds the two ways of talking to a cluster, for what's read from
+// it directly: the Direct source, and a detail page's own object. They're
 // interfaces (not the concrete clients) so tests can pass client-go's fakes.
 type Clients struct {
 	Kube    kubernetes.Interface // typed: built-in kinds like Pods and Services
@@ -33,7 +35,7 @@ type Clients struct {
 }
 
 // Lister lists one kind of resource as JSON-ready rows.
-type Lister func(ctx context.Context, clients Clients, q Query) (any, error)
+type Lister func(ctx context.Context, src Source, q Query) (any, error)
 
 // Listers maps the name used in the URL (/api/clusters/{id}/{resource}) to
 // the function that lists it. Adding a resource type means adding a line here.
@@ -56,9 +58,9 @@ var Listers = map[string]Lister{
 	"persistentvolumes":      asLister(listPersistentVolumes),
 	"storageclasses":         asLister(listStorageClasses),
 
-	"gateways":       asDynamicLister(listGateways),
-	"httproutes":     asDynamicLister(listHTTPRoutes),
-	"gatewayclasses": asDynamicLister(listGatewayClasses),
+	"gateways":       asLister(listGateways),
+	"httproutes":     asLister(listHTTPRoutes),
+	"gatewayclasses": asLister(listGatewayClasses),
 }
 
 // Kind is one resource type in Listers and where it lives in the
@@ -100,16 +102,9 @@ func Kinds() []Kind {
 // asLister wraps a typed list function (returning e.g. []Pod) so it fits in
 // the Listers map. Keeping the functions typed lets other Go code, like the
 // overview, use their results without converting from `any`.
-func asLister[T any](list func(context.Context, kubernetes.Interface, Query) ([]T, error)) Lister {
-	return func(ctx context.Context, clients Clients, q Query) (any, error) {
-		return list(ctx, clients.Kube, q)
-	}
-}
-
-// asDynamicLister does the same for list functions that use the dynamic client.
-func asDynamicLister[T any](list func(context.Context, dynamic.Interface, Query) ([]T, error)) Lister {
-	return func(ctx context.Context, clients Clients, q Query) (any, error) {
-		return list(ctx, clients.Dynamic, q)
+func asLister[T any](list func(context.Context, Source, Query) ([]T, error)) Lister {
+	return func(ctx context.Context, src Source, q Query) (any, error) {
+		return list(ctx, src, q)
 	}
 }
 

@@ -34,7 +34,7 @@ func TestListNames(t *testing.T) {
 	gateway.SetUID("u-gateway")
 	class := object("GatewayClass", "", "nginx", nil)
 	class.SetUID("u-gatewayclass")
-	index, err := ListNames(context.Background(), Clients{Kube: someObjects(), Dynamic: fakeDynamic(gateway, class)})
+	index, err := ListNames(context.Background(), Direct(Clients{Kube: someObjects(), Dynamic: fakeDynamic(gateway, class)}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestListNames(t *testing.T) {
 }
 
 func TestListNamesLeavesOutEvents(t *testing.T) {
-	index, err := ListNames(context.Background(), Clients{Kube: someObjects(), Dynamic: fakeDynamic()})
+	index, err := ListNames(context.Background(), Direct(Clients{Kube: someObjects(), Dynamic: fakeDynamic()}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func TestListNamesLeavesOutEvents(t *testing.T) {
 }
 
 func TestListNamesWithoutGatewayAPI(t *testing.T) {
-	index, err := ListNames(context.Background(), Clients{Kube: someObjects(), Dynamic: notInstalled()})
+	index, err := ListNames(context.Background(), Direct(Clients{Kube: someObjects(), Dynamic: notInstalled()}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +95,7 @@ func TestListNamesSkipsForbiddenKinds(t *testing.T) {
 	kube.PrependReactor("list", "secrets", func(action clienttesting.Action) (bool, runtime.Object, error) {
 		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "secrets"}, "", errors.New("RBAC"))
 	})
-	index, err := ListNames(context.Background(), Clients{Kube: kube, Dynamic: fakeDynamic()})
+	index, err := ListNames(context.Background(), Direct(Clients{Kube: kube, Dynamic: fakeDynamic()}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func TestListNamesReportsOtherFailures(t *testing.T) {
 	kube.PrependReactor("list", "pods", func(clienttesting.Action) (bool, runtime.Object, error) {
 		return true, nil, errors.New("timeout")
 	})
-	index, err := ListNames(context.Background(), Clients{Kube: kube, Dynamic: fakeDynamic()})
+	index, err := ListNames(context.Background(), Direct(Clients{Kube: kube, Dynamic: fakeDynamic()}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +132,7 @@ func TestListNamesFailsWhenNothingCanBeRead(t *testing.T) {
 	dynamic.PrependReactor("list", "*", func(clienttesting.Action) (bool, runtime.Object, error) {
 		return true, nil, errors.New("connection refused")
 	})
-	if _, err := ListNames(context.Background(), Clients{Kube: kube, Dynamic: dynamic}); err == nil {
+	if _, err := ListNames(context.Background(), Direct(Clients{Kube: kube, Dynamic: dynamic})); err == nil {
 		t.Fatal("want an error when the cluster can't be read at all")
 	}
 }
@@ -143,7 +143,7 @@ func TestEveryListerRowHasMeta(t *testing.T) {
 	clients := Clients{Kube: fake.NewClientset(), Dynamic: fakeDynamic()}
 	hasMeta := reflect.TypeFor[interface{ meta() Meta }]()
 	for name, lister := range Listers {
-		rows, err := lister(context.Background(), clients, Query{})
+		rows, err := lister(context.Background(), Direct(clients), Query{})
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}

@@ -45,20 +45,19 @@ type WorkloadCount struct {
 // the namespace count always cover the whole cluster; everything else follows
 // q.Namespace.
 //
-// The calls run one after another. That's a handful of requests, and it
-// keeps the code easy to follow; running them in parallel would be the next
-// step if this ever feels slow.
-func GetOverview(ctx context.Context, clients Clients, q Query) (*Overview, error) {
-	client := clients.Kube
+// The calls run one after another. From the watch cache they're cheap; read
+// directly from the cluster they're a handful of requests, and running them
+// in parallel would be the next step if that ever feels slow.
+func GetOverview(ctx context.Context, src Source, q Query) (*Overview, error) {
 	result := &Overview{}
 
-	namespaces, err := listNamespaces(ctx, client, q)
+	namespaces, err := listNamespaces(ctx, src, q)
 	if err != nil {
 		return nil, err
 	}
 	result.Namespaces = len(namespaces)
 
-	nodes, err := listNodes(ctx, client, q)
+	nodes, err := listNodes(ctx, src, q)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +68,7 @@ func GetOverview(ctx context.Context, clients Clients, q Query) (*Overview, erro
 		}
 	}
 
-	pods, err := listPods(ctx, client, q)
+	pods, err := listPods(ctx, src, q)
 	if err != nil {
 		return nil, err
 	}
@@ -78,55 +77,55 @@ func GetOverview(ctx context.Context, clients Clients, q Query) (*Overview, erro
 		result.Pods.ByStatus[p.Status]++
 	}
 
-	deployments, err := listDeployments(ctx, client, q)
+	deployments, err := listDeployments(ctx, src, q)
 	if err != nil {
 		return nil, err
 	}
 	result.Workloads = append(result.Workloads, countWorkloads("deployments", deployments,
 		func(d Deployment) bool { return d.Ready < d.Desired }))
 
-	statefulSets, err := listStatefulSets(ctx, client, q)
+	statefulSets, err := listStatefulSets(ctx, src, q)
 	if err != nil {
 		return nil, err
 	}
 	result.Workloads = append(result.Workloads, countWorkloads("statefulsets", statefulSets,
 		func(s StatefulSet) bool { return s.Ready < s.Desired }))
 
-	daemonSets, err := listDaemonSets(ctx, client, q)
+	daemonSets, err := listDaemonSets(ctx, src, q)
 	if err != nil {
 		return nil, err
 	}
 	result.Workloads = append(result.Workloads, countWorkloads("daemonsets", daemonSets,
 		func(d DaemonSet) bool { return d.Ready < d.Desired }))
 
-	jobs, err := listJobs(ctx, client, q)
+	jobs, err := listJobs(ctx, src, q)
 	if err != nil {
 		return nil, err
 	}
 	result.Workloads = append(result.Workloads, countWorkloads("jobs", jobs,
 		func(j Job) bool { return j.Status == "Failed" }))
 
-	cronJobs, err := listCronJobs(ctx, client, q)
+	cronJobs, err := listCronJobs(ctx, src, q)
 	if err != nil {
 		return nil, err
 	}
 	result.Workloads = append(result.Workloads, countWorkloads("cronjobs", cronJobs,
 		func(CronJob) bool { return false }))
 
-	result.Storage, err = storageCounts(ctx, clients, q)
+	result.Storage, err = storageCounts(ctx, src, q)
 	if err != nil {
 		return nil, err
 	}
 
 	// Gateway API is optional: a cluster without it simply gets no counts.
-	gateways, err := listGateways(ctx, clients.Dynamic, q)
+	gateways, err := listGateways(ctx, src, q)
 	if errors.Is(err, ErrGatewayAPINotInstalled) {
 		return result, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	httpRoutes, err := listHTTPRoutes(ctx, clients.Dynamic, q)
+	httpRoutes, err := listHTTPRoutes(ctx, src, q)
 	if err != nil {
 		return nil, err
 	}
@@ -144,15 +143,15 @@ func GetOverview(ctx context.Context, clients Clients, q Query) (*Overview, erro
 // could read the overview before may not be allowed to list it; then it's
 // left out rather than failing the whole page. A cluster with no claims and
 // no volumes gets no counts either, like one without Gateway API.
-func storageCounts(ctx context.Context, clients Clients, q Query) ([]WorkloadCount, error) {
-	claims, err := listPersistentVolumeClaims(ctx, clients.Kube, q)
+func storageCounts(ctx context.Context, src Source, q Query) ([]WorkloadCount, error) {
+	claims, err := listPersistentVolumeClaims(ctx, src, q)
 	if apierrors.IsForbidden(err) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	volumes, err := listPersistentVolumes(ctx, clients.Kube, q)
+	volumes, err := listPersistentVolumes(ctx, src, q)
 	if apierrors.IsForbidden(err) {
 		return nil, nil
 	}

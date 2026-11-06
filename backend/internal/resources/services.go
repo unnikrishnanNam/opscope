@@ -5,8 +5,6 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
 // Service is one row of the service list.
@@ -18,19 +16,19 @@ type Service struct {
 	Ports       []string `json:"ports"`       // like kubectl: "80/TCP", "443:30443/TCP"
 }
 
-func listServices(ctx context.Context, client kubernetes.Interface, q Query) ([]Service, error) {
-	list, err := client.CoreV1().Services(q.Namespace).List(ctx, metav1.ListOptions{})
+func listServices(ctx context.Context, src Source, q Query) ([]Service, error) {
+	items, err := ListOf[*corev1.Service](ctx, src, "services", q)
 	if err != nil {
 		return nil, err
 	}
 
-	rows := make([]Service, 0, len(list.Items))
-	for _, svc := range list.Items {
+	rows := make([]Service, 0, len(items))
+	for _, svc := range items {
 		rows = append(rows, Service{
 			Meta:        metaOf(svc.ObjectMeta),
 			Type:        string(svc.Spec.Type),
 			ClusterIP:   svc.Spec.ClusterIP,
-			ExternalIPs: serviceExternalIPs(&svc),
+			ExternalIPs: serviceExternalIPs(svc),
 			Ports:       servicePorts(svc.Spec.Ports),
 		})
 	}

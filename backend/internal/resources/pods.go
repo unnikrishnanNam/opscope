@@ -5,8 +5,6 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
 // Pod is one row of the pod list.
@@ -20,17 +18,17 @@ type Pod struct {
 	IP         string `json:"ip"`
 }
 
-func listPods(ctx context.Context, client kubernetes.Interface, q Query) ([]Pod, error) {
-	list, err := client.CoreV1().Pods(q.Namespace).List(ctx, metav1.ListOptions{})
+func listPods(ctx context.Context, src Source, q Query) ([]Pod, error) {
+	items, err := ListOf[*corev1.Pod](ctx, src, "pods", q)
 	if err != nil {
 		return nil, err
 	}
 
-	rows := make([]Pod, 0, len(list.Items))
-	for _, pod := range list.Items {
+	rows := make([]Pod, 0, len(items))
+	for _, pod := range items {
 		row := Pod{
 			Meta:       metaOf(pod.ObjectMeta),
-			Status:     podStatus(&pod),
+			Status:     podStatus(pod),
 			Containers: len(pod.Spec.Containers),
 			Node:       pod.Spec.NodeName,
 			IP:         pod.Status.PodIP,

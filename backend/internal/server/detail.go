@@ -10,6 +10,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"opscope/internal/clusters"
+	"opscope/internal/collector"
 	"opscope/internal/resources"
 )
 
@@ -17,7 +18,7 @@ import (
 // GET /api/clusters/{id}/{resource}/{name}               (cluster-wide kinds, e.g. a node)
 //
 // Everything the detail page shows about one object.
-func getDetail(manager *clusters.Manager) http.HandlerFunc {
+func getDetail(manager *clusters.Manager, live *collector.Set) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cluster, ok := findCluster(w, r, manager)
 		if !ok {
@@ -25,7 +26,7 @@ func getDetail(manager *clusters.Manager) http.HandlerFunc {
 		}
 
 		// For the cluster-wide route there's no {namespace}; PathValue gives "".
-		detail, err := resources.GetDetail(r.Context(), clientsOf(cluster),
+		detail, err := resources.GetDetail(r.Context(), clientsOf(cluster), live.Source(cluster),
 			r.PathValue("resource"), r.PathValue("namespace"), r.PathValue("name"))
 		switch {
 		case errors.Is(err, resources.ErrUnknownKind):

@@ -51,7 +51,7 @@ var notIndexed = map[string]bool{"events": true}
 // the others are still returned. Only when nothing at all could be read is
 // it an error, since then the cluster itself is the problem (unreachable,
 // credentials rejected).
-func ListNames(ctx context.Context, clients Clients) (*NameIndex, error) {
+func ListNames(ctx context.Context, src Source) (*NameIndex, error) {
 	var kinds []string
 	for _, kind := range slices.Sorted(maps.Keys(Listers)) {
 		if !notIndexed[kind] {
@@ -59,8 +59,8 @@ func ListNames(ctx context.Context, clients Clients) (*NameIndex, error) {
 		}
 	}
 
-	// Each kind is its own request to the API server, so they run in
-	// parallel; each goroutine writes only its own slot.
+	// Read directly, each kind is its own request to the API server, so
+	// they run in parallel; each goroutine writes only its own slot.
 	type result struct {
 		rows any
 		err  error
@@ -69,7 +69,7 @@ func ListNames(ctx context.Context, clients Clients) (*NameIndex, error) {
 	var wg sync.WaitGroup
 	for i, kind := range kinds {
 		wg.Go(func() {
-			rows, err := Listers[kind](ctx, clients, Query{})
+			rows, err := Listers[kind](ctx, src, Query{})
 			results[i] = result{rows, err}
 		})
 	}

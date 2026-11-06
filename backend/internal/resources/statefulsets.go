@@ -3,8 +3,7 @@ package resources
 import (
 	"context"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	appsv1 "k8s.io/api/apps/v1"
 )
 
 // StatefulSet is one row of the statefulset list.
@@ -14,14 +13,14 @@ type StatefulSet struct {
 	Ready   int32 `json:"ready"`
 }
 
-func listStatefulSets(ctx context.Context, client kubernetes.Interface, q Query) ([]StatefulSet, error) {
-	list, err := client.AppsV1().StatefulSets(q.Namespace).List(ctx, metav1.ListOptions{})
+func listStatefulSets(ctx context.Context, src Source, q Query) ([]StatefulSet, error) {
+	items, err := ListOf[*appsv1.StatefulSet](ctx, src, "statefulsets", q)
 	if err != nil {
 		return nil, err
 	}
 
-	rows := make([]StatefulSet, 0, len(list.Items))
-	for _, s := range list.Items {
+	rows := make([]StatefulSet, 0, len(items))
+	for _, s := range items {
 		rows = append(rows, StatefulSet{
 			Meta:    metaOf(s.ObjectMeta),
 			Desired: replicas(s.Spec.Replicas),

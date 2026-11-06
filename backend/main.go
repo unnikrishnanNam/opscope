@@ -93,7 +93,7 @@ func main() {
 	// Sample CPU and memory usage in the background, for the sparklines.
 	// It stops when ctx is cancelled.
 	history := metrics.NewHistory()
-	go history.Collect(ctx, manager, logger)
+	go history.Collect(ctx, manager, collectors.Source, logger)
 
 	srv := &http.Server{
 		Addr:              addr,

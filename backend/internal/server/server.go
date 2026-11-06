@@ -39,31 +39,31 @@ func New(cfg Config, manager *clusters.Manager, live *collector.Set, history *me
 
 	// One route for every list: namespaces, pods, deployments, ...
 	// The {resource} part picks the lister (see internal/resources).
-	mux.HandleFunc("GET /api/clusters/{id}/{resource}", listResource(manager))
+	mux.HandleFunc("GET /api/clusters/{id}/{resource}", listResource(manager, live))
 
 	// A fixed path segment beats a {placeholder}, so this route wins over
 	// the one above for /api/clusters/{id}/overview.
-	mux.HandleFunc("GET /api/clusters/{id}/overview", getOverview(manager))
+	mux.HandleFunc("GET /api/clusters/{id}/overview", getOverview(manager, live))
 
 	// Every object's name, for the command palette (also beats {resource}).
-	mux.HandleFunc("GET /api/clusters/{id}/names", listNames(manager))
+	mux.HandleFunc("GET /api/clusters/{id}/names", listNames(manager, live))
 
 	// The cluster's collector: what its watch cache holds (also beats {resource}).
 	mux.HandleFunc("GET /api/clusters/{id}/live", getLiveStatus(manager, live))
 
 	// Live CPU and memory usage from metrics-server.
-	mux.HandleFunc("GET /api/clusters/{id}/metrics/nodes", getNodeMetrics(manager, history))
+	mux.HandleFunc("GET /api/clusters/{id}/metrics/nodes", getNodeMetrics(manager, live, history))
 	mux.HandleFunc("GET /api/clusters/{id}/metrics/pods", getPodMetrics(manager))
 
 	// How full each claim's volume is, from the kubelets; only when turned on.
-	mux.HandleFunc("GET /api/clusters/{id}/metrics/volumes", getVolumeUsage(cfg.VolumeUsage, metrics.NewVolumes(), manager))
+	mux.HandleFunc("GET /api/clusters/{id}/metrics/volumes", getVolumeUsage(cfg.VolumeUsage, metrics.NewVolumes(), manager, live))
 
 	// One value of one secret, fetched only when the user clicks "Reveal".
 	mux.HandleFunc("GET /api/clusters/{id}/secrets/{namespace}/{name}/{key}", getSecretValue(manager))
 
 	// One object's details: with a namespace, or without for cluster-wide kinds.
-	mux.HandleFunc("GET /api/clusters/{id}/{resource}/{namespace}/{name}", getDetail(manager))
-	mux.HandleFunc("GET /api/clusters/{id}/{resource}/{name}", getDetail(manager))
+	mux.HandleFunc("GET /api/clusters/{id}/{resource}/{namespace}/{name}", getDetail(manager, live))
+	mux.HandleFunc("GET /api/clusters/{id}/{resource}/{name}", getDetail(manager, live))
 
 	// A pod's logs, streamed as plain text.
 	mux.HandleFunc("GET /api/clusters/{id}/pods/{namespace}/{name}/logs", streamLogs(manager))

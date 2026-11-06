@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"opscope/internal/clusters"
+	"opscope/internal/collector"
 	"opscope/internal/resources"
 )
 
@@ -13,7 +14,7 @@ import (
 // Lists one kind of resource, e.g. /api/clusters/lab/pods?namespace=default.
 // Without ?namespace it lists across all namespaces. ?type is only used by
 // events (Warning or Normal).
-func listResource(manager *clusters.Manager) http.HandlerFunc {
+func listResource(manager *clusters.Manager, live *collector.Set) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		name := r.PathValue("resource")
 		lister, ok := resources.Listers[name]
@@ -27,7 +28,7 @@ func listResource(manager *clusters.Manager) http.HandlerFunc {
 			return
 		}
 
-		rows, err := lister(r.Context(), clientsOf(cluster), queryFrom(r))
+		rows, err := lister(r.Context(), live.Source(cluster), queryFrom(r))
 		if errors.Is(err, resources.ErrGatewayAPINotInstalled) {
 			// Not a failure, just a missing feature: the "code" lets the UI
 			// show a calm note instead of an error box.
@@ -45,14 +46,14 @@ func listResource(manager *clusters.Manager) http.HandlerFunc {
 // GET /api/clusters/{id}/overview?namespace=...
 //
 // Counts and health for the cluster's front page.
-func getOverview(manager *clusters.Manager) http.HandlerFunc {
+func getOverview(manager *clusters.Manager, live *collector.Set) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cluster, ok := findCluster(w, r, manager)
 		if !ok {
 			return
 		}
 
-		overview, err := resources.GetOverview(r.Context(), clientsOf(cluster), queryFrom(r))
+		overview, err := resources.GetOverview(r.Context(), live.Source(cluster), queryFrom(r))
 		if err != nil {
 			writeClusterError(w, err, cluster)
 			return
@@ -67,14 +68,14 @@ func getOverview(manager *clusters.Manager) http.HandlerFunc {
 // search: {"objects": [...], "skipped": [...]}. Kinds the cluster doesn't
 // have or this user can't list are named in "skipped" instead of failing
 // the whole answer.
-func listNames(manager *clusters.Manager) http.HandlerFunc {
+func listNames(manager *clusters.Manager, live *collector.Set) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cluster, ok := findCluster(w, r, manager)
 		if !ok {
 			return
 		}
 
-		index, err := resources.ListNames(r.Context(), clientsOf(cluster))
+		index, err := resources.ListNames(r.Context(), live.Source(cluster))
 		if err != nil {
 			writeClusterError(w, err, cluster)
 			return

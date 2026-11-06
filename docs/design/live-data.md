@@ -279,15 +279,17 @@ cache, alongside the existing code; no page reads from it yet.
 
 Goal: every page reads from the cache and shows the same data as v1.3.0.
 
-- [ ] `Source` and `Query.At`; list functions read from a `Source`; `ErrNoHistory` for a non-zero
+- [x] `Source` and `Query.At`; list functions read from a `Source`; `ErrNoHistory` for a non-zero
       `At`
-- [ ] The cache `Source` and the direct `Source`, with the 5-second wait for a kind's first sync
-- [ ] The overview, the `/names` index, detail pages' related lists and usage's node and pod lists
+- [x] The cache `Source` and the direct `Source`, with the 5-second wait for a kind's first sync
+      (and none for a kind whose list failed, see notes)
+- [x] The overview, the `/names` index, detail pages' related lists and usage's node and pod lists
       read from the cache; the detail object, YAML, logs and Secret values stay direct
-- [ ] A Go test that runs every list through both sources and compares the rows
-- [ ] On the test clusters, every endpoint gives the same answer with `OPSCOPE_LIVE=false` and with
-      collectors on (two servers, ports 8090 and 8091), with two clusters connected
-- [ ] No change in the browser: light and dark, keyboard, 375 px and wide
+- [x] A Go test that runs every list through both sources and compares the rows
+- [~] On the test clusters, every endpoint gives the same answer with `OPSCOPE_LIVE=false` and with
+      collectors on (two servers, ports 8090 and 8091), with two clusters connected; the second
+      cluster was multipass again under another name (see notes)
+- [x] No change in the browser: light and dark, keyboard, 375 px and wide
 
 ## Phase L4: Permissions and fallbacks
 
@@ -453,3 +455,58 @@ Goal: v1.4.0 is ready to tag.
   same kubeconfig again as a second cluster started a second collector, which synced; removing it
   stopped it. No client-go messages in the log. With `OPSCOPE_LIVE=false`, `/live` says `off` and
   no collector starts. Pages don't read from the cache yet (L3), so they're unchanged.
+
+### L3: Listers on the cache (2026-11-06)
+
+- `resources.Source` has one method, `List(ctx, resource, q)`, returning typed objects (or
+  `*unstructured.Unstructured` for Gateway API). `ListOf[T]` casts them and refuses a non-zero
+  `Query.At` with `ErrNoHistory`. Every list function now starts with `ListOf` instead of a client
+  call; the flattening below it is untouched apart from `&x` becoming `x`, since the objects are
+  pointers now. `asDynamicLister` is gone: every lister takes a `Source`.
+- `resources.Direct` is v1.3's way: one list request per call, with a small table of typed list
+  calls (`typedLists` in `source.go`) and the dynamic client for Gateway API, which still turns a
+  404 into `ErrGatewayAPINotInstalled`. Adding a resource type now also needs a line there;
+  `CONTRIBUTING.md` says so in L4, with the rest of its changes.
+- The cache source (`collector.Set.Source`) reads from the collector's informer, by namespace index
+  when the query has one, and falls back to `Direct` for a kind it can't serve. Changed from the
+  plan: a kind whose list or watch has already failed doesn't wait the 5 seconds; it's read from
+  the cluster at once. Without that, every overview on a cluster without Gateway API waited 5
+  seconds for a sync that would never come.
+- Small changes in behaviour, so both sources give the same answer:
+  - Events are filtered by type in Go instead of with a field selector, and a detail page's events
+    by the object's UID in Go too.
+  - Events seen at the same moment are ordered by namespace and name. Before, their order among
+    themselves was whatever the API returned.
+  - A claim's "Used by" pods are ordered by name, as the API happened to list them.
+  - A claim's StorageClass is checked against the list of classes instead of one `get`.
+- Usage: `metrics.ReadNodes` and `Volumes.Read` take a `Source` for the nodes and pods; usage
+  itself still comes from metrics-server and the kubelets. The 15-minute history sampler gets each
+  cluster's source from the collector set.
+- Known gap until L4: once a kind has synced, the cache keeps serving it if the watch later breaks
+  (the cluster becomes unreachable, say), without saying the data may be old. L4's modes and gaps
+  cover it.
+- Tests: `TestCacheAndClusterGiveTheSameAnswers` builds a fake cluster with something of every kind
+  in two namespaces (a claim in use, claims from a StatefulSet, a claim with a missing class,
+  Secrets with values, events of both types at one moment, Gateway API objects) and checks that
+  every lister (six queries each), the overview, the name index and five detail pages give the
+  same JSON from the cache as from the cluster. The cache side fails the test if it falls back to
+  the cluster at all, and every answer must be a real answer, not two equal errors. Ignoring the
+  namespace in the cache source makes 39 comparisons fail, checked once. Other tests: a failed
+  kind is read from the cluster without waiting; an unsynced kind waits up to the limit, then reads
+  the cluster; `At` is refused. The existing tests now run on `Direct`. All pass five times in a
+  row with `-race`.
+- Checked against multipass (read-only), with two servers: collectors on (8090) and
+  `OPSCOPE_LIVE=false` (8091). A script compared 237 endpoints: every list across all namespaces
+  and in each of the 9 namespaces, both event types, the overview (all and per namespace), the
+  name index, the detail page of every pod and storage object and one object of each other kind,
+  and the node list behind usage. All matched; once, an endpoint matched only on a second read
+  because the cluster changed in between. With a second cluster added to both servers, its 237
+  endpoints matched too. Docker wasn't running, so the second cluster was multipass again under
+  another name: it has its own collector and cache, which is what the check is about, but not a
+  different cluster.
+- From the cache, a request takes about half a millisecond on multipass: the overview 0.5 ms
+  instead of 23 ms, the name index 0.4 ms instead of 69 ms, the pod list 0.5 ms instead of 6 ms
+  (median of five, on the same network as the cluster; a cluster further away gains more).
+- In the browser: the overview, lists, Secrets, a claim's "Used by", a StorageClass's counts and
+  the second cluster's pages look as before, in dark and in light at 375 px. The only console
+  errors are the `metrics/volumes` 404s that usage-off has always given.

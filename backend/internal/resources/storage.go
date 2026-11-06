@@ -7,7 +7,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
 // PersistentVolumeClaim is one row of the PVC list.
@@ -22,14 +21,14 @@ type PersistentVolumeClaim struct {
 	VolumeMode   string   `json:"volumeMode"`   // Filesystem or Block
 }
 
-func listPersistentVolumeClaims(ctx context.Context, client kubernetes.Interface, q Query) ([]PersistentVolumeClaim, error) {
-	list, err := client.CoreV1().PersistentVolumeClaims(q.Namespace).List(ctx, metav1.ListOptions{})
+func listPersistentVolumeClaims(ctx context.Context, src Source, q Query) ([]PersistentVolumeClaim, error) {
+	items, err := ListOf[*corev1.PersistentVolumeClaim](ctx, src, "persistentvolumeclaims", q)
 	if err != nil {
 		return nil, err
 	}
 
-	rows := make([]PersistentVolumeClaim, 0, len(list.Items))
-	for _, pvc := range list.Items {
+	rows := make([]PersistentVolumeClaim, 0, len(items))
+	for _, pvc := range items {
 		requested := pvc.Spec.Resources.Requests.Storage().Value()
 		capacity := requested
 		if size, ok := pvc.Status.Capacity[corev1.ResourceStorage]; ok {
@@ -42,7 +41,7 @@ func listPersistentVolumeClaims(ctx context.Context, client kubernetes.Interface
 			Capacity:     capacity,
 			Requested:    requested,
 			AccessModes:  accessModes(pvc.Spec.AccessModes),
-			StorageClass: claimClass(&pvc),
+			StorageClass: claimClass(pvc),
 			VolumeMode:   volumeMode(pvc.Spec.VolumeMode),
 		})
 	}
@@ -64,21 +63,21 @@ type PersistentVolume struct {
 }
 
 // listPersistentVolumes ignores q.Namespace: PVs aren't inside a namespace.
-func listPersistentVolumes(ctx context.Context, client kubernetes.Interface, q Query) ([]PersistentVolume, error) {
-	list, err := client.CoreV1().PersistentVolumes().List(ctx, metav1.ListOptions{})
+func listPersistentVolumes(ctx context.Context, src Source, q Query) ([]PersistentVolume, error) {
+	items, err := ListOf[*corev1.PersistentVolume](ctx, src, "persistentvolumes", q)
 	if err != nil {
 		return nil, err
 	}
 
-	rows := make([]PersistentVolume, 0, len(list.Items))
-	for _, pv := range list.Items {
+	rows := make([]PersistentVolume, 0, len(items))
+	for _, pv := range items {
 		row := PersistentVolume{
 			Meta:          metaOf(pv.ObjectMeta),
 			Status:        storageStatus(pv.ObjectMeta, string(pv.Status.Phase)),
 			Capacity:      pv.Spec.Capacity.Storage().Value(),
 			AccessModes:   accessModes(pv.Spec.AccessModes),
 			ReclaimPolicy: string(pv.Spec.PersistentVolumeReclaimPolicy),
-			StorageClass:  volumeClass(&pv),
+			StorageClass:  volumeClass(pv),
 			Source:        volumeSource(pv.Spec.PersistentVolumeSource),
 			Message:       pv.Status.Message,
 		}
@@ -107,18 +106,18 @@ type StorageClass struct {
 }
 
 // listStorageClasses ignores q.Namespace: StorageClasses are cluster-wide.
-func listStorageClasses(ctx context.Context, client kubernetes.Interface, q Query) ([]StorageClass, error) {
-	list, err := client.StorageV1().StorageClasses().List(ctx, metav1.ListOptions{})
+func listStorageClasses(ctx context.Context, src Source, q Query) ([]StorageClass, error) {
+	items, err := ListOf[*storagev1.StorageClass](ctx, src, "storageclasses", q)
 	if err != nil {
 		return nil, err
 	}
 
-	rows := make([]StorageClass, 0, len(list.Items))
-	for _, sc := range list.Items {
+	rows := make([]StorageClass, 0, len(items))
+	for _, sc := range items {
 		row := StorageClass{
 			Meta:          metaOf(sc.ObjectMeta),
 			Provisioner:   sc.Provisioner,
-			ReclaimPolicy: string(corev1.PersistentVolumeReclaimDelete), // the API's default
+			ReclaimPolicy: string(corev1.PersistentVolumeReclaimDelete), // the API"s default
 			BindingMode:   string(storagev1.VolumeBindingImmediate),
 			Default:       isDefaultClass(sc.Annotations),
 		}

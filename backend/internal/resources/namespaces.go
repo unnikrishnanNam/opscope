@@ -3,8 +3,7 @@ package resources
 import (
 	"context"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // Namespace is one row of the namespace list.
@@ -14,14 +13,14 @@ type Namespace struct {
 }
 
 // listNamespaces ignores q.Namespace: namespaces aren't inside one.
-func listNamespaces(ctx context.Context, client kubernetes.Interface, q Query) ([]Namespace, error) {
-	list, err := client.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+func listNamespaces(ctx context.Context, src Source, q Query) ([]Namespace, error) {
+	items, err := ListOf[*corev1.Namespace](ctx, src, "namespaces", q)
 	if err != nil {
 		return nil, err
 	}
 
-	rows := make([]Namespace, 0, len(list.Items))
-	for _, ns := range list.Items {
+	rows := make([]Namespace, 0, len(items))
+	for _, ns := range items {
 		rows = append(rows, Namespace{Meta: metaOf(ns.ObjectMeta), Status: string(ns.Status.Phase)})
 	}
 	sortRows(rows)

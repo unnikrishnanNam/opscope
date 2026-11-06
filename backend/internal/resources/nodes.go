@@ -6,8 +6,6 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
 // Node is one row of the node list.
@@ -26,17 +24,17 @@ type Node struct {
 }
 
 // listNodes ignores q.Namespace: nodes aren't inside a namespace.
-func listNodes(ctx context.Context, client kubernetes.Interface, q Query) ([]Node, error) {
-	list, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+func listNodes(ctx context.Context, src Source, q Query) ([]Node, error) {
+	items, err := ListOf[*corev1.Node](ctx, src, "nodes", q)
 	if err != nil {
 		return nil, err
 	}
 
-	rows := make([]Node, 0, len(list.Items))
-	for _, n := range list.Items {
+	rows := make([]Node, 0, len(items))
+	for _, n := range items {
 		row := Node{
 			Meta:        metaOf(n.ObjectMeta),
-			Status:      nodeStatus(&n),
+			Status:      nodeStatus(n),
 			Schedulable: !n.Spec.Unschedulable,
 			Roles:       nodeRoles(n.Labels),
 			Version:     n.Status.NodeInfo.KubeletVersion,
