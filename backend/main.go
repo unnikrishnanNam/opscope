@@ -16,6 +16,8 @@ import (
 	"syscall"
 	"time"
 
+	"k8s.io/klog/v2"
+
 	"opscope/internal/bus"
 	"opscope/internal/clusters"
 	"opscope/internal/collector"
@@ -35,6 +37,12 @@ const shutdownTimeout = 10 * time.Second
 
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	// client-go logs through klog, in its own format. Its lines go to
+	// Opscope's log at debug level instead: the collectors already say what
+	// matters (a cluster lost and back, a kind that can't be watched), and a
+	// lost connection would otherwise print a line for every kind.
+	klog.SetSlogLogger(slog.New(debugOnly{logger.Handler()}))
 
 	cfg := server.Config{
 		Version:     version,
@@ -127,6 +135,26 @@ func main() {
 		logger.Error("server error during shutdown", "error", err)
 	}
 	logger.Info("stopped")
+}
+
+// debugOnly passes every record on at debug level.
+type debugOnly struct{ slog.Handler }
+
+func (h debugOnly) Enabled(ctx context.Context, _ slog.Level) bool {
+	return h.Handler.Enabled(ctx, slog.LevelDebug)
+}
+
+func (h debugOnly) Handle(ctx context.Context, r slog.Record) error {
+	r.Level = slog.LevelDebug
+	return h.Handler.Handle(ctx, r)
+}
+
+func (h debugOnly) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return debugOnly{h.Handler.WithAttrs(attrs)}
+}
+
+func (h debugOnly) WithGroup(name string) slog.Handler {
+	return debugOnly{h.Handler.WithGroup(name)}
 }
 
 // getEnv returns the value of an environment variable, or a fallback if it is empty.

@@ -81,3 +81,62 @@ with the error on hover.
 ```bash
 kind delete cluster --name opscope-storage
 ```
+
+## Permissions
+
+`permissions.yaml` adds two users who may read less than `opscope.yaml` grants, so you can check how
+Opscope reads each kind with what it's allowed:
+
+```bash
+kind create cluster --name opscope-live --kubeconfig /tmp/opscope-live.kubeconfig
+export KUBECONFIG=/tmp/opscope-live.kubeconfig
+until kubectl apply -f test/scenarios/permissions.yaml; do sleep 2; done
+```
+
+Make a kubeconfig for each user, with a token for its service account:
+
+```bash
+for user in no-watch team-a; do
+  cp /tmp/opscope-live.kubeconfig /tmp/opscope-$user.kubeconfig
+  KUBECONFIG=/tmp/opscope-$user.kubeconfig kubectl config set-credentials $user \
+    --token="$(kubectl -n opscope-users create token $user --duration=24h)"
+  KUBECONFIG=/tmp/opscope-$user.kubeconfig kubectl config set-context $user --cluster=kind-opscope-live --user=$user
+  KUBECONFIG=/tmp/opscope-$user.kubeconfig kubectl config use-context $user
+done
+```
+
+Run Opscope with `OPSCOPE_KUBECONFIG=/tmp/opscope-live.kubeconfig` and add the two kubeconfigs in the
+UI. `GET /api/clusters/{id}/live` shows how each kind is read:
+
+| Cluster    | What it should show                                                                    |
+| ---------- | -------------------------------------------------------------------------------------- |
+| The admin  | Every kind `watch`, Gateway API `not_installed`; state `live`                          |
+| `no-watch` | The kinds it may list `poll`, Secrets `direct`; state `partial`. A new pod shows up within 30 seconds |
+| `team-a`   | Namespaced kinds `direct`, cluster-wide kinds `forbidden`. Pods in `team-a` list; across all namespaces, the page says it isn't allowed |
+
+Gateway API kinds show as `direct` or `forbidden` for the two users, not `not_installed`: the API
+server checks the permission before it checks that the kind exists.
+
+**A permission granted later:** give `no-watch` the `watch` verb on the core kinds. Within five
+minutes, without a restart, those kinds change to `watch`:
+
+```bash
+kubectl patch clusterrole opscope-test-no-watch --type=json \
+  -p '[{"op":"replace","path":"/rules/0/verbs","value":["get","list","watch"]}]'
+```
+
+**A cluster that stops answering:** pause the kind node for half a minute.
+
+```bash
+docker pause opscope-live-control-plane
+docker unpause opscope-live-control-plane
+```
+
+Within about 15 seconds the state is `unreachable` and pages show the cluster's error; the log has
+one warning. After the unpause it's `live` again, with one line in the log.
+
+### Clean up
+
+```bash
+kind delete cluster --name opscope-live
+```

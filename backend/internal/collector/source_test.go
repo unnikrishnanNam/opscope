@@ -209,7 +209,7 @@ func (f failingSource) List(_ context.Context, resource string, _ resources.Quer
 	return nil, errors.New("not from the cache")
 }
 
-// A kind that failed to list is read from the cluster at once, without
+// A kind the cache doesn't hold is read from the cluster at once, without
 // waiting, so its error (here: Gateway API not installed) is the one the
 // pages already know how to show.
 func TestFailedKindIsReadFromTheCluster(t *testing.T) {
@@ -218,11 +218,11 @@ func TestFailedKindIsReadFromTheCluster(t *testing.T) {
 		return true, nil, apierrors.NewNotFound(schema.GroupResource{Group: "gateway.networking.k8s.io", Resource: "gateways"}, "")
 	})
 	c := Start(t.Context(), "lab", cluster.clients(), bus.New(), quiet)
-	eventually(t, "the gateways error", func() bool {
+	eventually(t, "gateways probed", func() bool {
 		k := c.kind("gateways")
 		k.mu.Lock()
 		defer k.mu.Unlock()
-		return k.lastErr != nil
+		return k.mode == ModeNotInstalled
 	})
 
 	src := &cacheSource{collector: c, direct: resources.Direct(resources.Clients{Kube: cluster.kube, Dynamic: cluster.dyn}), wait: time.Minute}

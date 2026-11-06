@@ -22,7 +22,7 @@ Opscope ships as one container image that serves both the web UI and its API.
 You need:
 
 - A Kubernetes cluster whose API server Opscope can reach, and a service account or kubeconfig that
-  can `get` and `list` the resources it shows (see [Permissions](#permissions)).
+  can `get`, `list` and `watch` the resources it shows (see [Permissions](#permissions)).
 - Optional: [metrics-server](https://github.com/kubernetes-sigs/metrics-server), for CPU and memory
   usage. Without it, the usage columns and charts explain that it's missing.
 - Optional: [Gateway API](https://gateway-api.sigs.k8s.io/) (`gateway.networking.k8s.io/v1`), for
@@ -94,8 +94,14 @@ kubectl -n opscope logs deployment/opscope
 
 ## Permissions
 
-Opscope only ever uses `get` and `list`. It never creates, changes or deletes anything, and it polls
-rather than watching.
+Opscope only ever uses `get`, `list` and `watch`, all of them read verbs. It never creates, changes
+or deletes anything.
+
+For each connected cluster, Opscope lists every kind once and then watches it: the API server sends
+each change as it happens, and Opscope keeps an up-to-date copy in memory that its pages read. Pages
+load faster, every page shows the same moment, and the cluster gets one watch per kind instead of a
+list for every page view. The detail page's YAML, logs and Secret values are still read from the
+cluster each time you open them.
 
 | API group                   | Resources                                             | Used for               |
 | --------------------------- | ----------------------------------------------------- | ---------------------- |
@@ -111,14 +117,41 @@ rather than watching.
 | core (`""`)                 | secrets (`secrets-access.yaml` only)                  | Secrets pages, Reveal  |
 | core (`""`)                 | nodes/proxy (`get`, `volume-usage.yaml` only)         | Volume usage (opt-in)  |
 
-`opscope.yaml` grants everything above except the last two rows. The same applies to a kubeconfig
-used from outside the cluster: Opscope can show only what that user is allowed to read. Anything it
-can't read is reported on the page that needs it, and the rest keeps working.
+Each row is `get`, `list` and `watch` unless it says otherwise; `metrics.k8s.io` has no watch, so it
+gets `get` and `list`. `opscope.yaml` grants everything above except the last two rows. The same
+applies to a kubeconfig used from outside the cluster: Opscope can show only what that user is
+allowed to read. Anything it can't read is reported on the page that needs it, and the rest keeps
+working.
+
+### With less access
+
+Opscope works with what the role allows, kind by kind:
+
+- **Without `watch`,** it lists that kind every 30 seconds instead, so its pages are up to 30
+  seconds behind.
+- **Without `list` across all namespaces,** for example a kubeconfig user who can read only some
+  namespaces, pages read that kind from the cluster each time, in the namespace you choose, as
+  Opscope did before v1.4.
+- **Without `list` at all,** the page for that kind says it isn't allowed.
+
+It checks again every five minutes, so a permission granted later is picked up without a restart.
+When a cluster stops answering, pages read it directly and show the error, rather than a copy that
+may be out of date, until it answers again.
+
+### Turning live data off
+
+`OPSCOPE_LIVE=false` turns this off: Opscope keeps no copy, and every page asks the cluster when it
+loads and again every 10 seconds, as before v1.4. It's a fallback, for example if memory is tight or
+something looks wrong with live data; `watch` is then never used.
 
 ### Secret access
 
 Secrets are listed by key name only. A value is fetched only when someone chooses "Reveal" on one
 key, is sent with `Cache-Control: no-store`, and never appears in the YAML view.
+
+With `watch`, the API server sends Opscope each Secret that changes, values included, just as it
+does when the Secrets list is loaded. Opscope drops the values as each Secret arrives and keeps
+only its type and key names, so values are never stored, cached or logged.
 
 **Granting Secret access is a deliberate choice.** With `secrets-access.yaml` applied, the Opscope
 pod can read every Secret in the cluster, and so can anyone who can reach Opscope. To grant it:
@@ -251,6 +284,7 @@ Opscope is configured with environment variables:
 | `OPSCOPE_IN_CLUSTER`   | (off)              | `true`: use the pod's service account, when running in a pod      |
 | `OPSCOPE_CLUSTER_NAME` | context name       | Display name for the environment or in-cluster cluster            |
 | `OPSCOPE_VOLUME_USAGE` | (off)              | `true`: show how full volumes are (see [Volume usage](#volume-usage)) |
+| `OPSCOPE_LIVE`         | (on)               | `false`: keep no live copy; pages ask the cluster each time (see [Turning live data off](#turning-live-data-off)) |
 | `DATA_DIR`             | `../data`          | Where clusters added in the UI are saved (`/data` in the image)   |
 | `STATIC_DIR`           | `../frontend/dist` | Folder with the built web UI (`/app/web` in the image)            |
 

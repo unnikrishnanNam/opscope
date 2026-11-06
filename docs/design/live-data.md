@@ -67,7 +67,8 @@ after that.
   | `poll`          | `list` allowed, `watch` forbidden                   | The cache, relisted every 30 s  |
   | `direct`        | listing across all namespaces is forbidden          | v1.3 behaviour: a list per request, in the selected namespace |
   | `not_installed` | the kind isn't in the cluster (Gateway API)         | The existing calm note          |
-  | `forbidden`     | `list` forbidden altogether (often Secrets)         | The existing permission message |
+  | `forbidden`     | `list` forbidden for a cluster-wide kind            | The existing permission message |
+  | `pending`       | not probed yet, or the probe got no answer          | A list per request, as `direct` |
 
   The collector finds the mode with a `list` (limit 1) and a short `watch` before it starts an
   informer, and checks again every 5 minutes for kinds that weren't available, so installing Gateway
@@ -75,7 +76,8 @@ after that.
   kubeconfig user who may read only some namespaces.
 - **A kill switch: `OPSCOPE_LIVE=false`** turns collectors off and every kind runs in `direct`
   mode, exactly as v1.3.0. It is the fallback the engine plan asks for when loading changes, and it
-  is how L3 compares the two paths on a real cluster (see Open questions, 2).
+  is how L3 compares the two paths on a real cluster. It's documented in `docs/deployment.md` as a
+  fallback users can choose, for at least v1.4 and v1.5. (Answered in review, 2026-11-06.)
 - **Before a kind's first sync, a request waits up to 5 seconds,** then reads that kind directly for
   that one request. A slow first sync never shows an empty page.
 - **The UID is in every row (contract 1).** `Meta` gains `uid`, so every list row, the `/names`
@@ -206,7 +208,7 @@ its gap together with the next event that fits, never alone, so every queue hold
 // GET /api/clusters/{id}/live
 {
   "enabled": true,           // false when OPSCOPE_LIVE=false
-  "state": "live",           // live, partial (some kinds not live), connecting, unreachable, off
+  "state": "live",           // live, partial (some kinds polled), connecting, unreachable, off
   "kinds": [
     { "resource": "pods", "mode": "watch", "synced": true, "objects": 412, "lastChange": "2026-11-02T10:04:11Z" },
     { "resource": "secrets", "mode": "forbidden" },
@@ -295,16 +297,16 @@ Goal: every page reads from the cache and shows the same data as v1.3.0.
 
 Goal: without `watch`, or with only some namespaces readable, Opscope still works and says how.
 
-- [ ] Probe per kind (`list` with limit 1, then a short `watch`) and the modes `watch`, `poll`,
+- [x] Probe per kind (`list` with limit 1, then a short `watch`) and the modes `watch`, `poll`,
       `direct`, `not_installed` and `forbidden`; probing again every 5 minutes
-- [ ] `poll` relists every 30 seconds into the same cache and publishes the differences
-- [ ] `CollectorGap` on relist, while a cluster is unreachable, and when a collector stops
-- [ ] An unreachable cluster backs off and reconnects without filling the log
-- [ ] `watch` in `deploy/kubernetes/opscope.yaml` and `secrets-access.yaml`
-- [ ] `docs/deployment.md` (permissions table, "it polls rather than watching" replaced, the
+- [x] `poll` relists every 30 seconds into the same cache and publishes the differences
+- [x] `CollectorGap` on relist, while a cluster is unreachable, and when a collector stops
+- [x] An unreachable cluster backs off and reconnects without filling the log
+- [x] `watch` in `deploy/kubernetes/opscope.yaml` and `secrets-access.yaml`
+- [x] `docs/deployment.md` (permissions table, "it polls rather than watching" replaced, the
       modes), `CONTRIBUTING.md` (principles, adding a resource type) and the README
-- [ ] Go tests with fakes for every mode, and for a mode changing when a permission is granted
-- [ ] Checked on a kind cluster with a role that allows `list` but not `watch`, and with a
+- [x] Go tests with fakes for every mode, and for a mode changing when a permission is granted
+- [x] Checked on a kind cluster with a role that allows `list` but not `watch`, and with a
       namespace-only role
 
 ## Phase L5: Live pages
@@ -366,8 +368,7 @@ Goal: v1.4.0 is ready to tag.
 
 1. ~~**Secrets in the cache.**~~ Answered: watched, values dropped in the transform (see
    Decisions).
-2. **Kill switch.** Proposed: keep `OPSCOPE_LIVE=false`, documented as a fallback, for at least
-   v1.4 and v1.5. Or leave it undocumented, for testing only?
+2. ~~**Kill switch.**~~ Answered: documented as a fallback (see Decisions).
 3. **`/metrics` endpoint.** Proposed: not in v1.4; it comes with the Helm chart and multiple
    replicas (v1.8). Bring it forward if you'd rather measure the collectors with it in L6.
 4. **Events in the cache.** Events change constantly on busy clusters and are the largest kind by
@@ -510,3 +511,69 @@ Goal: v1.4.0 is ready to tag.
 - In the browser: the overview, lists, Secrets, a claim's "Used by", a StorageClass's counts and
   the second cluster's pages look as before, in dark and in light at 375 px. The only console
   errors are the `metrics/volumes` 404s that usage-off has always given.
+
+### L4: Permissions and fallbacks (2026-11-06)
+
+- Open question 2 answered in review: `OPSCOPE_LIVE=false` is documented as a fallback
+  (`docs/deployment.md`, "Turning live data off", and the settings table). Moved into Decisions.
+- Each kind is probed through the dynamic client: a `list` with `limit=1`, then a `watch` with a
+  one-second timeout from that list's resourceVersion. Forbidden for a namespaced kind gives
+  `direct`, for a cluster-wide kind `forbidden`; 404 gives `not_installed`; a forbidden watch gives
+  `poll`. Added to the plan: `pending`, for a kind not probed yet or whose probe got no answer
+  (the cluster didn't respond). It's probed again after 10 s, then 20, 40, ... up to every 5
+  minutes. Kinds not watched are probed again every 5 minutes; a watched kind only when its list or
+  watch fails with forbidden or not found (a permission removed, Gateway API uninstalled).
+- Every probe runs at once when a collector starts, so a cluster's modes are known in one round
+  trip. Only one goroutine per collector changes modes, so two changes never overlap.
+- `poll` lists every 30 seconds into its own cache, through the same `Direct` lists the pages use,
+  trimmed the same way. It publishes adds, updates and deletes by resourceVersion, with a gap
+  before them when anything changed, since several changes between two polls arrive as one. Its
+  first list is published as initial adds, as an informer's is.
+- Relists: client-go doesn't tell a watch-error handler when a watch ends and it lists again, so
+  the collector notices relists through the informer's list-options hook, which sees every list and
+  watch it starts (a streamed "watch list" counts as a list). A list after the first starts a gap,
+  from the last moment the watch was known to work (its start or its last event); the next watch
+  ends it. So a gap can be wider than the real break, never narrower.
+- Unreachable clusters: every 10 seconds the collector asks the cluster for its version, with the
+  10-second client. When it doesn't answer, the state is `unreachable` and pages read the cluster
+  directly, so they show the cluster's error as in v1.3 instead of a copy that may be old. When it
+  answers again, a gap covers the time in between, for every kind. That's one warning and one info
+  line in the log per outage.
+- A collector that stops publishes a gap with no end (`To` zero): nothing is recorded until a
+  collector for that cluster starts again. A kind that changes mode publishes a gap, and its new
+  cache's first list comes as initial adds.
+- Changed from the plan: the cluster's `state` counts only polled kinds as `partial`. A `direct`
+  kind is read from the cluster on each request, so it's never behind; counting it would have made
+  every install without `secrets-access.yaml` permanently `partial`.
+- Found on the kind cluster: when a connection drops, client-go logged a "watch ended with error"
+  line for every kind, through klog in its own format. klog now writes to Opscope's logger at debug
+  level (`klog.SetSlogLogger` in `main.go`), which makes `k8s.io/klog/v2` a direct dependency at
+  the version client-go already used. The collector's own mode messages are one line per change
+  ("how kinds are read", grouped by mode) instead of one per kind, and only at info level when some
+  kind isn't watched.
+- Found on the kind cluster too: for a user without Gateway API permissions, the API server answers
+  403 before it checks that the kind exists, so those kinds show as `direct` or `forbidden`, not
+  `not_installed`. That's what v1.3 got as well; the page says it isn't allowed.
+- Docs: the ClusterRole and `secrets-access.yaml` have `watch` (not `metrics.k8s.io`, which has no
+  watch). `docs/deployment.md` explains the copy in memory, the three ways to read with less
+  access, what `watch` means for Secret values, and `OPSCOPE_LIVE`. `CONTRIBUTING.md` has the new
+  principle wording, the `typedLists` line for a new kind, and the two new packages. The README says
+  `get`, `list` and `watch`.
+- Tests: the modes for every case (secrets direct, nodes forbidden, pods polled, gateways not
+  installed, configmaps watched) with their reasons; a pod added while polled arriving after a gap
+  and in the cache; kinds the cache doesn't hold read from the cluster; a granted `watch` picked up
+  by the next probe; an unreachable cluster read directly and leaving a gap; an expired watch
+  leaving a relist gap; a stopped collector's open gap. Removing the relist gap or the unreachable
+  fallback makes those tests fail, checked once each. All pass ten times in a row with `-race`.
+- `test/scenarios/permissions.yaml` (with a README section) sets up two users on a kind cluster:
+  `no-watch` (`get` and `list` on everything `opscope.yaml` grants) and `team-a` (one namespace).
+  Checked on a throwaway kind cluster, deleted afterwards:
+  - The admin: every kind `watch`, Gateway API `not_installed`, state `live`.
+  - `no-watch`: polled kinds, Secrets `direct`, state `partial`; a new pod appeared after 26 s.
+  - `team-a`: pods in `team-a` list; across all namespaces, and nodes, the API's own forbidden
+    message, as v1.3.
+  - Granting `no-watch` `watch` on the core kinds moved them to `watch` at the next 5-minute probe
+    (23:52 to 23:57), without a restart; the kinds in other rules stayed polled.
+  - Pausing the kind node: `unreachable` within 15 s, pages showed the cluster's timeout error;
+    after the unpause, `live` again, with one warning and one info line in the log.
+- The L3 comparison against multipass was run again on this code: all 237 endpoints still match.

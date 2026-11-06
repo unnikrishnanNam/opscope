@@ -42,7 +42,7 @@ func (s *Set) add(cluster *clusters.Cluster) {
 	if !s.enabled {
 		return
 	}
-	clients := Clients{Kube: cluster.Stream, Dynamic: cluster.StreamDynamic}
+	clients := Clients{Kube: cluster.Stream, Dynamic: cluster.StreamDynamic, Check: cluster.Client}
 	c := Start(s.ctx, cluster.ID, clients, s.bus, s.logger)
 
 	s.mu.Lock()

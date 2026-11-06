@@ -16,8 +16,8 @@ this pod restarting, what does this Service route to, what did that job log. It 
 workloads, configuration, networking, events, logs and live resource usage, across as many clusters
 as you connect, and finds any of it from one search box.
 
-It is read-only by design. Opscope uses only `get` and `list`, and nothing in it can change a
-cluster, so it can be given to anyone who needs to look, such as developers, on-call engineers and
+It is read-only by design. Opscope uses only `get`, `list` and `watch`, and nothing in it can
+change a cluster, so it can be given to anyone who needs to look, such as developers, on-call engineers and
 support, without granting write access. It ships as a single container image and runs on your own
 machine or inside the cluster it shows.
 
@@ -131,8 +131,8 @@ Shortcuts are ignored while you type in a field.
 
 ## Security
 
-- **Read-only access.** Opscope uses only `get` and `list`, and the Kubernetes manifests grant
-  nothing more. See [Permissions](docs/deployment.md#permissions).
+- **Read-only access.** Opscope uses only `get`, `list` and `watch`, and the Kubernetes manifests
+  grant nothing more. See [Permissions](docs/deployment.md#permissions).
 - **No login.** Anyone who can open Opscope can read everything it can read. Keep it on
   `127.0.0.1`, reach it through `kubectl port-forward` in a cluster, or put an authenticating proxy
   in front of it. See [Giving people access](docs/deployment.md#giving-people-access).

@@ -25,8 +25,10 @@ metadata:
   namespace: opscope
 ---
 # Read-only access to everything Opscope shows (except Secrets).
-# Only "get" and "list": Opscope never creates, changes or deletes anything,
-# and it polls instead of watching.
+# Only "get", "list" and "watch": Opscope never creates, changes or deletes
+# anything. It lists each kind once and then watches for changes, keeping a
+# copy in memory that its pages read; without "watch" it lists again every
+# 30 seconds instead.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -34,26 +36,26 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: [namespaces, nodes, pods, services, configmaps, events, persistentvolumeclaims, persistentvolumes]
-    verbs: [get, list]
+    verbs: [get, list, watch]
   - apiGroups: [""]
     resources: [pods/log] # the Logs tab
     verbs: [get]
   - apiGroups: [apps]
     resources: [deployments, statefulsets, daemonsets]
-    verbs: [get, list]
+    verbs: [get, list, watch]
   - apiGroups: [batch]
     resources: [jobs, cronjobs]
-    verbs: [get, list]
+    verbs: [get, list, watch]
   - apiGroups: [networking.k8s.io]
     resources: [ingresses]
-    verbs: [get, list]
+    verbs: [get, list, watch]
   - apiGroups: [storage.k8s.io]
     resources: [storageclasses]
-    verbs: [get, list]
+    verbs: [get, list, watch]
   - apiGroups: [gateway.networking.k8s.io] # Gateway API; harmless if it isn't installed
     resources: [gateways, httproutes, gatewayclasses]
-    verbs: [get, list]
-  - apiGroups: [metrics.k8s.io] # metrics-server, for CPU and memory usage
+    verbs: [get, list, watch]
+  - apiGroups: [metrics.k8s.io] # metrics-server, for CPU and memory usage; it has no watch
     resources: [nodes, pods]
     verbs: [get, list]
 ---
