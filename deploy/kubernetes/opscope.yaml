@@ -113,6 +113,12 @@ spec:
             # see "Volume usage" in docs/deployment.md for what it allows.
             # - name: OPSCOPE_VOLUME_USAGE
             #   value: "true"
+            # Go's garbage collector works harder as memory nears this, rather than
+            # letting the heap grow to twice what it holds. Keep it about 10% under
+            # the memory limit below, and change the two together. See "Memory" in
+            # docs/deployment.md for how much a cluster needs.
+            - name: GOMEMLIMIT
+              value: 230MiB
           ports:
             - name: http
               containerPort: 8080
@@ -131,7 +137,7 @@ spec:
           resources:
             requests:
               cpu: 20m
-              memory: 48Mi
+              memory: 64Mi
             limits:
               memory: 256Mi
           securityContext:

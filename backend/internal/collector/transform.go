@@ -18,8 +18,10 @@ import (
 // directly).
 const ContentHashAnnotation = "opscope/content-hash"
 
-// lastAppliedAnnotation is where `kubectl apply` keeps a copy of the whole
-// object, which for a Secret includes its values.
+// lastAppliedAnnotation is where `kubectl apply` (and Argo CD, by default)
+// keeps a copy of the whole object as it was applied: for a Secret or a
+// ConfigMap, its values too. Nothing reads it from the cache, and on a
+// Deployment it can be a third of the object.
 const lastAppliedAnnotation = "kubectl.kubernetes.io/last-applied-configuration"
 
 // trim is the informer transform: what the cache and the bus keep of each
@@ -30,7 +32,7 @@ func trim(obj any) (any, error) {
 	if _, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		return obj, nil // holds an object from the cache, trimmed already
 	}
-	trimManagedFields(obj)
+	trimMeta(obj)
 	switch o := obj.(type) {
 	case *corev1.Secret:
 		dropSecretValues(o)
@@ -40,10 +42,12 @@ func trim(obj any) (any, error) {
 	return obj, nil
 }
 
-// trimManagedFields keeps who changed the object, how and when, without
-// fieldsV1: the list of fields each manager owns, which is often larger
-// than the rest of the object. The change log needs the managers' names.
-func trimManagedFields(obj any) {
+// trimMeta drops what every kind carries that the cache doesn't need:
+//   - managedFields' fieldsV1, the list of fields each manager owns, which
+//     is often larger than the rest of the object. Who changed it, how and
+//     when stay: the change log needs the managers' names.
+//   - kubectl apply's copy of the object (see lastAppliedAnnotation).
+func trimMeta(obj any) {
 	m, err := meta.Accessor(obj)
 	if err != nil {
 		return
@@ -54,16 +58,19 @@ func trimManagedFields(obj any) {
 		fields[i].FieldsV1 = nil
 	}
 	m.SetManagedFields(fields)
+	if annotations := m.GetAnnotations(); annotations[lastAppliedAnnotation] != "" {
+		delete(annotations, lastAppliedAnnotation)
+		m.SetAnnotations(annotations)
+	}
 }
 
-// dropSecretValues keeps a Secret's key names and nothing they hold. kubectl
-// apply's annotation holds the values too, so it goes as well.
+// dropSecretValues keeps a Secret's key names and nothing they hold.
+// kubectl apply's annotation, which holds them too, went in trimMeta.
 func dropSecretValues(s *corev1.Secret) {
 	for key := range s.Data {
 		s.Data[key] = nil
 	}
 	s.StringData = nil
-	delete(s.Annotations, lastAppliedAnnotation)
 }
 
 // hashConfigMap replaces a ConfigMap's values with one hash of them all.

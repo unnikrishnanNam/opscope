@@ -4,6 +4,39 @@ Manifests that set up cases a healthy cluster doesn't have, to check Opscope's p
 them in a throwaway [kind](https://kind.sigs.k8s.io/) cluster with its own kubeconfig, never in a
 cluster you care about.
 
+## Workloads
+
+`workloads.yaml` makes pods that fail in the common ways, next to a healthy Deployment, to check
+that the pages show each failure and keep up with it without a reload:
+
+```bash
+kind create cluster --name opscope-workloads --kubeconfig /tmp/opscope-workloads.kubeconfig
+export KUBECONFIG=/tmp/opscope-workloads.kubeconfig
+until kubectl apply -f test/scenarios/workloads.yaml; do sleep 2; done
+```
+
+Run Opscope with `OPSCOPE_KUBECONFIG=/tmp/opscope-workloads.kubeconfig` and look at the
+`workloads-test` namespace. The failures settle within a minute:
+
+| Object                       | What the pages should show                                                                                                                                                    |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Deployment and Service `web` | 2 of 2 ready: the healthy one to compare with                                                                                                                                 |
+| Pod `crashloop-…`            | Error, then CrashLoopBackOff, restarts rising. Last exit "Error (exit 1)"; its previous logs say `cannot read /etc/app/config.yaml`. Deployment `crashloop`: 0 of 1 available |
+| Pod `oom`                    | OOMKilled, then CrashLoopBackOff, restarts rising. Last exit "OOMKilled (exit 137)"                                                                                           |
+| Pod `bad-image`              | ErrImagePull, then ImagePullBackOff, no restarts. A warning event: failed to pull the image                                                                                   |
+| Service `no-endpoints`       | Listed like any Service, its selector `app=web-frontend` on the detail page. Nothing says yet that it matches no pods: that's for a later release's issues feed               |
+| Overview                     | Pods by status: 2 Running and one of each failure. Deployments: 1 of 2 not ready. Warnings: BackOff and Failed                                                                |
+
+**Live updates:** leave the Pods page open. Each restart and status change shows within about a
+second, without a reload. The restarts slow down as Kubernetes waits longer each time, up to once
+every five minutes.
+
+### Clean up
+
+```bash
+kind delete cluster --name opscope-workloads
+```
+
 ## Storage
 
 ```bash

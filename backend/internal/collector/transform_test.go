@@ -1,11 +1,14 @@
 package collector
 
 import (
+	"maps"
 	"testing"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -53,6 +56,29 @@ func TestTrimDropsSecretValues(t *testing.T) {
 	}
 	if secret.Type != corev1.SecretTypeOpaque {
 		t.Error("the type should stay")
+	}
+}
+
+func TestTrimDropsKubectlsCopyFromEveryKind(t *testing.T) {
+	applied := map[string]string{lastAppliedAnnotation: `{"data":{"db-url":"postgres://app@db/shop"}}`, "team": "payments"}
+	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "app", Annotations: maps.Clone(applied)}, Data: map[string]string{"db-url": "postgres://app@db/shop"}}
+	deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "web", Annotations: maps.Clone(applied)}}
+	route := &unstructured.Unstructured{Object: map[string]any{"metadata": map[string]any{"name": "web", "annotations": map[string]any{lastAppliedAnnotation: "{}", "team": "payments"}}}}
+	for _, obj := range []metav1.Object{cm, deployment, route} {
+		trim(obj)
+		if got := obj.GetAnnotations(); got[lastAppliedAnnotation] != "" || got["team"] != "payments" {
+			t.Errorf("%s: only the last-applied annotation should go: %v", obj.GetName(), got)
+		}
+	}
+	if cm.Annotations[ContentHashAnnotation] == "" {
+		t.Error("the ConfigMap should still get its hash")
+	}
+
+	// An object without annotations keeps none, rather than an empty map.
+	plain := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "web"}}
+	trim(plain)
+	if plain.Annotations != nil {
+		t.Errorf("annotations = %v, want none", plain.Annotations)
 	}
 }
 

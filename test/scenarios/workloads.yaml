@@ -1,0 +1,121 @@
+# Workloads that fail in the common ways, next to a healthy one, to check that
+# Opscope's pages show each failure and update as it changes. See README.md.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: workloads-test
+---
+# Healthy: two pods serving on 8080, and a Service that finds them.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: workloads-test
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: busybox:1.36
+          command: [httpd, -f, -p, "8080", -h, /tmp]
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+          resources:
+            requests: { cpu: 5m, memory: 8Mi }
+            limits: { memory: 16Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: workloads-test
+spec:
+  selector:
+    app: web
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+# A Service whose selector matches no pods: a label typed wrong. The pods are
+# labelled app=web.
+apiVersion: v1
+kind: Service
+metadata:
+  name: no-endpoints
+  namespace: workloads-test
+spec:
+  selector:
+    app: web-frontend
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+# Starts, fails a few seconds later, and is restarted after a longer wait
+# each time: CrashLoopBackOff. Its Deployment never becomes available.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crashloop
+  namespace: workloads-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: crashloop
+  template:
+    metadata:
+      labels:
+        app: crashloop
+    spec:
+      containers:
+        - name: app
+          image: busybox:1.36
+          command: [sh, -c, "echo starting; sleep 3; echo 'cannot read /etc/app/config.yaml' >&2; exit 1"]
+          resources:
+            requests: { cpu: 5m, memory: 8Mi }
+            limits: { memory: 16Mi }
+---
+# Doubles a string until it passes the 16 MiB limit and is killed:
+# OOMKilled, then CrashLoopBackOff as it's restarted.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: oom
+  namespace: workloads-test
+  labels:
+    app: oom
+spec:
+  containers:
+    - name: app
+      image: busybox:1.36
+      command: [sh, -c, 'echo filling memory; a=x; while true; do a="$a$a"; done']
+      resources:
+        requests: { cpu: 5m, memory: 16Mi }
+        limits: { memory: 16Mi }
+---
+# An image that can't be pulled: the .invalid domain never resolves.
+# ErrImagePull, then ImagePullBackOff.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bad-image
+  namespace: workloads-test
+  labels:
+    app: bad-image
+spec:
+  containers:
+    - name: app
+      image: registry.invalid/opscope/does-not-exist:1.0
+      resources:
+        requests: { cpu: 5m, memory: 8Mi }
+        limits: { memory: 16Mi }

@@ -88,9 +88,54 @@ kubectl -n opscope logs deployment/opscope
   seccomp profile. It writes only to `/data`.
 - Liveness and readiness probes use `/api/health`.
 - One replica: usage history is kept in memory, so one copy keeps it consistent.
-- Requests 20m CPU and 48 MiB of memory, with a 256 MiB memory limit.
+- Requests 20m CPU and 64 MiB of memory, with a 256 MiB memory limit, and `GOMEMLIMIT` set just
+  under it (see [Memory](#memory)).
 - On `SIGTERM`, Opscope stops accepting connections and gives running requests up to 10 seconds to
   finish; open log streams are closed after that.
+
+### Memory
+
+Opscope keeps a copy of the objects it shows, so its memory grows with the size of the clusters
+it's connected to. It keeps less than the cluster sends: no Secret or ConfigMap values, no list of
+fields each manager owns, and no `kubectl apply` copy of the object. Measured per 1,000 objects
+in memory:
+
+| Kind                                  | Per 1,000 objects                        |
+| ------------------------------------- | ---------------------------------------- |
+| Pods                                  | 11–15 MiB                                |
+| Deployments, StatefulSets, DaemonSets | 6–12 MiB (each holds its pod template)   |
+| Jobs                                  | about 8 MiB                              |
+| Nodes                                 | 7–20 MiB (mostly the images they hold)   |
+| PersistentVolumeClaims and volumes    | about 4 MiB                              |
+| Services                              | about 2 MiB                              |
+| ConfigMaps, Secrets                   | about 2 MiB, whatever their values' size |
+| Events, Namespaces                    | about 1.3 MiB                            |
+
+On top of that copy, the process needs about 25 MiB. Go's garbage collector also lets memory grow
+to about twice what Opscope holds before it cleans up, unless `GOMEMLIMIT` tells it to work harder
+near a limit. The manifest sets it to 230 MiB, under its 256 MiB limit.
+
+Pods and Events are most of it. Roughly, for one cluster:
+
+| Cluster                                          | Copy kept | Memory used | Memory limit (`GOMEMLIMIT`)    |
+| ------------------------------------------------ | --------- | ----------- | ------------------------------ |
+| 500 pods, 2,000 events, 1,000 other objects      | 12 MiB    | 40–60 MiB   | 256 MiB (230 MiB), the default |
+| 2,000 pods, 10,000 events, 4,000 other objects   | 50 MiB    | 100–130 MiB | 256 MiB (230 MiB), the default |
+| 5,000 pods, 25,000 events, 10,000 other objects  | 130 MiB   | 200–280 MiB | 512 MiB (460 MiB)              |
+| 10,000 pods, 50,000 events, 20,000 other objects | 250 MiB   | 400–530 MiB | 1 GiB (920 MiB)                |
+
+Each connected cluster adds its own copy. To count a cluster's pods and events:
+
+```bash
+kubectl get pods -A --no-headers | wc -l
+kubectl get events -A --no-headers | wc -l
+```
+
+If memory is tighter than this allows, [turn live data off](#turning-live-data-off): Opscope then
+keeps no copy and uses 30–40 MiB, whatever the size of the cluster.
+
+With Docker, there's no limit unless you set one. If you do (`--memory 512m`), set `GOMEMLIMIT`
+about 10% under it (`-e GOMEMLIMIT=460MiB`).
 
 ## Permissions
 

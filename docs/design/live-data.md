@@ -49,6 +49,9 @@ after that.
   - ConfigMaps keep their key names and a content hash, not their values: the list only shows key
     names, the detail page reads the object directly, and the Change log (v1.7) tracks ConfigMap
     content by hash.
+  - kubectl's `last-applied-configuration` annotation is dropped from every kind, not only
+    Secrets: it's a copy of the whole object, ConfigMap values included, and nothing reads it from
+    the cache. (Found in L6.)
 - **Pages read from the cache; three things stay direct.** Lists, the overview, the `/names` index,
   the related lists on detail pages (events for an object, pods using a claim, claims made from a
   StatefulSet, volumes, StorageClass lookups) and the node and pod lists that usage reads all come
@@ -331,16 +334,17 @@ change, without a timer.
 
 Goal: checked against failure cases, with published memory numbers.
 
-- [ ] `test/scenarios/workloads.yaml`: a CrashLoopBackOff pod, an OOMKilled pod, an
+- [x] `test/scenarios/workloads.yaml`: a CrashLoopBackOff pod, an OOMKilled pod, an
       ImagePullBackOff pod, and a Service whose selector matches nothing, with a table in the README
       of what each page should show
-- [ ] On a kind cluster: each scenario appears and changes live (restart counts rise without a
+- [x] On a kind cluster: each scenario appears and changes live (restart counts rise without a
       reload)
-- [ ] A Go benchmark that fills the cache with realistic objects and reports memory per 1,000
+- [x] A Go benchmark that fills the cache with realistic objects and reports memory per 1,000
       objects per kind
-- [ ] Memory measured on the scenario cluster and on multipass (read-only), with one and with two
-      clusters connected; the run's length agreed before it starts
-- [ ] The manifest's requests and limits updated, and a sizing table in `docs/deployment.md`
+- [x] Memory measured on the scenario cluster and on multipass (read-only), with one and with two
+      clusters connected; the run's length agreed before it starts (10 minutes)
+- [~] The manifest's requests and limits updated, and a sizing table in `docs/deployment.md` (the
+      limit stays; `GOMEMLIMIT` added instead; see notes)
 
 ## Phase L7: Release
 
@@ -372,9 +376,8 @@ Goal: v1.4.0 is ready to tag.
 2. ~~**Kill switch.**~~ Answered: documented as a fallback (see Decisions).
 3. **`/metrics` endpoint.** Proposed: not in v1.4; it comes with the Helm chart and multiple
    replicas (v1.8). Bring it forward if you'd rather measure the collectors with it in L6.
-4. **Events in the cache.** Events change constantly on busy clusters and are the largest kind by
-   count. Proposed: cache them like the rest (the overview's warnings then update live), and move
-   them back to `direct` if L6 shows they cost too much memory.
+4. ~~**Events in the cache.**~~ Proposed answer from L6's numbers: keep them cached. An event
+   takes about 1.3 KiB, a tenth of a pod, so 10,000 events are about 13 MiB. Waiting for review.
 
 ## Phase notes
 
@@ -657,3 +660,77 @@ Goal: v1.4.0 is ready to tag.
     Found and fixed: the panel ran off the left edge on phones, where the indicator starts the
     second row; the open button lost its warning colour; "Not installed" repeated its reason; and
     Events and Namespaces showed their API names.
+
+### L6: Scenarios and sizing (2026-11-07)
+
+- `test/scenarios/workloads.yaml` has a healthy `web` Deployment and Service next to a
+  CrashLoopBackOff Deployment, an OOMKilled pod (a shell doubling a string past a 16 MiB limit),
+  an ImagePullBackOff pod (an image on `registry.invalid`, which never resolves) and a Service
+  whose selector has a typo. The README's table says what each page should show.
+- Checked on a throwaway kind cluster, deleted afterwards. Every page showed what kubectl showed,
+  and the Pods page kept up without a reload: restart counts rose and each status change (Error,
+  Running, CrashLoopBackOff, ErrImagePull, ImagePullBackOff) was fetched within about a second
+  of kubectl seeing it, five changes out of five. The overview counted the failures by status and
+  one Deployment of two not ready; the warnings listed BackOff and Failed.
+- Found: nothing says that `no-endpoints` matches no pods. The detail page shows its selector, and
+  that's all. Left for the issues feed in a later release; noted in the README.
+- The app's browser pane reports a background tab as hidden, which pauses its stream (as designed
+  in L5). For the check above, the page's `document.hidden` was overridden from the console.
+- `BenchmarkCacheMemory` (`collector/memory_test.go`) fills a cache through the transform with
+  2,000 made-up objects per kind, written as JSON and read back so every string is its own
+  allocation, and reports the heap per 1,000. With `OPSCOPE_BENCH_DIR`, it reads
+  `kubectl get <kind> -A -o json` files instead. Per 1,000 objects (made up / multipass / kind):
+
+  | Kind        | Made up   | multipass | kind      |
+  | ----------- | --------- | --------- | --------- |
+  | Pods        | 12.8 MiB  | 14.3 MiB  | 10.7 MiB  |
+  | Deployments | 11.6 MiB  | 8.7 MiB   | 6.2 MiB   |
+  | Nodes       | 19.1 MiB  | 9.9 MiB   | 7.1 MiB   |
+  | Jobs        | 8.2 MiB   | (none)    | (none)    |
+  | Claims      | 3.8 MiB   | 3.7 MiB   | (none)    |
+  | Services    | 2.4 MiB   | 2.3 MiB   | 2.0 MiB   |
+  | ConfigMaps  | 1.9 MiB   | 1.1 MiB   | 1.4 MiB   |
+  | Secrets     | 1.9 MiB   | (not saved) | (not saved) |
+  | Events      | 1.4 MiB   | 1.2 MiB   | 1.2 MiB   |
+  | Namespaces  | 1.3 MiB   | 1.2 MiB   | 1.1 MiB   |
+
+  The real columns are after the fix below. multipass has 3 nodes, 46 pods and 19 Deployments,
+  so its rows are averages of few objects.
+  The made-up objects are a production-like pod with an app container and a mesh sidecar, probes,
+  env and a projected token volume; nodes report 50 images, which is most of their size. In
+  memory an object takes about twice its JSON. Secrets weren't saved to disk from the real
+  clusters, since that would write their values out.
+- Found and fixed: kubectl's `last-applied-configuration` annotation was kept on every kind but
+  Secrets. On a ConfigMap it holds the values the transform drops, and on an applied Deployment
+  it's a full copy. `trim` now drops it from every kind (`trimMeta`), with a test for a
+  ConfigMap, a Deployment and a Gateway API object. Made-up ConfigMaps went from 4.9 to 1.9 KiB,
+  Deployments from 15.6 to 11.6, Services from 3.1 to 2.4.
+- Memory of the real process: this branch's image in Docker, four containers side by side for
+  10 minutes, sampled every 5 seconds with `docker stats`, while a loop loaded six lists from each
+  every 10 seconds. kind had the scenarios plus 3,000 ConfigMaps, 1,000 Secrets and 500 Services
+  in ten namespaces (about 4,600 objects); multipass had about 250.
+
+  | Container                       | First minute | Last 2.5 minutes |
+  | ------------------------------- | ------------ | ---------------- |
+  | kind                            | 36–42 MiB    | 47 MiB           |
+  | multipass                       | 24 MiB       | 27 MiB           |
+  | both                            | 39–46 MiB    | 55 MiB           |
+  | both, `OPSCOPE_LIVE=false`      | 27–32 MiB    | 37 MiB           |
+
+  All four rose a little over the 10 minutes, the one with no cache too. To tell growth from a
+  leak, a container ran with `GODEBUG=gctrace=1` while 200 ConfigMaps were relabelled for 3
+  minutes (about 76,000 updates) and pages loaded every 5 seconds. The live heap after each
+  collection stayed at 10–12 MB from the first 30 seconds to the last: no leak. Those 11 MB match
+  the benchmark (about 7 MiB for the cluster's objects) plus the server itself. A fresh container
+  on the same cluster peaked at 34 MiB during its first sync, so startup isn't the constraint.
+- From these: memory is about 25 MiB plus twice the copy, since Go lets the heap reach twice
+  what's live before collecting. With the 256 MiB limit that's around 3,500 pods.
+- Changed from the plan: the limit stays at 256 MiB, and the manifest sets `GOMEMLIMIT=230MiB`,
+  so the collector works harder near the limit instead of the pod being killed. The request
+  goes from 48 to 64 MiB, above the 27–55 MiB measured. `docs/deployment.md` has a "Memory"
+  section: memory per kind, and a table from 500 to 10,000 pods with the limit to set. Applied
+  on kind with this branch's image: the pod ran at a 28 MiB working set with about 3,500
+  objects.
+- Open question 4 (Events): an event takes a tenth of a pod's memory, so the proposal is to keep
+  them cached; it's marked for review. Question 3 (`/metrics`) is unchanged: these measurements
+  didn't need it.
