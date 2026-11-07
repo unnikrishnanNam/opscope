@@ -84,10 +84,11 @@ export const overviewKinds = [
   "persistentvolumes",
 ];
 
-// kindsOn lists the kinds a page shows, for the top bar's live status: a
-// list page (or a detail page under it) its own, the overview its counts
-// and recent warnings.
-export function kindsOn(page) {
+// kindsOn lists the kinds a page updates live, for the top bar's live
+// status: a list page its own, the overview its counts and recent warnings.
+// A detail page none: it's read on a timer (`detail` is true there).
+export function kindsOn(page, detail) {
+  if (detail) return [];
   if (page?.resource) return [page.resource];
   if (page?.path === "overview") return [...overviewKinds, "events"];
   return undefined;

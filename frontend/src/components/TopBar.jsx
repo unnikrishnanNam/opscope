@@ -75,7 +75,7 @@ export default function TopBar({ cluster, status, pagePath, onMenu, onSearch }) 
         </span>
       </button>
       <div className="topbar-end">
-        {cluster && <ClusterLiveStatus kinds={kindsOn(page)} />}
+        {cluster && <ClusterLiveStatus kinds={kindsOn(page, Boolean(objectName))} />}
         {/* Switching cluster from a detail page goes to the list: the object is in the old cluster. */}
         <ClusterPicker cluster={cluster} pagePath={page?.path ?? pagePath} />
         {cluster && (

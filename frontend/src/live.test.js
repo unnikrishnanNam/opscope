@@ -103,6 +103,9 @@ group("describe", () => {
     expect(on(["services"]).label).toBe("Every 30 s");
     expect(on(["pods", "services", "secrets"]).label).toBe("Every 30 s"); // the slowest
     expect(on(undefined).label).toBe("Every 30 s"); // no page: every kind
+    // A detail page shows no live kinds: it's read on its timer, which isn't a warning.
+    expect(on([])).toMatchObject({ label: "Every 10 s", tone: "neutral" });
+    expect(on([]).groups).toEqual(on(["pods"]).groups);
   });
 
   test("kinds that aren't watched are grouped by how and why", () => {

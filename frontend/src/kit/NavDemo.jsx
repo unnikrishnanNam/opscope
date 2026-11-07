@@ -330,6 +330,8 @@ const LIVE_STATES = [
       },
     },
   ],
+  // On a detail page, which is read on a timer: the page passes no live kinds.
+  ["Detail page", { connection: "open", status: { state: "live", kinds: watched(["pods", "nodes"]) } }, []],
   ["Connecting", { connection: "connecting", status: null }],
   ["Reconnecting", { connection: "reconnecting", status: { state: "live", kinds: [] } }],
   ["Unreachable", { connection: "open", status: { state: "unreachable", kinds: [] } }],
@@ -341,9 +343,9 @@ const kitLabel = (resource) => resource.charAt(0).toUpperCase() + resource.slice
 function LiveStates() {
   return (
     <div className="kit-stack">
-      {LIVE_STATES.map(([label, snapshot]) => (
+      {LIVE_STATES.map(([label, snapshot, pageKinds]) => (
         <Row key={label} label={label}>
-          <LiveStatus info={describe(snapshot, kitLabel)} align="start" />
+          <LiveStatus info={describe(snapshot, kitLabel, pageKinds)} align="start" />
         </Row>
       ))}
     </div>

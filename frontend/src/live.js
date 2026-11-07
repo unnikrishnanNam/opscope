@@ -209,8 +209,9 @@ export function wants(message, live, path) {
 //   { label, tone: "ok" | "warn" | "bad" | "neutral", summary, groups: [{ title, kinds, reason }] }
 // `labelOf` names a resource for people ("pods" -> "Pods"). `pageKinds` are
 // the kinds the page on screen shows: the label is how fresh that page is,
-// so a cluster where only Secrets can't be listed reads "Live" on Pods.
-// Without it, every kind counts. The groups always list every kind.
+// so a cluster where only Secrets can't be listed reads "Live" on Pods. An
+// empty list is a page that isn't live at all (a detail page). Without it,
+// every kind counts. The groups always list every kind.
 export function describe(snapshot, labelOf = (r) => r, pageKinds) {
   if (!snapshot) return null;
   const { connection, status } = snapshot;
@@ -265,6 +266,15 @@ export function describe(snapshot, labelOf = (r) => r, pageKinds) {
 
   if (status.state === "connecting") {
     return { label: "Connecting", tone: "neutral", summary: "Reading the cluster for the first time.", groups };
+  }
+  // A page that shows no live kinds, like a detail page, is read on its timer.
+  if (pageKinds?.length === 0) {
+    return {
+      label: "Every 10 s",
+      tone: "neutral",
+      summary: "This page is read from the cluster every 10 seconds. Lists and the overview update live.",
+      groups,
+    };
   }
   // The slowest kind on the page decides.
   const shown = pageKinds ? status.kinds.filter((k) => pageKinds.includes(k.resource)) : status.kinds;
