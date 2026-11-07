@@ -4,8 +4,7 @@ import (
 	"context"
 	"sort"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // ConfigMap is one row of the configmap list. Values aren't included;
@@ -15,14 +14,14 @@ type ConfigMap struct {
 	Keys []string `json:"keys"`
 }
 
-func listConfigMaps(ctx context.Context, client kubernetes.Interface, q Query) ([]ConfigMap, error) {
-	list, err := client.CoreV1().ConfigMaps(q.Namespace).List(ctx, metav1.ListOptions{})
+func listConfigMaps(ctx context.Context, src Source, q Query) ([]ConfigMap, error) {
+	items, err := ListOf[*corev1.ConfigMap](ctx, src, "configmaps", q)
 	if err != nil {
 		return nil, err
 	}
 
-	rows := make([]ConfigMap, 0, len(list.Items))
-	for _, cm := range list.Items {
+	rows := make([]ConfigMap, 0, len(items))
+	for _, cm := range items {
 		keys := []string{}
 		for key := range cm.Data {
 			keys = append(keys, key)

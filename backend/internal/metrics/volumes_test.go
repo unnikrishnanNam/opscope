@@ -20,6 +20,8 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	clienttesting "k8s.io/client-go/testing"
+
+	"opscope/internal/resources"
 )
 
 // podOn is a running pod on a node, with the given volumes.
@@ -113,7 +115,7 @@ func TestReadVolumes(t *testing.T) {
 		calls:   map[string]int{},
 	}
 
-	report, err := newStubbed(stub).Read(context.Background(), "lab", kube, "data")
+	report, err := newStubbed(stub).Read(context.Background(), "lab", kube, resources.Direct(resources.Clients{Kube: kube}), "data")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +146,7 @@ func TestReadVolumes(t *testing.T) {
 
 func TestReadVolumesWithNothingMounted(t *testing.T) {
 	stub := &stubStats{calls: map[string]int{}}
-	report, err := newStubbed(stub).Read(context.Background(), "lab", fake.NewClientset(), "")
+	report, err := newStubbed(stub).Read(context.Background(), "lab", fake.NewClientset(), resources.Direct(resources.Clients{Kube: fake.NewClientset()}), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +174,7 @@ func TestVolumeUsageCache(t *testing.T) {
 	v := newStubbed(stub)
 	read := func() {
 		t.Helper()
-		if _, err := v.Read(context.Background(), "lab", kube, ""); err != nil {
+		if _, err := v.Read(context.Background(), "lab", kube, resources.Direct(resources.Clients{Kube: kube}), ""); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -186,7 +188,7 @@ func TestVolumeUsageCache(t *testing.T) {
 	}
 
 	// Another cluster with a node of the same name is asked separately.
-	if _, err := v.Read(context.Background(), "other", kube, ""); err != nil {
+	if _, err := v.Read(context.Background(), "other", kube, resources.Direct(resources.Clients{Kube: kube}), ""); err != nil {
 		t.Fatal(err)
 	}
 	if stub.calls["a"] != 2 || stub.calls["b"] != 2 {
@@ -212,7 +214,7 @@ func TestVolumeUsageForbidden(t *testing.T) {
 		calls:   map[string]int{},
 	}
 
-	_, err := newStubbed(stub).Read(context.Background(), "lab", kube, "")
+	_, err := newStubbed(stub).Read(context.Background(), "lab", kube, resources.Direct(resources.Clients{Kube: kube}), "")
 	if !errors.Is(err, ErrVolumeUsageForbidden) || !apierrors.IsForbidden(err) {
 		t.Fatalf("got %v, want ErrVolumeUsageForbidden wrapping the API's answer", err)
 	}
@@ -223,7 +225,7 @@ func TestReadVolumesWithoutPodAccess(t *testing.T) {
 	kube.PrependReactor("list", "pods", func(clienttesting.Action) (bool, runtime.Object, error) {
 		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "pods"}, "", errors.New("RBAC"))
 	})
-	_, err := NewVolumes().Read(context.Background(), "lab", kube, "")
+	_, err := NewVolumes().Read(context.Background(), "lab", kube, resources.Direct(resources.Clients{Kube: kube}), "")
 	// Not the node proxy's fault: an ordinary "not allowed", like any list.
 	if !apierrors.IsForbidden(err) || errors.Is(err, ErrVolumeUsageForbidden) {
 		t.Fatalf("got %v, want a plain forbidden error", err)

@@ -16,6 +16,8 @@ import (
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+
+	"opscope/internal/resources"
 )
 
 // fakeMetrics is a fake dynamic client serving the given metrics objects.
@@ -57,7 +59,7 @@ func TestReadNodesJoinsAllocatable(t *testing.T) {
 		}},
 	})
 
-	nodes, err := ReadNodes(context.Background(), kube, dyn)
+	nodes, err := ReadNodes(context.Background(), resources.Direct(resources.Clients{Kube: kube}), dyn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +97,7 @@ func TestMissingMetricsServer(t *testing.T) {
 		dyn.PrependReactor("list", "*", func(clienttesting.Action) (bool, runtime.Object, error) {
 			return true, nil, failure
 		})
-		if _, err := ReadNodes(context.Background(), fake.NewClientset(), dyn); !errors.Is(err, ErrUnavailable) {
+		if _, err := ReadNodes(context.Background(), resources.Direct(resources.Clients{Kube: fake.NewClientset()}), dyn); !errors.Is(err, ErrUnavailable) {
 			t.Errorf("for %v: got %v, want ErrUnavailable", failure, err)
 		}
 	}

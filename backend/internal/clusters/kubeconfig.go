@@ -115,7 +115,9 @@ func checkSafeForUpload(config *clientcmdapi.Config) error {
 type clientSet struct {
 	kube   *kubernetes.Clientset  // typed: Go structs for built-in kinds (Pods, Services, ...)
 	dyn    *dynamic.DynamicClient // dynamic: any kind as plain maps, incl. custom resources
-	stream *kubernetes.Clientset  // typed, but with no timeout: for long streams like following logs
+	stream *kubernetes.Clientset  // typed, but with no timeout: for long streams like following logs and watches
+	// dynamic, with no timeout: for watching custom resources (Gateway API)
+	streamDyn *dynamic.DynamicClient
 }
 
 // newClients builds the clients for the current context of config. It does
@@ -131,18 +133,20 @@ func newClients(config *clientcmdapi.Config) (clientSet, string, error) {
 // clientsFor builds the clients from connection settings, wherever they came
 // from: a kubeconfig, or the pod's own service account (in-cluster mode).
 func clientsFor(restConfig *rest.Config) (clientSet, string, error) {
-	// The stream client is a copy made before the timeout is set: a timeout
-	// covers the whole response, which would cut a log stream after 10 seconds.
-	// Streams end instead when the browser goes away (the request context).
-	streamConfig := rest.CopyConfig(restConfig)
-	restConfig.Timeout = requestTimeout
 	// client-go's own limit (5 requests a second, bursts of 10) is made for
 	// controllers that run unattended. One page here can take a dozen calls
 	// at once (the command palette's /names lists every kind in parallel),
 	// and the limit is shared by everything Opscope does with this cluster,
-	// so a few of those in a row would slow every page down.
+	// so a few of those in a row would slow every page down. The collector
+	// also lists and then watches every kind when it starts.
 	restConfig.QPS = clientQPS
 	restConfig.Burst = clientBurst
+	// The stream clients are a copy made before the timeout is set: a timeout
+	// covers the whole response, which would cut a log stream or a watch
+	// after 10 seconds. Log streams end instead when the browser goes away
+	// (the request context), watches when the collector stops.
+	streamConfig := rest.CopyConfig(restConfig)
+	restConfig.Timeout = requestTimeout
 
 	var c clientSet
 	var err error
@@ -153,6 +157,9 @@ func clientsFor(restConfig *rest.Config) (clientSet, string, error) {
 		return clientSet{}, "", err
 	}
 	if c.stream, err = kubernetes.NewForConfig(streamConfig); err != nil {
+		return clientSet{}, "", err
+	}
+	if c.streamDyn, err = dynamic.NewForConfig(streamConfig); err != nil {
 		return clientSet{}, "", err
 	}
 	return c, restConfig.Host, nil

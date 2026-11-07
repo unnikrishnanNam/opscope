@@ -13,11 +13,12 @@ import (
 
 // The command palette searches every object in a cluster by name. Rather
 // than make the browser load every table, ListNames lists them all here and
-// returns only kind, namespace and name, which is all a search needs.
+// returns only kind, namespace, name and UID, which is all a search needs.
 
 // ObjectName is one object in the index.
 type ObjectName struct {
 	Resource  string `json:"resource"` // the API name, e.g. "pods"
+	UID       string `json:"uid"`
 	Namespace string `json:"namespace,omitempty"`
 	Name      string `json:"name"`
 }
@@ -50,7 +51,7 @@ var notIndexed = map[string]bool{"events": true}
 // the others are still returned. Only when nothing at all could be read is
 // it an error, since then the cluster itself is the problem (unreachable,
 // credentials rejected).
-func ListNames(ctx context.Context, clients Clients) (*NameIndex, error) {
+func ListNames(ctx context.Context, src Source) (*NameIndex, error) {
 	var kinds []string
 	for _, kind := range slices.Sorted(maps.Keys(Listers)) {
 		if !notIndexed[kind] {
@@ -58,8 +59,8 @@ func ListNames(ctx context.Context, clients Clients) (*NameIndex, error) {
 		}
 	}
 
-	// Each kind is its own request to the API server, so they run in
-	// parallel; each goroutine writes only its own slot.
+	// Read directly, each kind is its own request to the API server, so
+	// they run in parallel; each goroutine writes only its own slot.
 	type result struct {
 		rows any
 		err  error
@@ -68,7 +69,7 @@ func ListNames(ctx context.Context, clients Clients) (*NameIndex, error) {
 	var wg sync.WaitGroup
 	for i, kind := range kinds {
 		wg.Go(func() {
-			rows, err := Listers[kind](ctx, clients, Query{})
+			rows, err := Listers[kind](ctx, src, Query{})
 			results[i] = result{rows, err}
 		})
 	}
@@ -92,7 +93,7 @@ func ListNames(ctx context.Context, clients Clients) (*NameIndex, error) {
 		default:
 			read++
 			for _, m := range metas(r.rows) {
-				index.Objects = append(index.Objects, ObjectName{Resource: kind, Namespace: m.Namespace, Name: m.Name})
+				index.Objects = append(index.Objects, ObjectName{Resource: kind, UID: m.UID, Namespace: m.Namespace, Name: m.Name})
 			}
 		}
 	}

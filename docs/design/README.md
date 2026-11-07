@@ -12,6 +12,7 @@ describe how Opscope got there.
 | [command-palette.md](command-palette.md)  | The command palette, the command registry, keyboard shortcuts | v1.2.0   |
 | [repositioning.md](repositioning.md)      | Opscope as an operations tool: licence, documentation, positioning | v1.3.0   |
 | [storage.md](storage.md)                  | Storage pages: PersistentVolumeClaims, PersistentVolumes, StorageClasses, volume usage | v1.3.0   |
+| [live-data.md](live-data.md)              | Live data: a watch cache per cluster, the event bus, pages that update as the cluster changes | v1.4.0   |
 
 ## When to write one
 

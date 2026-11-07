@@ -12,12 +12,11 @@ import (
 	"fmt"
 	"strings"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
 )
 
 // ErrGatewayAPINotInstalled means the cluster doesn't serve Gateway API v1.
@@ -29,23 +28,18 @@ func gatewayAPI(resource string) schema.GroupVersionResource {
 }
 
 // listCustom lists a custom resource and converts each item into T.
-// An empty namespace lists across all namespaces (or a cluster-wide kind).
-func listCustom[T any](ctx context.Context, client dynamic.Interface, gvr schema.GroupVersionResource, namespace string) ([]T, error) {
-	list, err := client.Resource(gvr).Namespace(namespace).List(ctx, metav1.ListOptions{})
-	if apierrors.IsNotFound(err) {
-		// The API server answers 404 for a resource type it doesn't know.
-		return nil, ErrGatewayAPINotInstalled
-	}
+func listCustom[T any](ctx context.Context, src Source, resource string, q Query) ([]T, error) {
+	objects, err := ListOf[*unstructured.Unstructured](ctx, src, resource, q)
 	if err != nil {
 		return nil, err
 	}
 
-	items := make([]T, 0, len(list.Items))
-	for _, item := range list.Items {
+	items := make([]T, 0, len(objects))
+	for _, item := range objects {
 		var obj T
 		// Like json.Unmarshal, but from a map instead of bytes.
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, &obj); err != nil {
-			return nil, fmt.Errorf("reading %s %s: %w", gvr.Resource, item.GetName(), err)
+			return nil, fmt.Errorf("reading %s %s: %w", resource, item.GetName(), err)
 		}
 		items = append(items, obj)
 	}
@@ -92,8 +86,8 @@ type Gateway struct {
 	AttachedRoutes int32             `json:"attachedRoutes"` // routes attached across all listeners
 }
 
-func listGateways(ctx context.Context, client dynamic.Interface, q Query) ([]Gateway, error) {
-	objects, err := listCustom[gatewayObject](ctx, client, gatewayAPI("gateways"), q.Namespace)
+func listGateways(ctx context.Context, src Source, q Query) ([]Gateway, error) {
+	objects, err := listCustom[gatewayObject](ctx, src, "gateways", q)
 	if err != nil {
 		return nil, err
 	}
@@ -179,8 +173,8 @@ type HTTPRoute struct {
 	Rules     int      `json:"rules"`
 }
 
-func listHTTPRoutes(ctx context.Context, client dynamic.Interface, q Query) ([]HTTPRoute, error) {
-	objects, err := listCustom[httpRouteObject](ctx, client, gatewayAPI("httproutes"), q.Namespace)
+func listHTTPRoutes(ctx context.Context, src Source, q Query) ([]HTTPRoute, error) {
+	objects, err := listCustom[httpRouteObject](ctx, src, "httproutes", q)
 	if err != nil {
 		return nil, err
 	}
@@ -296,8 +290,8 @@ type GatewayClass struct {
 }
 
 // listGatewayClasses ignores q.Namespace: GatewayClasses are cluster-wide.
-func listGatewayClasses(ctx context.Context, client dynamic.Interface, q Query) ([]GatewayClass, error) {
-	objects, err := listCustom[gatewayClassObject](ctx, client, gatewayAPI("gatewayclasses"), "")
+func listGatewayClasses(ctx context.Context, src Source, q Query) ([]GatewayClass, error) {
+	objects, err := listCustom[gatewayClassObject](ctx, src, "gatewayclasses", q)
 	if err != nil {
 		return nil, err
 	}

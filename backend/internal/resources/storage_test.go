@@ -59,7 +59,7 @@ func TestListPersistentVolumeClaims(t *testing.T) {
 		},
 	)
 
-	claims, err := listPersistentVolumeClaims(context.Background(), client, Query{Namespace: "data"})
+	claims, err := listPersistentVolumeClaims(context.Background(), kubeSource(client), Query{Namespace: "data"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +123,7 @@ func TestListPersistentVolumes(t *testing.T) {
 		},
 	)
 
-	volumes, err := listPersistentVolumes(context.Background(), client, Query{Namespace: "ignored"})
+	volumes, err := listPersistentVolumes(context.Background(), kubeSource(client), Query{Namespace: "ignored"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +182,7 @@ func TestListStorageClasses(t *testing.T) {
 		},
 	)
 
-	classes, err := listStorageClasses(context.Background(), client, Query{})
+	classes, err := listStorageClasses(context.Background(), kubeSource(client), Query{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,7 +227,7 @@ func TestStorageDetails(t *testing.T) {
 		{"storageclasses", "", "standard", "StorageClass"},
 	}
 	for _, tt := range tests {
-		d, err := GetDetail(context.Background(), clients, tt.resource, tt.namespace, tt.name)
+		d, err := GetDetail(context.Background(), clients, Direct(clients), tt.resource, tt.namespace, tt.name)
 		if err != nil {
 			t.Errorf("%s: %v", tt.resource, err)
 			continue
@@ -263,7 +263,7 @@ func TestOverviewStorage(t *testing.T) {
 	)
 	clients := Clients{Kube: client, Dynamic: fakeDynamic()}
 
-	o, err := GetOverview(context.Background(), clients, Query{})
+	o, err := GetOverview(context.Background(), Direct(clients), Query{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -276,7 +276,7 @@ func TestOverviewStorage(t *testing.T) {
 	}
 
 	// Claims follow the namespace; volumes are cluster-wide, like nodes.
-	o, err = GetOverview(context.Background(), clients, Query{Namespace: "web"})
+	o, err = GetOverview(context.Background(), Direct(clients), Query{Namespace: "web"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -287,7 +287,7 @@ func TestOverviewStorage(t *testing.T) {
 }
 
 func TestOverviewWithoutStorage(t *testing.T) {
-	o, err := GetOverview(context.Background(), Clients{Kube: fake.NewClientset(), Dynamic: fakeDynamic()}, Query{})
+	o, err := GetOverview(context.Background(), Direct(Clients{Kube: fake.NewClientset(), Dynamic: fakeDynamic()}), Query{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -300,7 +300,7 @@ func TestOverviewWithoutStorage(t *testing.T) {
 	client.PrependReactor("list", "persistentvolumes", func(clienttesting.Action) (bool, runtime.Object, error) {
 		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "persistentvolumes"}, "", errors.New("RBAC"))
 	})
-	o, err = GetOverview(context.Background(), Clients{Kube: client, Dynamic: fakeDynamic()}, Query{})
+	o, err = GetOverview(context.Background(), Direct(Clients{Kube: client, Dynamic: fakeDynamic()}), Query{})
 	if err != nil {
 		t.Fatal(err)
 	}

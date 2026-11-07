@@ -4,8 +4,6 @@ import (
 	"context"
 
 	networkingv1 "k8s.io/api/networking/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
 // Ingress is one row of the ingress list.
@@ -17,17 +15,17 @@ type Ingress struct {
 	TLS       bool     `json:"tls"`       // true when it serves HTTPS
 }
 
-func listIngresses(ctx context.Context, client kubernetes.Interface, q Query) ([]Ingress, error) {
-	list, err := client.NetworkingV1().Ingresses(q.Namespace).List(ctx, metav1.ListOptions{})
+func listIngresses(ctx context.Context, src Source, q Query) ([]Ingress, error) {
+	items, err := ListOf[*networkingv1.Ingress](ctx, src, "ingresses", q)
 	if err != nil {
 		return nil, err
 	}
 
-	rows := make([]Ingress, 0, len(list.Items))
-	for _, ing := range list.Items {
+	rows := make([]Ingress, 0, len(items))
+	for _, ing := range items {
 		row := Ingress{
 			Meta:      metaOf(ing.ObjectMeta),
-			Class:     ingressClass(&ing),
+			Class:     ingressClass(ing),
 			Hosts:     []string{},
 			Addresses: []string{},
 			TLS:       len(ing.Spec.TLS) > 0,

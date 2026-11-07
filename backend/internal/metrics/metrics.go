@@ -14,13 +14,15 @@ import (
 	"sort"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
+
+	"opscope/internal/resources"
 )
 
 // metrics-server's API. Like Gateway API, it isn't part of client-go's typed
@@ -83,20 +85,22 @@ type podMetricsObject struct {
 }
 
 // ReadNodes returns every node's usage, joined with its allocatable
-// resources from the node list (metrics-server only knows usage).
-func ReadNodes(ctx context.Context, kube kubernetes.Interface, dyn dynamic.Interface) ([]NodeUsage, error) {
+// resources from the node list (metrics-server only knows usage). Usage is
+// always read from metrics-server, which has no watch; the nodes come from
+// src, usually the watch cache.
+func ReadNodes(ctx context.Context, src resources.Source, dyn dynamic.Interface) ([]NodeUsage, error) {
 	items, err := list[nodeMetricsObject](ctx, dyn, nodeMetricsAPI, "")
 	if err != nil {
 		return nil, err
 	}
 
-	nodes, err := kube.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	nodes, err := resources.ListOf[*corev1.Node](ctx, src, "nodes", resources.Query{})
 	if err != nil {
 		return nil, err
 	}
 	type allocatable struct{ cpu, memory int64 }
 	alloc := map[string]allocatable{}
-	for _, n := range nodes.Items {
+	for _, n := range nodes {
 		alloc[n.Name] = allocatable{n.Status.Allocatable.Cpu().MilliValue(), n.Status.Allocatable.Memory().Value()}
 	}
 

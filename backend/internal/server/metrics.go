@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"opscope/internal/clusters"
+	"opscope/internal/collector"
 	"opscope/internal/metrics"
 )
 
@@ -20,14 +21,14 @@ type nodeMetricsResponse struct {
 //
 // Current usage per node (read live) plus the last 15 minutes of history
 // (from the background collector).
-func getNodeMetrics(manager *clusters.Manager, history *metrics.History) http.HandlerFunc {
+func getNodeMetrics(manager *clusters.Manager, live *collector.Set, history *metrics.History) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cluster, ok := findCluster(w, r, manager)
 		if !ok {
 			return
 		}
 
-		nodes, err := metrics.ReadNodes(r.Context(), cluster.Client, cluster.Dynamic)
+		nodes, err := metrics.ReadNodes(r.Context(), live.Source(cluster), cluster.Dynamic)
 		if err != nil {
 			writeMetricsError(w, err, cluster)
 			return
@@ -64,7 +65,7 @@ func getPodMetrics(manager *clusters.Manager) http.HandlerFunc {
 // Used and free space for the claims mounted by running pods. Off unless
 // OPSCOPE_VOLUME_USAGE=true; then it answers 404 with a code, before
 // looking at the cluster, so nothing ever reaches a kubelet.
-func getVolumeUsage(enabled bool, volumes *metrics.Volumes, manager *clusters.Manager) http.HandlerFunc {
+func getVolumeUsage(enabled bool, volumes *metrics.Volumes, manager *clusters.Manager, live *collector.Set) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !enabled {
 			writeJSON(w, http.StatusNotFound, map[string]string{
@@ -78,7 +79,7 @@ func getVolumeUsage(enabled bool, volumes *metrics.Volumes, manager *clusters.Ma
 			return
 		}
 
-		report, err := volumes.Read(r.Context(), cluster.ID, cluster.Client, r.URL.Query().Get("namespace"))
+		report, err := volumes.Read(r.Context(), cluster.ID, cluster.Client, live.Source(cluster), r.URL.Query().Get("namespace"))
 		if err != nil {
 			writeVolumeUsageError(w, err, cluster)
 			return

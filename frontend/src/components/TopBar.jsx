@@ -3,11 +3,12 @@ import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { useApi } from "../api.js";
 import { useClusters } from "../clusters.jsx";
 import { modKey } from "../platform.js";
-import { nsQuery, pageFor } from "../sections.js";
+import { kindsOn, nsQuery, pageFor } from "../sections.js";
 import Button from "./Button.jsx";
 import ClusterSwitcher from "./ClusterSwitcher.jsx";
 import Combobox from "./Combobox.jsx";
 import { Breadcrumbs } from "./PageHeader.jsx";
+import { ClusterLiveStatus } from "./LiveStatus.jsx";
 import { Kbd } from "./Tag.jsx";
 import { MenuIcon, SearchIcon } from "./icons.jsx";
 import "./TopBar.css";
@@ -74,6 +75,7 @@ export default function TopBar({ cluster, status, pagePath, onMenu, onSearch }) 
         </span>
       </button>
       <div className="topbar-end">
+        {cluster && <ClusterLiveStatus kinds={kindsOn(page, Boolean(objectName))} />}
         {/* Switching cluster from a detail page goes to the list: the object is in the old cluster. */}
         <ClusterPicker cluster={cluster} pagePath={page?.path ?? pagePath} />
         {cluster && (
@@ -103,7 +105,7 @@ function ClusterPicker({ cluster, pagePath }) {
 function NamespacePicker({ cluster, reachable, clusterScoped }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const selected = searchParams.get("ns") ?? "";
-  const { data: namespaces } = useApi(reachable ? `/clusters/${cluster.id}/namespaces` : null);
+  const { data: namespaces } = useApi(reachable ? `/clusters/${cluster.id}/namespaces` : null, { live: "namespaces" });
 
   // On pages like Nodes the namespace doesn't apply. ?ns stays in the URL, so
   // it's still selected when you go back to a namespaced page.

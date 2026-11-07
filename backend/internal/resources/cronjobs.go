@@ -4,8 +4,7 @@ import (
 	"context"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	batchv1 "k8s.io/api/batch/v1"
 )
 
 // CronJob is one row of the cronjob list.
@@ -19,14 +18,14 @@ type CronJob struct {
 	LastSuccess  *time.Time `json:"lastSuccess"`  // when a job last finished successfully
 }
 
-func listCronJobs(ctx context.Context, client kubernetes.Interface, q Query) ([]CronJob, error) {
-	list, err := client.BatchV1().CronJobs(q.Namespace).List(ctx, metav1.ListOptions{})
+func listCronJobs(ctx context.Context, src Source, q Query) ([]CronJob, error) {
+	items, err := ListOf[*batchv1.CronJob](ctx, src, "cronjobs", q)
 	if err != nil {
 		return nil, err
 	}
 
-	rows := make([]CronJob, 0, len(list.Items))
-	for _, cj := range list.Items {
+	rows := make([]CronJob, 0, len(items))
+	for _, cj := range items {
 		row := CronJob{
 			Meta:         metaOf(cj.ObjectMeta),
 			Schedule:     cj.Spec.Schedule,

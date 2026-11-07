@@ -70,7 +70,7 @@ func TestClaimDetail(t *testing.T) {
 		&corev1.Pod{ObjectMeta: meta("web", "db-0"), Spec: corev1.PodSpec{Volumes: []corev1.Volume{claimVolume("db")}}},
 	)
 
-	d, err := GetDetail(context.Background(), clients, "persistentvolumeclaims", "data", "db")
+	d, err := GetDetail(context.Background(), clients, Direct(clients), "persistentvolumeclaims", "data", "db")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestClaimWithMissingClass(t *testing.T) {
 		},
 	})
 
-	d, err := GetDetail(context.Background(), clients, "persistentvolumeclaims", "data", "db")
+	d, err := GetDetail(context.Background(), clients, Direct(clients), "persistentvolumeclaims", "data", "db")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +125,7 @@ func TestClaimDetailWithoutPodAccess(t *testing.T) {
 		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "pods"}, "", errors.New("RBAC"))
 	})
 
-	d, err := GetDetail(context.Background(), clients, "persistentvolumeclaims", "data", "db")
+	d, err := GetDetail(context.Background(), clients, Direct(clients), "persistentvolumeclaims", "data", "db")
 	if err != nil {
 		t.Fatalf("a forbidden pod list should leave out \"Used by\", not fail: %v", err)
 	}
@@ -159,7 +159,7 @@ func TestVolumeDetail(t *testing.T) {
 	}
 	clients := relatedClients(t, map[string]runtime.Object{"persistentvolumes": volume("bound", corev1.VolumeBound)})
 
-	d, err := GetDetail(context.Background(), clients, "persistentvolumes", "", "bound")
+	d, err := GetDetail(context.Background(), clients, Direct(clients), "persistentvolumes", "", "bound")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +178,7 @@ func TestVolumeDetail(t *testing.T) {
 
 	// A Released volume names its old claim, but there's no claim left to link to.
 	clients = relatedClients(t, map[string]runtime.Object{"persistentvolumes": volume("released", corev1.VolumeReleased)})
-	d, err = GetDetail(context.Background(), clients, "persistentvolumes", "", "released")
+	d, err = GetDetail(context.Background(), clients, Direct(clients), "persistentvolumes", "", "released")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +206,7 @@ func TestStorageClassDetail(t *testing.T) {
 		&corev1.PersistentVolumeClaim{ObjectMeta: meta("b", "z"), Spec: corev1.PersistentVolumeClaimSpec{StorageClassName: &other}},
 	)
 
-	d, err := GetDetail(context.Background(), clients, "storageclasses", "", "standard")
+	d, err := GetDetail(context.Background(), clients, Direct(clients), "storageclasses", "", "standard")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -298,7 +298,7 @@ func TestStatefulSetClaims(t *testing.T) {
 		claim("data-dbx-0", ""),     // another StatefulSet's
 	)
 
-	d, err := GetDetail(context.Background(), clients, "statefulsets", "data", "db")
+	d, err := GetDetail(context.Background(), clients, Direct(clients), "statefulsets", "data", "db")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -19,35 +19,35 @@ import (
 
 func someObjects() *fake.Clientset {
 	return fake.NewClientset(
-		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "api-1", Namespace: "web"}},
-		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "api", Namespace: "web"}},
-		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "db-password", Namespace: "data"}},
-		&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "worker-1"}},
+		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "api-1", Namespace: "web", UID: "u-pod"}},
+		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "api", Namespace: "web", UID: "u-service"}},
+		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "db-password", Namespace: "data", UID: "u-secret"}},
+		&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "worker-1", UID: "u-node"}},
 		&corev1.Event{ObjectMeta: metav1.ObjectMeta{Name: "api-1.1", Namespace: "web"}},
-		&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "db", Namespace: "data"}},
-		&storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: "standard"}},
+		&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "db", Namespace: "data", UID: "u-claim"}},
+		&storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: "standard", UID: "u-class"}},
 	)
 }
 
 func TestListNames(t *testing.T) {
-	dynamic := fakeDynamic(
-		object("Gateway", "web", "main", nil),
-		object("GatewayClass", "", "nginx", nil),
-	)
-	index, err := ListNames(context.Background(), Clients{Kube: someObjects(), Dynamic: dynamic})
+	gateway := object("Gateway", "web", "main", nil)
+	gateway.SetUID("u-gateway")
+	class := object("GatewayClass", "", "nginx", nil)
+	class.SetUID("u-gatewayclass")
+	index, err := ListNames(context.Background(), Direct(Clients{Kube: someObjects(), Dynamic: fakeDynamic(gateway, class)}))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	want := []ObjectName{
-		{Resource: "gatewayclasses", Name: "nginx"},
-		{Resource: "gateways", Namespace: "web", Name: "main"},
-		{Resource: "nodes", Name: "worker-1"},
-		{Resource: "persistentvolumeclaims", Namespace: "data", Name: "db"},
-		{Resource: "pods", Namespace: "web", Name: "api-1"},
-		{Resource: "secrets", Namespace: "data", Name: "db-password"},
-		{Resource: "services", Namespace: "web", Name: "api"},
-		{Resource: "storageclasses", Name: "standard"},
+		{Resource: "gatewayclasses", UID: "u-gatewayclass", Name: "nginx"},
+		{Resource: "gateways", UID: "u-gateway", Namespace: "web", Name: "main"},
+		{Resource: "nodes", UID: "u-node", Name: "worker-1"},
+		{Resource: "persistentvolumeclaims", UID: "u-claim", Namespace: "data", Name: "db"},
+		{Resource: "pods", UID: "u-pod", Namespace: "web", Name: "api-1"},
+		{Resource: "secrets", UID: "u-secret", Namespace: "data", Name: "db-password"},
+		{Resource: "services", UID: "u-service", Namespace: "web", Name: "api"},
+		{Resource: "storageclasses", UID: "u-class", Name: "standard"},
 	}
 	// Namespaces are listed too; the fake has none, so they don't show here.
 	if !reflect.DeepEqual(index.Objects, want) {
@@ -59,7 +59,7 @@ func TestListNames(t *testing.T) {
 }
 
 func TestListNamesLeavesOutEvents(t *testing.T) {
-	index, err := ListNames(context.Background(), Clients{Kube: someObjects(), Dynamic: fakeDynamic()})
+	index, err := ListNames(context.Background(), Direct(Clients{Kube: someObjects(), Dynamic: fakeDynamic()}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func TestListNamesLeavesOutEvents(t *testing.T) {
 }
 
 func TestListNamesWithoutGatewayAPI(t *testing.T) {
-	index, err := ListNames(context.Background(), Clients{Kube: someObjects(), Dynamic: notInstalled()})
+	index, err := ListNames(context.Background(), Direct(Clients{Kube: someObjects(), Dynamic: notInstalled()}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +95,7 @@ func TestListNamesSkipsForbiddenKinds(t *testing.T) {
 	kube.PrependReactor("list", "secrets", func(action clienttesting.Action) (bool, runtime.Object, error) {
 		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "secrets"}, "", errors.New("RBAC"))
 	})
-	index, err := ListNames(context.Background(), Clients{Kube: kube, Dynamic: fakeDynamic()})
+	index, err := ListNames(context.Background(), Direct(Clients{Kube: kube, Dynamic: fakeDynamic()}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func TestListNamesReportsOtherFailures(t *testing.T) {
 	kube.PrependReactor("list", "pods", func(clienttesting.Action) (bool, runtime.Object, error) {
 		return true, nil, errors.New("timeout")
 	})
-	index, err := ListNames(context.Background(), Clients{Kube: kube, Dynamic: fakeDynamic()})
+	index, err := ListNames(context.Background(), Direct(Clients{Kube: kube, Dynamic: fakeDynamic()}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +132,7 @@ func TestListNamesFailsWhenNothingCanBeRead(t *testing.T) {
 	dynamic.PrependReactor("list", "*", func(clienttesting.Action) (bool, runtime.Object, error) {
 		return true, nil, errors.New("connection refused")
 	})
-	if _, err := ListNames(context.Background(), Clients{Kube: kube, Dynamic: dynamic}); err == nil {
+	if _, err := ListNames(context.Background(), Direct(Clients{Kube: kube, Dynamic: dynamic})); err == nil {
 		t.Fatal("want an error when the cluster can't be read at all")
 	}
 }
@@ -143,7 +143,7 @@ func TestEveryListerRowHasMeta(t *testing.T) {
 	clients := Clients{Kube: fake.NewClientset(), Dynamic: fakeDynamic()}
 	hasMeta := reflect.TypeFor[interface{ meta() Meta }]()
 	for name, lister := range Listers {
-		rows, err := lister(context.Background(), clients, Query{})
+		rows, err := lister(context.Background(), Direct(clients), Query{})
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}

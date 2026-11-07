@@ -6,8 +6,6 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
 // Job is one row of the job list.
@@ -21,15 +19,15 @@ type Job struct {
 	Finished    *time.Time `json:"finished"` // null while the job is still going
 }
 
-func listJobs(ctx context.Context, client kubernetes.Interface, q Query) ([]Job, error) {
-	list, err := client.BatchV1().Jobs(q.Namespace).List(ctx, metav1.ListOptions{})
+func listJobs(ctx context.Context, src Source, q Query) ([]Job, error) {
+	items, err := ListOf[*batchv1.Job](ctx, src, "jobs", q)
 	if err != nil {
 		return nil, err
 	}
 
-	rows := make([]Job, 0, len(list.Items))
-	for _, job := range list.Items {
-		status, finished := jobStatus(&job)
+	rows := make([]Job, 0, len(items))
+	for _, job := range items {
+		status, finished := jobStatus(job)
 		rows = append(rows, Job{
 			Meta:        metaOf(job.ObjectMeta),
 			Status:      status,

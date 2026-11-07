@@ -35,7 +35,7 @@ func TestSecretDetailHidesValues(t *testing.T) {
 	clients := detailClients(t, map[string]runtime.Object{
 		"secrets": &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "web", Name: "db",
+				Namespace: "web", Name: "db", UID: "u-db",
 				Annotations: map[string]string{
 					// kubectl apply stores the whole Secret here, values included.
 					"kubectl.kubernetes.io/last-applied-configuration": `{"data":{"password":"aHVudGVyMg=="}}`,
@@ -47,9 +47,12 @@ func TestSecretDetailHidesValues(t *testing.T) {
 		},
 	})
 
-	d, err := GetDetail(context.Background(), clients, "secrets", "web", "db")
+	d, err := GetDetail(context.Background(), clients, Direct(clients), "secrets", "web", "db")
 	if err != nil {
 		t.Fatal(err)
+	}
+	if d.UID != "u-db" {
+		t.Errorf("uid = %q, want u-db", d.UID)
 	}
 	for _, leak := range []string{"hunter2", "aHVudGVyMg"} {
 		if strings.Contains(d.YAML, leak) {
@@ -95,7 +98,7 @@ func TestPodDetail(t *testing.T) {
 		},
 	})
 
-	d, err := GetDetail(context.Background(), clients, "pods", "web", "api-1")
+	d, err := GetDetail(context.Background(), clients, Direct(clients), "pods", "web", "api-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +146,7 @@ func TestHTTPRouteDetail(t *testing.T) {
 	dyn := fakeDynamic(route)
 	clients := Clients{Kube: fake.NewClientset(), Dynamic: dyn}
 
-	d, err := GetDetail(context.Background(), clients, "httproutes", "web", "api")
+	d, err := GetDetail(context.Background(), clients, Direct(clients), "httproutes", "web", "api")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +163,7 @@ func TestHTTPRouteDetail(t *testing.T) {
 }
 
 func TestDetailUnknownKind(t *testing.T) {
-	_, err := GetDetail(context.Background(), Clients{Kube: fake.NewClientset(), Dynamic: fakeDynamic()}, "widgets", "", "x")
+	_, err := GetDetail(context.Background(), Clients{}, Direct(Clients{}), "widgets", "", "x")
 	if !errors.Is(err, ErrUnknownKind) {
 		t.Fatalf("got %v, want ErrUnknownKind", err)
 	}

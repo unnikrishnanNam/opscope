@@ -20,8 +20,8 @@ and how changes are checked and released.
 Every change keeps these properties. A pull request that would break one needs a discussion in an
 issue first.
 
-- **Read-only.** Opscope uses only `get` and `list`. It never creates, changes or deletes anything
-  in a cluster, and it doesn't offer commands that would, not even as text to copy.
+- **Read-only.** Opscope uses only `get`, `list` and `watch`. It never creates, changes or deletes
+  anything in a cluster, and it doesn't offer commands that would, not even as text to copy.
 - **Safe by default.** Opscope has no login, so it listens on `127.0.0.1` in every example and is
   reached through a port-forward in a cluster. Secret values are fetched one key at a time and never
   cached; logs are never cached.
@@ -120,6 +120,10 @@ only in development and is left out of production builds.
 backend/                  Go server
   main.go                 entry point: reads env vars, loads clusters, serves, shuts down cleanly
   internal/clusters/      known clusters (environment, in-cluster, added in the UI), clients for each
+  internal/collector/     one collector per cluster: watches every kind into an in-memory cache,
+                          which pages read through a Source; falls back to polling or direct reads
+                          where the cluster's permissions require it
+  internal/bus/           typed events between parts of Opscope: every change a collector sees
   internal/resources/     one file per resource type: lists it and flattens it into table rows;
                           detail.go builds detail pages, gatewayapi.go reads Gateway API resources,
                           storage.go and storage_detail.go the storage kinds, names.go builds the
@@ -203,13 +207,15 @@ runs the Go tests and the frontend tests. Before opening a pull request, also ch
 
 ### Adding a resource type
 
-1. **Backend:** a file in `internal/resources/` that lists it and flattens each object into a row
-   (rows embed `Meta`), and one line in `Listers` in `resources.go`. The type is then in
-   `GET /api/clusters/{id}/{resource}` and in the search index.
+1. **Backend:** a file in `internal/resources/` that lists it from a `Source` (`ListOf`) and
+   flattens each object into a row (rows embed `Meta`), one line in `Listers` in `resources.go`,
+   and one in `typedLists` in `source.go` for reading it straight from the cluster (not needed for
+   Gateway API kinds, which use the dynamic client). The type is then in
+   `GET /api/clusters/{id}/{resource}` and in the search index, and the collector watches it.
 2. **Detail page:** an entry in `kinds` in `detail.go`, and kind-specific sections in
    `detail_sections.go` if it needs any.
 3. **Permissions:** the resource in the ClusterRole in `deploy/kubernetes/opscope.yaml`, with only
-   `get` and `list`.
+   `get`, `list` and `watch`.
 4. **Frontend:** an entry in `src/sections.js` (with `aliases` for kubectl's short names) and its
    columns in `src/columns.jsx`. The sidebar, the route, the palette's "Go to" and object search
    follow from these.

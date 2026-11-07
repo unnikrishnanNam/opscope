@@ -1,0 +1,117 @@
+# Permission scenarios: users who may read less than opscope.yaml grants, to
+# check how Opscope reads each kind with what it's allowed (watch, poll,
+# direct, forbidden). Run them on a throwaway kind cluster; see README.md in
+# this folder.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-a
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-b
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: opscope-users
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: team-a
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: web }
+  template:
+    metadata:
+      labels: { app: web }
+    spec:
+      containers:
+        - name: web
+          image: registry.k8s.io/pause:3.10
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: settings
+  namespace: team-b
+data:
+  mode: fast
+---
+# A user who can read everything opscope.yaml grants, but not watch it:
+# every kind is polled.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: no-watch
+  namespace: opscope-users
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: opscope-test-no-watch
+rules:
+  - apiGroups: [""]
+    resources: [namespaces, nodes, pods, services, configmaps, events, persistentvolumeclaims, persistentvolumes]
+    verbs: [get, list]
+  - apiGroups: [apps]
+    resources: [deployments, statefulsets, daemonsets]
+    verbs: [get, list]
+  - apiGroups: [batch]
+    resources: [jobs, cronjobs]
+    verbs: [get, list]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses]
+    verbs: [get, list]
+  - apiGroups: [storage.k8s.io]
+    resources: [storageclasses]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: opscope-test-no-watch
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: opscope-test-no-watch
+subjects:
+  - kind: ServiceAccount
+    name: no-watch
+    namespace: opscope-users
+---
+# A user who can read one namespace only: namespaced kinds are read
+# directly, a namespace at a time; cluster-wide kinds aren't allowed.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: team-a
+  namespace: opscope-users
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: opscope-test-team-a
+  namespace: team-a
+rules:
+  - apiGroups: ["", apps, batch]
+    resources: [pods, services, configmaps, events, deployments, statefulsets, daemonsets, jobs, cronjobs]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: opscope-test-team-a
+  namespace: team-a
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: opscope-test-team-a
+subjects:
+  - kind: ServiceAccount
+    name: team-a
+    namespace: opscope-users

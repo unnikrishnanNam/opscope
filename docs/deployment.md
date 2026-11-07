@@ -22,7 +22,7 @@ Opscope ships as one container image that serves both the web UI and its API.
 You need:
 
 - A Kubernetes cluster whose API server Opscope can reach, and a service account or kubeconfig that
-  can `get` and `list` the resources it shows (see [Permissions](#permissions)).
+  can `get`, `list` and `watch` the resources it shows (see [Permissions](#permissions)).
 - Optional: [metrics-server](https://github.com/kubernetes-sigs/metrics-server), for CPU and memory
   usage. Without it, the usage columns and charts explain that it's missing.
 - Optional: [Gateway API](https://gateway-api.sigs.k8s.io/) (`gateway.networking.k8s.io/v1`), for
@@ -54,7 +54,7 @@ The manifests in each release tag use that release's published image, so you can
 straight from GitHub:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.3.0/deploy/kubernetes/opscope.yaml
+kubectl apply -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.4.0/deploy/kubernetes/opscope.yaml
 ```
 
 From a clone of the repository, apply `deploy/kubernetes/opscope.yaml` the same way. Apply the file,
@@ -88,14 +88,65 @@ kubectl -n opscope logs deployment/opscope
   seccomp profile. It writes only to `/data`.
 - Liveness and readiness probes use `/api/health`.
 - One replica: usage history is kept in memory, so one copy keeps it consistent.
-- Requests 20m CPU and 48 MiB of memory, with a 256 MiB memory limit.
+- Requests 20m CPU and 64 MiB of memory, with a 256 MiB memory limit, and `GOMEMLIMIT` set just
+  under it (see [Memory](#memory)).
 - On `SIGTERM`, Opscope stops accepting connections and gives running requests up to 10 seconds to
   finish; open log streams are closed after that.
 
+### Memory
+
+Opscope keeps a copy of the objects it shows, so its memory grows with the size of the clusters
+it's connected to. It keeps less than the cluster sends: no Secret or ConfigMap values, no list of
+fields each manager owns, and no `kubectl apply` copy of the object. Measured per 1,000 objects
+in memory:
+
+| Kind                                  | Per 1,000 objects                        |
+| ------------------------------------- | ---------------------------------------- |
+| Pods                                  | 11–15 MiB                                |
+| Deployments, StatefulSets, DaemonSets | 6–12 MiB (each holds its pod template)   |
+| Jobs                                  | about 8 MiB                              |
+| Nodes                                 | 7–20 MiB (mostly the images they hold)   |
+| PersistentVolumeClaims and volumes    | about 4 MiB                              |
+| Services                              | about 2 MiB                              |
+| ConfigMaps, Secrets                   | about 2 MiB, whatever their values' size |
+| Events, Namespaces                    | about 1.3 MiB                            |
+
+On top of that copy, the process needs about 25 MiB. Go's garbage collector also lets memory grow
+to about twice what Opscope holds before it cleans up, unless `GOMEMLIMIT` tells it to work harder
+near a limit. The manifest sets it to 230 MiB, under its 256 MiB limit.
+
+Pods and Events are most of it. Roughly, for one cluster:
+
+| Cluster                                          | Copy kept | Memory used | Memory limit (`GOMEMLIMIT`)    |
+| ------------------------------------------------ | --------- | ----------- | ------------------------------ |
+| 500 pods, 2,000 events, 1,000 other objects      | 12 MiB    | 40–60 MiB   | 256 MiB (230 MiB), the default |
+| 2,000 pods, 10,000 events, 4,000 other objects   | 50 MiB    | 100–130 MiB | 256 MiB (230 MiB), the default |
+| 5,000 pods, 25,000 events, 10,000 other objects  | 130 MiB   | 200–280 MiB | 512 MiB (460 MiB)              |
+| 10,000 pods, 50,000 events, 20,000 other objects | 250 MiB   | 400–530 MiB | 1 GiB (920 MiB)                |
+
+Each connected cluster adds its own copy. To count a cluster's pods and events:
+
+```bash
+kubectl get pods -A --no-headers | wc -l
+kubectl get events -A --no-headers | wc -l
+```
+
+If memory is tighter than this allows, [turn live data off](#turning-live-data-off): Opscope then
+keeps no copy and uses 30–40 MiB, whatever the size of the cluster.
+
+With Docker, there's no limit unless you set one. If you do (`--memory 512m`), set `GOMEMLIMIT`
+about 10% under it (`-e GOMEMLIMIT=460MiB`).
+
 ## Permissions
 
-Opscope only ever uses `get` and `list`. It never creates, changes or deletes anything, and it polls
-rather than watching.
+Opscope only ever uses `get`, `list` and `watch`, all of them read verbs. It never creates, changes
+or deletes anything.
+
+For each connected cluster, Opscope lists every kind once and then watches it: the API server sends
+each change as it happens, and Opscope keeps an up-to-date copy in memory that its pages read. Pages
+load faster, every page shows the same moment, and the cluster gets one watch per kind instead of a
+list for every page view. The detail page's YAML, logs and Secret values are still read from the
+cluster each time you open them.
 
 | API group                   | Resources                                             | Used for               |
 | --------------------------- | ----------------------------------------------------- | ---------------------- |
@@ -111,26 +162,58 @@ rather than watching.
 | core (`""`)                 | secrets (`secrets-access.yaml` only)                  | Secrets pages, Reveal  |
 | core (`""`)                 | nodes/proxy (`get`, `volume-usage.yaml` only)         | Volume usage (opt-in)  |
 
-`opscope.yaml` grants everything above except the last two rows. The same applies to a kubeconfig
-used from outside the cluster: Opscope can show only what that user is allowed to read. Anything it
-can't read is reported on the page that needs it, and the rest keeps working.
+Each row is `get`, `list` and `watch` unless it says otherwise; `metrics.k8s.io` has no watch, so it
+gets `get` and `list`. `opscope.yaml` grants everything above except the last two rows. The same
+applies to a kubeconfig used from outside the cluster: Opscope can show only what that user is
+allowed to read. Anything it can't read is reported on the page that needs it, and the rest keeps
+working.
+
+### With less access
+
+Opscope works with what the role allows, kind by kind:
+
+- **Without `watch`,** it lists that kind every 30 seconds instead, so its pages are up to 30
+  seconds behind.
+- **Without `list` across all namespaces,** for example a kubeconfig user who can read only some
+  namespaces, pages read that kind from the cluster each time, in the namespace you choose, as
+  Opscope did before v1.4.
+- **Without `list` at all,** the page for that kind says it isn't allowed.
+
+It checks again every five minutes, so a permission granted later is picked up without a restart.
+When a cluster stops answering, pages read it directly and show the error, rather than a copy that
+may be out of date, until it answers again.
+
+The top bar says which applies: **Live** when pages update within a few seconds of a change,
+**Every 30 s** or **Every 10 s** when some kinds can't be watched or listed across namespaces.
+Click it for the kinds and the reason. Detail pages always read **Every 10 s**: they're read from
+the cluster each time, as before.
+
+### Turning live data off
+
+`OPSCOPE_LIVE=false` turns this off: Opscope keeps no copy, and every page asks the cluster when it
+loads and again every 10 seconds, as before v1.4. It's a fallback, for example if memory is tight or
+something looks wrong with live data; `watch` is then never used.
 
 ### Secret access
 
 Secrets are listed by key name only. A value is fetched only when someone chooses "Reveal" on one
 key, is sent with `Cache-Control: no-store`, and never appears in the YAML view.
 
+With `watch`, the API server sends Opscope each Secret that changes, values included, just as it
+does when the Secrets list is loaded. Opscope drops the values as each Secret arrives and keeps
+only its type and key names, so values are never stored, cached or logged.
+
 **Granting Secret access is a deliberate choice.** With `secrets-access.yaml` applied, the Opscope
 pod can read every Secret in the cluster, and so can anyone who can reach Opscope. To grant it:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.3.0/deploy/kubernetes/secrets-access.yaml
+kubectl apply -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.4.0/deploy/kubernetes/secrets-access.yaml
 ```
 
 To remove it again:
 
 ```bash
-kubectl delete -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.3.0/deploy/kubernetes/secrets-access.yaml
+kubectl delete -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.4.0/deploy/kubernetes/secrets-access.yaml
 ```
 
 The Secrets pages then say that this user isn't allowed to read them.
@@ -189,6 +272,13 @@ There are two safe ways to let people in:
 
 Don't expose Opscope with an Ingress, a Gateway or a `LoadBalancer` Service without such a proxy.
 
+Each browser tab keeps one connection open for live updates
+([server-sent events](api.md#get-apiclustersidlivestream)), with a message at least every 15
+seconds. A proxy in front of Opscope must pass it on without buffering and without closing it
+sooner than that; nginx is told not to buffer it, and other proxies' defaults are usually fine.
+If the connection can't be kept, pages fall back to asking every 10 seconds, and the top bar says
+**Reconnecting**.
+
 ## Keeping clusters added in the UI
 
 Other clusters can be added in the UI of an in-cluster Opscope too. They are saved in `/data`, which
@@ -225,8 +315,8 @@ Each release is published to the GitHub Container Registry for `linux/amd64` and
 
 | Tag       | Points to                                         |
 | --------- | ------------------------------------------------- |
-| `v1.3.0`  | That release, never moved                         |
-| `1.3`     | The latest release of that minor version          |
+| `v1.4.0`  | That release, never moved                         |
+| `1.4`     | The latest release of that minor version          |
 | `latest`  | The latest release (pre-releases are never tagged `latest`) |
 
 On a server, pin a version tag, so that a restart never upgrades Opscope by surprise. The commands
@@ -251,6 +341,7 @@ Opscope is configured with environment variables:
 | `OPSCOPE_IN_CLUSTER`   | (off)              | `true`: use the pod's service account, when running in a pod      |
 | `OPSCOPE_CLUSTER_NAME` | context name       | Display name for the environment or in-cluster cluster            |
 | `OPSCOPE_VOLUME_USAGE` | (off)              | `true`: show how full volumes are (see [Volume usage](#volume-usage)) |
+| `OPSCOPE_LIVE`         | (on)               | `false`: keep no live copy; pages ask the cluster each time (see [Turning live data off](#turning-live-data-off)) |
 | `DATA_DIR`             | `../data`          | Where clusters added in the UI are saved (`/data` in the image)   |
 | `STATIC_DIR`           | `../frontend/dist` | Folder with the built web UI (`/app/web` in the image)            |
 
@@ -275,11 +366,11 @@ Usage history is kept in memory and starts empty after a restart. Each release's
 **In a cluster,** delete the optional roles you applied, then `opscope.yaml`:
 
 ```bash
-kubectl delete -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.3.0/deploy/kubernetes/secrets-access.yaml --ignore-not-found
+kubectl delete -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.4.0/deploy/kubernetes/secrets-access.yaml --ignore-not-found
 ```
 
 ```bash
-kubectl delete -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.3.0/deploy/kubernetes/opscope.yaml
+kubectl delete -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.4.0/deploy/kubernetes/opscope.yaml
 ```
 
 Do the same for `volume-usage.yaml` if you applied it. Deleting `opscope.yaml` deletes the

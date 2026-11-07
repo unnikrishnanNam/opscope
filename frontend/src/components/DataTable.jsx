@@ -21,7 +21,8 @@ const SKELETON_ROWS = 8;
 //   className  optional: "name", "mono", "num" (right-aligned) or "muted-cell"
 //
 // Other props:
-//   rows       the data; null while loading (skeleton rows are shown)
+//   rows       the data; null while loading (skeleton rows are shown). Rows
+//              are told apart by uid, or by namespace and name without one
 //   noun       what the rows are, plural: "pods"
 //   linkTo     optional (row) => URL: the first column becomes a link, and
 //              clicking anywhere on the row opens it
@@ -132,7 +133,7 @@ export default function DataTable({
                 const url = linkTo?.(row);
                 return (
                   <tr
-                    key={`${row.namespace ?? ""}/${row.name}`}
+                    key={row.uid || `${row.namespace ?? ""}/${row.name}`}
                     className={url ? "is-link" : undefined}
                     onClick={url ? (e) => openRow(e, url) : undefined}
                   >

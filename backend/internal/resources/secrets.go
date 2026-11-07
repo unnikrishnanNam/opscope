@@ -7,6 +7,7 @@ import (
 	"sort"
 	"unicode/utf8"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -20,14 +21,14 @@ type Secret struct {
 	Keys []string `json:"keys"`
 }
 
-func listSecrets(ctx context.Context, client kubernetes.Interface, q Query) ([]Secret, error) {
-	list, err := client.CoreV1().Secrets(q.Namespace).List(ctx, metav1.ListOptions{})
+func listSecrets(ctx context.Context, src Source, q Query) ([]Secret, error) {
+	items, err := ListOf[*corev1.Secret](ctx, src, "secrets", q)
 	if err != nil {
 		return nil, err
 	}
 
-	rows := make([]Secret, 0, len(list.Items))
-	for _, s := range list.Items {
+	rows := make([]Secret, 0, len(items))
+	for _, s := range items {
 		keys := []string{}
 		for key := range s.Data {
 			keys = append(keys, key)

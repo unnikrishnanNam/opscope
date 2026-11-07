@@ -86,7 +86,7 @@ func TestListGateways(t *testing.T) {
 		},
 	}))
 
-	gateways, err := listGateways(context.Background(), client, Query{})
+	gateways, err := listGateways(context.Background(), dynSource(client), Query{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +137,7 @@ func TestListHTTPRoutes(t *testing.T) {
 		},
 	}))
 
-	routes, err := listHTTPRoutes(context.Background(), client, Query{Namespace: "web"})
+	routes, err := listHTTPRoutes(context.Background(), dynSource(client), Query{Namespace: "web"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +184,7 @@ func TestListGatewayClasses(t *testing.T) {
 		"spec":   map[string]any{"controllerName": "gateway.nginx.org/nginx-gateway-controller"},
 		"status": map[string]any{"conditions": []any{condition("Accepted", "True", "")}},
 	})
-	classes, err := listGatewayClasses(context.Background(), fakeDynamic(class), Query{Namespace: "ignored"})
+	classes, err := listGatewayClasses(context.Background(), dynSource(fakeDynamic(class)), Query{Namespace: "ignored"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,13 +204,13 @@ func notInstalled() *dynamicfake.FakeDynamicClient {
 }
 
 func TestGatewayAPINotInstalled(t *testing.T) {
-	_, err := listGateways(context.Background(), notInstalled(), Query{})
+	_, err := listGateways(context.Background(), dynSource(notInstalled()), Query{})
 	if !errors.Is(err, ErrGatewayAPINotInstalled) {
 		t.Fatalf("got %v, want ErrGatewayAPINotInstalled", err)
 	}
 
 	// The overview still works, just without Gateway API counts.
-	o, err := GetOverview(context.Background(), Clients{Kube: fake.NewClientset(), Dynamic: notInstalled()}, Query{})
+	o, err := GetOverview(context.Background(), Direct(Clients{Kube: fake.NewClientset(), Dynamic: notInstalled()}), Query{})
 	if err != nil {
 		t.Fatal(err)
 	}

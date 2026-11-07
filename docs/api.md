@@ -12,7 +12,8 @@ Opscope can read; see [Giving people access](deployment.md#giving-people-access)
 
 ## Conventions
 
-- All endpoints are `GET` unless noted, and return JSON, except pod logs, which are plain text.
+- All endpoints are `GET` unless noted, and return JSON, except pod logs, which are plain text,
+  and the live stream, which is server-sent events.
 - Requests that read a cluster never change it. The only endpoints that change anything are
   `POST` and `DELETE` on `/api/clusters`, and they change Opscope's own list of clusters, not a
   cluster.
@@ -51,7 +52,7 @@ or "turned off" from an error:
 ### `GET /api/health`
 
 ```json
-{ "status": "ok", "version": "v1.3.0" }
+{ "status": "ok", "version": "v1.4.0" }
 ```
 
 Used by the Kubernetes liveness and readiness probes. It doesn't contact any cluster.
@@ -112,8 +113,9 @@ started.
 
 ### `GET /api/clusters/{id}/{resource}`
 
-One row per object of a resource type, with the columns its table shows. Every row has `name`,
-`namespace` (namespaced kinds only) and `created`.
+One row per object of a resource type, with the columns its table shows. Every row has `uid`,
+`name`, `namespace` (namespaced kinds only) and `created`. The `uid` is the object's
+`metadata.uid`: unlike the name, it isn't reused when an object is deleted and made again.
 
 | Parameter    | Effect                                                         |
 | ------------ | -------------------------------------------------------------- |
@@ -146,11 +148,11 @@ them. `gatewayAPI` is `null` when the cluster has no Gateway API.
 
 ### `GET /api/clusters/{id}/names`
 
-Every object's resource type, namespace and name, for search. Events are not included.
+Every object's resource type, UID, namespace and name, for search. Events are not included.
 
 ```json
 {
-  "objects": [{ "resource": "pods", "namespace": "web", "name": "api-7d9f" }],
+  "objects": [{ "resource": "pods", "uid": "6f1c0d2e-…", "namespace": "web", "name": "api-7d9f" }],
   "skipped": [{ "resource": "secrets", "code": "forbidden" }]
 }
 ```
@@ -209,6 +211,88 @@ A pod's logs as plain text, sent with `Cache-Control: no-store`.
 
 Without `follow`, a request is cut off after 30 seconds. A request the API server rejects (no
 previous run, a container that doesn't exist) returns `400` with its message.
+
+## Live updates
+
+Opscope keeps a copy of each cluster in memory, watched for changes, and lists are read from it
+(see [Permissions](deployment.md#permissions)). These endpoints say how that copy is kept and
+when it changes. With live data turned off (`OPSCOPE_LIVE=false`), every
+list is read from the cluster on each request.
+
+### `GET /api/clusters/{id}/live`
+
+```json
+{
+  "enabled": true,
+  "state": "live",
+  "kinds": [
+    { "resource": "pods", "mode": "watch", "synced": true, "objects": 412, "lastChange": "2026-11-02T10:04:11Z" },
+    { "resource": "secrets", "mode": "forbidden", "reason": "listing isn't allowed", "synced": false, "objects": 0, "lastChange": null },
+    { "resource": "gateways", "mode": "not_installed", "reason": "not installed on this cluster", "synced": false, "objects": 0, "lastChange": null }
+  ]
+}
+```
+
+`state` is the cluster's as a whole:
+
+| `state`       | Meaning                                                                        |
+| ------------- | ------------------------------------------------------------------------------ |
+| `live`        | Every kind is watched, or read from the cluster on each request                 |
+| `partial`     | Some kinds may only be listed, not watched, so they're listed every 30 seconds |
+| `connecting`  | Some kinds haven't been read for the first time yet                             |
+| `unreachable` | The cluster doesn't answer; lists are read from it, and fail, until it does    |
+| `off`         | Live data is turned off; `enabled` is `false` and `kinds` is empty             |
+
+Each kind's `mode` says how it's read:
+
+| `mode`          | How                                                                                 |
+| --------------- | ----------------------------------------------------------------------------------- |
+| `watch`         | Listed once, then watched                                                           |
+| `poll`          | Listed every 30 seconds: watching isn't allowed                                     |
+| `direct`        | Read from the cluster on each request, one namespace at a time: listing across all namespaces isn't allowed |
+| `forbidden`     | Listing isn't allowed; its list answers `403`                                       |
+| `not_installed` | The cluster doesn't have it (Gateway API)                                           |
+| `pending`       | Not known yet, or the cluster didn't answer; read from the cluster meanwhile        |
+
+`synced` is whether a watched or polled kind has its first list, `objects` how many objects it
+holds, and `lastChange` when it last saw a change after that first list. `error` is the last
+failed list, watch or probe while the kind isn't synced. Opscope probes the kinds that aren't
+watched again every 5 minutes, so a permission granted or Gateway API installed is picked up
+without a restart.
+
+### `GET /api/clusters/{id}/live/stream`
+
+[Server-sent events](https://html.spec.whatwg.org/multipage/server-sent-events.html) that say
+when to fetch again. They never carry objects: a page that's told its kind changed asks for its
+list again.
+
+```
+event: status
+data: {"state":"live","kinds":[{"resource":"pods","mode":"watch"},{"resource":"secrets","mode":"forbidden","reason":"listing isn't allowed"}]}
+
+event: changed
+data: {"resource":"pods","namespaces":["default","shop"]}
+
+event: changed
+data: {"resource":"nodes"}
+
+event: heartbeat
+data: {}
+```
+
+| Event       | When                                                                                       |
+| ----------- | ------------------------------------------------------------------------------------------ |
+| `status`    | First, and whenever `state` or a kind's mode changes; `/live` without counts or errors      |
+| `changed`   | Objects of `resource` were added, changed or deleted, in `namespaces` (left out for cluster-wide kinds); at most once a second per resource |
+| `resync`    | Changes may have been missed (the stream fell behind): fetch everything again              |
+| `heartbeat` | Every 15 seconds, so proxies keep the connection and a client can tell it's alive          |
+
+The stream sets `Cache-Control: no-cache` and `X-Accel-Buffering: no`, so an nginx in front of
+Opscope passes messages on at once. With live data off it answers `204 No Content`, which tells a
+browser's `EventSource` not to reconnect. A cluster whose collector hasn't started yet (for a
+moment after it's added) answers `503`.
+
+After reconnecting, fetch everything again: changes made while disconnected aren't replayed.
 
 ## Usage
 

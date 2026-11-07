@@ -26,6 +26,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
+	"opscope/internal/resources"
 )
 
 const (
@@ -95,13 +97,14 @@ func NewVolumes() *Volumes {
 }
 
 // Read returns usage for the claims in a namespace ("" for all). It asks
-// only the nodes running pods that mount claims there, all at once.
-func (v *Volumes) Read(ctx context.Context, clusterID string, kube kubernetes.Interface, namespace string) (*VolumeReport, error) {
-	pods, err := kube.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+// only the nodes running pods that mount claims there, all at once, through
+// kube; the pods come from src, usually the watch cache.
+func (v *Volumes) Read(ctx context.Context, clusterID string, kube kubernetes.Interface, src resources.Source, namespace string) (*VolumeReport, error) {
+	pods, err := resources.ListOf[*corev1.Pod](ctx, src, "pods", resources.Query{Namespace: namespace})
 	if err != nil {
 		return nil, err
 	}
-	claimsByNode := claimsInUse(pods.Items)
+	claimsByNode := claimsInUse(pods)
 	nodes := make([]string, 0, len(claimsByNode))
 	for node := range claimsByNode {
 		nodes = append(nodes, node)
@@ -263,7 +266,7 @@ func parseSummary(raw []byte) ([]VolumeUsage, error) {
 // claimsInUse lists, per node, the claims mounted by pods running there:
 // "namespace/name", sorted. Generic ephemeral volumes count too; their
 // claim is named <pod>-<volume>.
-func claimsInUse(pods []corev1.Pod) map[string][]string {
+func claimsInUse(pods []*corev1.Pod) map[string][]string {
 	byNode := map[string][]string{}
 	for _, pod := range pods {
 		node := pod.Spec.NodeName

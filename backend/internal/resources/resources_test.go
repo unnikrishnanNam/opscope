@@ -12,11 +12,21 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 )
+
+// kubeSource and dynSource read straight from a fake client, as Opscope
+// does with collectors off.
+func kubeSource(kube kubernetes.Interface) Source { return Direct(Clients{Kube: kube}) }
+func dynSource(dyn dynamic.Interface) Source      { return Direct(Clients{Dynamic: dyn}) }
 
 // meta is a shortcut for building object metadata in tests.
 func meta(namespace, name string) metav1.ObjectMeta {
@@ -135,7 +145,7 @@ func TestListPodsFiltersByNamespaceAndSorts(t *testing.T) {
 		&corev1.Pod{ObjectMeta: meta("db", "c")},
 	)
 
-	pods, err := listPods(context.Background(), client, Query{Namespace: "web"})
+	pods, err := listPods(context.Background(), kubeSource(client), Query{Namespace: "web"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +156,7 @@ func TestListPodsFiltersByNamespaceAndSorts(t *testing.T) {
 		t.Errorf("unexpected counts for b: %+v", b)
 	}
 
-	all, _ := listPods(context.Background(), client, Query{})
+	all, _ := listPods(context.Background(), kubeSource(client), Query{})
 	if n := len(all); n != 3 {
 		t.Errorf("all namespaces: got %d pods, want 3", n)
 	}
@@ -158,7 +168,7 @@ func TestListDeploymentsDefaultsToOneReplica(t *testing.T) {
 		Status:     appsv1.DeploymentStatus{ReadyReplicas: 1, AvailableReplicas: 1, UpdatedReplicas: 1},
 	})
 
-	deployments, err := listDeployments(context.Background(), client, Query{})
+	deployments, err := listDeployments(context.Background(), kubeSource(client), Query{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,7 +230,7 @@ func TestListCronJobs(t *testing.T) {
 		Status:     batchv1.CronJobStatus{Active: []corev1.ObjectReference{{Name: "backup-1"}}},
 	})
 
-	cronJobs, err := listCronJobs(context.Background(), client, Query{Namespace: "ops"})
+	cronJobs, err := listCronJobs(context.Background(), kubeSource(client), Query{Namespace: "ops"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,8 +243,59 @@ func TestListCronJobs(t *testing.T) {
 func TestEveryListerWorksOnAnEmptyCluster(t *testing.T) {
 	clients := Clients{Kube: fake.NewClientset(), Dynamic: fakeDynamic()}
 	for name, lister := range Listers {
-		if _, err := lister(context.Background(), clients, Query{}); err != nil {
+		if _, err := lister(context.Background(), Direct(clients), Query{}); err != nil {
 			t.Errorf("%s: %v", name, err)
+		}
+	}
+}
+
+// Every row carries its object's UID, whichever lister made it. One object
+// of each kind, each with a UID named after its resource, makes a row that
+// lost or swapped its UID easy to spot.
+func TestEveryRowHasItsUID(t *testing.T) {
+	uid := func(resource string) types.UID { return types.UID("uid-" + resource) }
+	named := func(resource, namespace string) metav1.ObjectMeta {
+		return metav1.ObjectMeta{Namespace: namespace, Name: "one", UID: uid(resource)}
+	}
+	kube := fake.NewClientset(
+		&corev1.Namespace{ObjectMeta: named("namespaces", "")},
+		&corev1.Node{ObjectMeta: named("nodes", "")},
+		&corev1.Event{ObjectMeta: named("events", "web")},
+		&corev1.Pod{ObjectMeta: named("pods", "web")},
+		&appsv1.Deployment{ObjectMeta: named("deployments", "web")},
+		&appsv1.StatefulSet{ObjectMeta: named("statefulsets", "web")},
+		&appsv1.DaemonSet{ObjectMeta: named("daemonsets", "web")},
+		&batchv1.Job{ObjectMeta: named("jobs", "web")},
+		&batchv1.CronJob{ObjectMeta: named("cronjobs", "web")},
+		&corev1.ConfigMap{ObjectMeta: named("configmaps", "web")},
+		&corev1.Secret{ObjectMeta: named("secrets", "web")},
+		&corev1.Service{ObjectMeta: named("services", "web")},
+		&networkingv1.Ingress{ObjectMeta: named("ingresses", "web")},
+		&corev1.PersistentVolumeClaim{ObjectMeta: named("persistentvolumeclaims", "web")},
+		&corev1.PersistentVolume{ObjectMeta: named("persistentvolumes", "")},
+		&storagev1.StorageClass{ObjectMeta: named("storageclasses", "")},
+	)
+	var gatewayObjects []*unstructured.Unstructured
+	for _, o := range []struct{ kind, resource, namespace string }{
+		{"Gateway", "gateways", "web"},
+		{"HTTPRoute", "httproutes", "web"},
+		{"GatewayClass", "gatewayclasses", ""},
+	} {
+		obj := object(o.kind, o.namespace, "one", nil)
+		obj.SetUID(uid(o.resource))
+		gatewayObjects = append(gatewayObjects, obj)
+	}
+	clients := Clients{Kube: kube, Dynamic: fakeDynamic(gatewayObjects...)}
+
+	for resource, lister := range Listers {
+		rows, err := lister(context.Background(), Direct(clients), Query{})
+		if err != nil {
+			t.Errorf("%s: %v", resource, err)
+			continue
+		}
+		got := metas(rows)
+		if len(got) != 1 || got[0].UID != string(uid(resource)) {
+			t.Errorf("%s: rows %+v, want one with uid %q", resource, got, uid(resource))
 		}
 	}
 }
@@ -256,7 +317,7 @@ func TestListNodes(t *testing.T) {
 		},
 	})
 
-	nodes, err := listNodes(context.Background(), client, Query{})
+	nodes, err := listNodes(context.Background(), kubeSource(client), Query{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -287,7 +348,7 @@ func TestListEventsNewestFirst(t *testing.T) {
 		&corev1.Event{ObjectMeta: meta("web", "e2"), Type: "Warning", Reason: "Failed", LastTimestamp: newer},
 	)
 
-	events, err := listEvents(context.Background(), client, Query{})
+	events, err := listEvents(context.Background(), kubeSource(client), Query{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -317,7 +378,7 @@ func TestOverview(t *testing.T) {
 			Status: appsv1.DeploymentStatus{ReadyReplicas: 1}},
 	)
 
-	o, err := GetOverview(context.Background(), Clients{Kube: client, Dynamic: fakeDynamic()}, Query{})
+	o, err := GetOverview(context.Background(), Direct(Clients{Kube: client, Dynamic: fakeDynamic()}), Query{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -339,7 +400,7 @@ func TestSecretListNeverContainsValues(t *testing.T) {
 		Data:       map[string][]byte{"password": []byte("hunter2"), "user": []byte("admin")},
 	})
 
-	secrets, err := listSecrets(context.Background(), client, Query{})
+	secrets, err := listSecrets(context.Background(), kubeSource(client), Query{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -386,7 +447,7 @@ func TestListConfigMapsCountsBothKindsOfKeys(t *testing.T) {
 		BinaryData: map[string][]byte{"logo.png": {1}},
 	})
 
-	configMaps, err := listConfigMaps(context.Background(), client, Query{})
+	configMaps, err := listConfigMaps(context.Background(), kubeSource(client), Query{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -417,7 +478,7 @@ func TestListServices(t *testing.T) {
 		},
 	)
 
-	services, err := listServices(context.Background(), client, Query{})
+	services, err := listServices(context.Background(), kubeSource(client), Query{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -444,12 +505,37 @@ func TestListIngresses(t *testing.T) {
 		},
 	})
 
-	ingresses, err := listIngresses(context.Background(), client, Query{})
+	ingresses, err := listIngresses(context.Background(), kubeSource(client), Query{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	ing := ingresses[0]
 	if ing.Class != "nginx" || !ing.TLS || strings.Join(ing.Hosts, ",") != "example.com,*" {
 		t.Errorf("unexpected ingress row: %+v", ing)
+	}
+}
+
+// Every lister has an API address, so the collector watches every kind the
+// lists read.
+func TestEveryListerHasAKind(t *testing.T) {
+	got := map[string]Kind{}
+	for _, k := range Kinds() {
+		got[k.Resource] = k
+	}
+	for resource := range Listers {
+		k, ok := got[resource]
+		if !ok {
+			t.Errorf("%s: no entry in kinds or listOnly", resource)
+			continue
+		}
+		if k.GVR.Resource != resource {
+			t.Errorf("%s: GVR %v names another resource", resource, k.GVR)
+		}
+	}
+	if !got["gateways"].Custom || got["pods"].Custom {
+		t.Error("only Gateway API kinds are custom")
+	}
+	if !got["events"].Namespaced || got["nodes"].Namespaced {
+		t.Error("events are namespaced, nodes aren't")
 	}
 }

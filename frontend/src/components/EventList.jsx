@@ -19,7 +19,7 @@ export default function EventList({ clusterId, events, showObject = true, showNa
         const warning = e.type === "Warning";
         const link = showObject && detailPath(clusterId, e.objectResource, e.namespace, e.objectName);
         return (
-          <li key={`${e.namespace}/${e.name}`} className="event">
+          <li key={e.uid || `${e.namespace}/${e.name}`} className="event">
             <span className="event-mark">
               {warning ? <WarningIcon size={14} className="event-warning" /> : <span className="event-dot" />}
               <span className="visually-hidden">{warning ? "Warning:" : "Normal:"}</span>

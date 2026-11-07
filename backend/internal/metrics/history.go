@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"opscope/internal/clusters"
+	"opscope/internal/resources"
 )
 
 const (
@@ -106,12 +107,13 @@ func (h *History) Forget(keep map[string]bool) {
 
 // Collect samples every cluster now and then every SampleEvery, until ctx
 // is cancelled. Run it in its own goroutine: `go history.Collect(...)`.
-func (h *History) Collect(ctx context.Context, manager *clusters.Manager, logger *slog.Logger) {
+// sources says where to read each cluster's nodes from.
+func (h *History) Collect(ctx context.Context, manager *clusters.Manager, sources func(*clusters.Cluster) resources.Source, logger *slog.Logger) {
 	ticker := time.NewTicker(SampleEvery)
 	defer ticker.Stop()
 
 	for {
-		h.sampleAll(ctx, manager, logger)
+		h.sampleAll(ctx, manager, sources, logger)
 		select {
 		case <-ctx.Done():
 			return
@@ -121,13 +123,13 @@ func (h *History) Collect(ctx context.Context, manager *clusters.Manager, logger
 }
 
 // sampleAll takes one sample from each cluster, one after another.
-func (h *History) sampleAll(ctx context.Context, manager *clusters.Manager, logger *slog.Logger) {
+func (h *History) sampleAll(ctx context.Context, manager *clusters.Manager, sources func(*clusters.Cluster) resources.Source, logger *slog.Logger) {
 	known := map[string]bool{}
 	for _, c := range manager.List() {
 		known[c.ID] = true
 
 		sampleCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		nodes, err := ReadNodes(sampleCtx, c.Client, c.Dynamic)
+		nodes, err := ReadNodes(sampleCtx, sources(c), c.Dynamic)
 		cancel()
 		if err != nil {
 			// Unreachable clusters and clusters without metrics-server are

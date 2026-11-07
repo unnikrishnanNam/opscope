@@ -15,7 +15,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	"opscope/internal/bus"
 	"opscope/internal/clusters"
+	"opscope/internal/collector"
 	"opscope/internal/metrics"
 )
 
@@ -26,7 +28,8 @@ func newTestServer(t *testing.T) http.Handler {
 	os.WriteFile(filepath.Join(dir, "index.html"), []byte("<html>app</html>"), 0o644)
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	return New(Config{Version: "test", StaticDir: dir}, clusters.NewManager(t.TempDir()), metrics.NewHistory(), logger)
+	live := collector.NewSet(t.Context(), false, bus.New(), logger)
+	return New(Config{Version: "test", StaticDir: dir}, clusters.NewManager(t.TempDir()), live, metrics.NewHistory(), logger)
 }
 
 // get sends a GET request to the handler and returns the recorded response.

@@ -14,6 +14,7 @@ import { RefreshIcon } from "../components/icons.jsx";
 import { detailPath, nsQuery } from "../sections.js";
 import "./ResourceList.css";
 
+// Without live updates (see live.js), or for kinds that can't be watched.
 const REFRESH_MS = 10_000;
 // metrics-server refreshes its numbers every 15 seconds; asking more often
 // would only return the same values.
@@ -34,7 +35,7 @@ export default function ResourceList({ page }) {
   // Don't ask an unreachable cluster; Layout already shows why.
   const query = namespace ? `?namespace=${encodeURIComponent(namespace)}` : "";
   const path = reachable ? `/clusters/${cluster.id}/${page.resource}${query}` : null;
-  const { data, error, loading, updatedAt, reload } = useApi(path, { refreshMs: REFRESH_MS });
+  const { data, error, loading, updatedAt, reload } = useApi(path, { refreshMs: REFRESH_MS, live: page.resource });
 
   // Live usage, for pages that show it (nodes, pods, and claims when volume usage is on).
   const metricsPath = page.metrics && reachable ? `/clusters/${cluster.id}/metrics/${page.metrics}${query}` : null;
@@ -42,7 +43,7 @@ export default function ResourceList({ page }) {
   const rows = data && withUsage(data, usage.data, page.metrics);
 
   // The refresh button only spins for a refresh someone asked for, not for
-  // the automatic one every 10 seconds.
+  // the automatic ones.
   const [refreshing, setRefreshing] = useState(false);
   useEffect(() => {
     if (!loading) setRefreshing(false);

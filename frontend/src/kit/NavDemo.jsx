@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Button from "../components/Button.jsx";
 import ClusterSwitcher from "../components/ClusterSwitcher.jsx";
+import LiveStatus from "../components/LiveStatus.jsx";
 import Combobox from "../components/Combobox.jsx";
 import { ConfirmDialog, Dialog, Drawer } from "../components/Dialog.jsx";
 import { Breadcrumbs, PageHeader } from "../components/PageHeader.jsx";
@@ -9,6 +10,7 @@ import StatusBadge from "../components/StatusBadge.jsx";
 import { Tag } from "../components/Tag.jsx";
 import ThemeSwitch from "../components/ThemeSwitch.jsx";
 import { Logo } from "../components/Logo.jsx";
+import { describe } from "../live.js";
 import {
   CopyIcon,
   ExternalLinkIcon,
@@ -278,12 +280,90 @@ function Row({ label, children }) {
   );
 }
 
+/* --------------------------------------------------------------------------
+   Live status
+   -------------------------------------------------------------------------- */
+
+// Every state the top bar's indicator can be in, from describe() in live.js.
+const watched = (resources) => resources.map((resource) => ({ resource, mode: "watch" }));
+const LIVE_STATES = [
+  ["Live", { connection: "open", status: { state: "live", kinds: watched(["pods", "nodes"]) } }],
+  [
+    "Live, some not",
+    {
+      connection: "open",
+      status: {
+        state: "live",
+        kinds: [
+          ...watched(["pods"]),
+          { resource: "secrets", mode: "forbidden", reason: "listing isn't allowed" },
+          { resource: "gateways", mode: "not_installed", reason: "not installed on this cluster" },
+          { resource: "httproutes", mode: "not_installed", reason: "not installed on this cluster" },
+        ],
+      },
+    },
+  ],
+  [
+    "Polled",
+    {
+      connection: "open",
+      status: {
+        state: "partial",
+        kinds: [
+          { resource: "pods", mode: "poll", reason: "watching isn't allowed" },
+          { resource: "services", mode: "poll", reason: "watching isn't allowed" },
+          { resource: "configmaps", mode: "direct", reason: "listing across all namespaces isn't allowed" },
+        ],
+      },
+    },
+  ],
+  [
+    "One namespace",
+    {
+      connection: "open",
+      status: {
+        state: "live",
+        kinds: [
+          { resource: "pods", mode: "direct", reason: "listing across all namespaces isn't allowed" },
+          { resource: "nodes", mode: "forbidden", reason: "listing isn't allowed" },
+        ],
+      },
+    },
+  ],
+  // On a detail page, which is read on a timer: the page passes no live kinds.
+  ["Detail page", { connection: "open", status: { state: "live", kinds: watched(["pods", "nodes"]) } }, []],
+  ["Connecting", { connection: "connecting", status: null }],
+  ["Reconnecting", { connection: "reconnecting", status: { state: "live", kinds: [] } }],
+  ["Unreachable", { connection: "open", status: { state: "unreachable", kinds: [] } }],
+  ["Off", { connection: "off", status: { state: "off", kinds: [] } }],
+];
+
+const kitLabel = (resource) => resource.charAt(0).toUpperCase() + resource.slice(1);
+
+function LiveStates() {
+  return (
+    <div className="kit-stack">
+      {LIVE_STATES.map(([label, snapshot, pageKinds]) => (
+        <Row key={label} label={label}>
+          <LiveStatus info={describe(snapshot, kitLabel, pageKinds)} align="start" />
+        </Row>
+      ))}
+    </div>
+  );
+}
+
 export const navSections = [
   {
     id: "pickers",
     title: "Pickers and menus",
     about: "Type to filter long lists; arrow keys and Enter pick; Escape closes and returns to the button.",
     render: () => <Pickers />,
+  },
+  {
+    id: "live-status",
+    title: "Live status",
+    about: "In the top bar: how fresh the pages are. Click for the kinds that aren't live and why; Escape closes.",
+    render: () => <LiveStates />,
   },
   {
     id: "headers",

@@ -16,8 +16,8 @@ this pod restarting, what does this Service route to, what did that job log. It 
 workloads, configuration, networking, events, logs and live resource usage, across as many clusters
 as you connect, and finds any of it from one search box.
 
-It is read-only by design. Opscope uses only `get` and `list`, and nothing in it can change a
-cluster, so it can be given to anyone who needs to look, such as developers, on-call engineers and
+It is read-only by design. Opscope uses only `get`, `list` and `watch`, and nothing in it can
+change a cluster, so it can be given to anyone who needs to look, such as developers, on-call engineers and
 support, without granting write access. It ships as a single container image and runs on your own
 machine or inside the cluster it shows.
 
@@ -27,8 +27,13 @@ machine or inside the cluster it shows.
   resource kind with what needs attention, and recent warning events.
 - **Resources:** Nodes; Pods, Deployments, StatefulSets, DaemonSets, Jobs and CronJobs;
   ConfigMaps and Secrets; Services, Ingresses, and Gateway API Gateways, HTTPRoutes and
-  GatewayClasses; PersistentVolumeClaims, PersistentVolumes and StorageClasses. Tables filter, sort
-  and refresh on their own, with kubectl-style statuses such as `CrashLoopBackOff` and `Init:1/2`.
+  GatewayClasses; PersistentVolumeClaims, PersistentVolumes and StorageClasses. Tables filter and
+  sort, with kubectl-style statuses such as `CrashLoopBackOff` and `Init:1/2`.
+- **Live updates:** lists and the overview change within a second or two of a change in the
+  cluster, without reloading. Opscope watches each cluster and keeps a trimmed copy in memory, so
+  pages load quickly and a cluster gets one watch per kind rather than a request per page view. The
+  top bar says how fresh the page is. Without `watch`, Opscope polls and says so
+  ([permissions](docs/deployment.md#with-less-access), [memory](docs/deployment.md#memory)).
 - **Storage:** claims link to their volumes, StorageClasses and the pods that use them, pods and
   StatefulSets show their volumes and claims, and the overview counts claims that can't bind and
   volumes left behind. Optionally, how full each volume is
@@ -71,7 +76,7 @@ clusters, and cleaning up.
 In the cluster Opscope should show:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.3.0/deploy/kubernetes/opscope.yaml
+kubectl apply -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.4.0/deploy/kubernetes/opscope.yaml
 ```
 
 ```bash
@@ -131,13 +136,14 @@ Shortcuts are ignored while you type in a field.
 
 ## Security
 
-- **Read-only access.** Opscope uses only `get` and `list`, and the Kubernetes manifests grant
-  nothing more. See [Permissions](docs/deployment.md#permissions).
+- **Read-only access.** Opscope uses only `get`, `list` and `watch`, and the Kubernetes manifests
+  grant nothing more. See [Permissions](docs/deployment.md#permissions).
 - **No login.** Anyone who can open Opscope can read everything it can read. Keep it on
   `127.0.0.1`, reach it through `kubectl port-forward` in a cluster, or put an authenticating proxy
   in front of it. See [Giving people access](docs/deployment.md#giving-people-access).
 - **Secrets** are listed by key name only. A value is fetched only when you choose "Reveal" on one
-  key, is never cached, and never appears in the YAML view. Reading Secrets in a cluster needs a
+  key, is never cached (the live copy drops values as each Secret arrives), and never appears in
+  the YAML view. Reading Secrets in a cluster needs a
   separate, optional role.
 - **Volume usage** is off by default. It needs `get` on `nodes/proxy`, which reaches the kubelet's
   whole API, so it's turned on deliberately, with a setting and a separate, optional role. See
@@ -151,7 +157,7 @@ Shortcuts are ignored while you type in a field.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overview-dark.png">
-  <img src="docs/screenshots/overview-light.png" alt="The Opscope overview: a health summary, nodes, pods, CPU and memory usage, every resource kind with what needs attention, and per-node usage">
+  <img src="docs/screenshots/overview-light.png" alt="The Opscope overview: a health summary, nodes, pods, CPU and memory usage, every resource kind with what needs attention, per-node usage, and the Live indicator in the top bar">
 </picture>
 
 | Pods | A pod's detail page |

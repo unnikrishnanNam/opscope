@@ -3,8 +3,7 @@ package resources
 import (
 	"context"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	appsv1 "k8s.io/api/apps/v1"
 )
 
 // DaemonSet is one row of the daemonset list.
@@ -16,14 +15,14 @@ type DaemonSet struct {
 	NodeSelector map[string]string `json:"nodeSelector"`
 }
 
-func listDaemonSets(ctx context.Context, client kubernetes.Interface, q Query) ([]DaemonSet, error) {
-	list, err := client.AppsV1().DaemonSets(q.Namespace).List(ctx, metav1.ListOptions{})
+func listDaemonSets(ctx context.Context, src Source, q Query) ([]DaemonSet, error) {
+	items, err := ListOf[*appsv1.DaemonSet](ctx, src, "daemonsets", q)
 	if err != nil {
 		return nil, err
 	}
 
-	rows := make([]DaemonSet, 0, len(list.Items))
-	for _, d := range list.Items {
+	rows := make([]DaemonSet, 0, len(items))
+	for _, d := range items {
 		rows = append(rows, DaemonSet{
 			Meta:         metaOf(d.ObjectMeta),
 			Desired:      d.Status.DesiredNumberScheduled,

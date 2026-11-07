@@ -9,12 +9,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/yaml"
@@ -77,7 +76,6 @@ var ErrUnknownKind = errors.New("no detail view for this resource type")
 type Detail struct {
 	Meta
 	Kind        string            `json:"kind"`
-	UID         string            `json:"uid"`
 	Labels      map[string]string `json:"labels"`
 	Annotations map[string]string `json:"annotations"`
 	Owners      []Owner           `json:"owners"`
@@ -138,8 +136,10 @@ type DataEntry struct {
 }
 
 // GetDetail fetches one object and builds its detail view. For cluster-wide
-// kinds (nodes, ...) namespace is ignored.
-func GetDetail(ctx context.Context, clients Clients, resource, namespace, name string) (*Detail, error) {
+// kinds (nodes, ...) namespace is ignored. The object itself, and so its
+// YAML, is read directly from the cluster; related objects (its events, the
+// pods using a claim, ...) come from src.
+func GetDetail(ctx context.Context, clients Clients, src Source, resource, namespace, name string) (*Detail, error) {
 	info, ok := kinds[resource]
 	if !ok {
 		return nil, ErrUnknownKind
@@ -162,12 +162,12 @@ func GetDetail(ctx context.Context, clients Clients, resource, namespace, name s
 
 	d := &Detail{
 		Meta: Meta{
+			UID:       string(obj.GetUID()),
 			Name:      obj.GetName(),
 			Namespace: obj.GetNamespace(),
 			Created:   obj.GetCreationTimestamp().Time,
 		},
 		Kind:        info.Kind,
-		UID:         string(obj.GetUID()),
 		Labels:      emptyIfNil(obj.GetLabels()),
 		Annotations: emptyIfNil(obj.GetAnnotations()),
 		Owners:      []Owner{},
@@ -187,7 +187,7 @@ func GetDetail(ctx context.Context, clients Clients, resource, namespace, name s
 	if err := addSections(d, resource, obj); err != nil {
 		return nil, fmt.Errorf("reading %s %s: %w", info.Kind, name, err)
 	}
-	if err := addRelated(ctx, clients, d, resource, obj); err != nil {
+	if err := addRelated(ctx, src, d, resource, obj); err != nil {
 		return nil, err
 	}
 
@@ -197,7 +197,7 @@ func GetDetail(ctx context.Context, clients Clients, resource, namespace, name s
 	}
 	d.YAML = string(yamlBytes)
 
-	if d.Events, err = eventsFor(ctx, clients, obj, info.Namespaced); err != nil {
+	if d.Events, err = eventsFor(ctx, src, obj, info.Namespaced); err != nil {
 		return nil, err
 	}
 	return d, nil
@@ -257,22 +257,22 @@ func conditionsOf(obj *unstructured.Unstructured) ([]Condition, error) {
 // eventsFor lists the events about one object, newest first. Events point at
 // their object by UID, which can't mix up an object with an older one that
 // had the same name.
-func eventsFor(ctx context.Context, clients Clients, obj *unstructured.Unstructured, namespaced bool) ([]Event, error) {
+func eventsFor(ctx context.Context, src Source, obj *unstructured.Unstructured, namespaced bool) ([]Event, error) {
 	namespace := obj.GetNamespace()
 	if !namespaced {
 		namespace = "" // events about nodes etc. live in "default"; search everywhere
 	}
-	selector := fields.OneTermEqualSelector("involvedObject.uid", string(obj.GetUID())).String()
-
-	list, err := clients.Kube.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{FieldSelector: selector})
+	items, err := ListOf[*corev1.Event](ctx, src, "events", Query{Namespace: namespace})
 	if err != nil {
 		return nil, err
 	}
 	events := []Event{}
-	for _, e := range list.Items {
-		events = append(events, eventRow(&e))
+	for _, e := range items {
+		if e.InvolvedObject.UID == obj.GetUID() {
+			events = append(events, eventRow(e))
+		}
 	}
-	sort.Slice(events, func(i, j int) bool { return events[i].LastSeen.After(events[j].LastSeen) })
+	sortEvents(events)
 	return events, nil
 }
 

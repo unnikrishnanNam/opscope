@@ -3,8 +3,7 @@ package resources
 import (
 	"context"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	appsv1 "k8s.io/api/apps/v1"
 )
 
 // Deployment is one row of the deployment list.
@@ -16,14 +15,14 @@ type Deployment struct {
 	Available int32 `json:"available"` // replicas ready for long enough to count
 }
 
-func listDeployments(ctx context.Context, client kubernetes.Interface, q Query) ([]Deployment, error) {
-	list, err := client.AppsV1().Deployments(q.Namespace).List(ctx, metav1.ListOptions{})
+func listDeployments(ctx context.Context, src Source, q Query) ([]Deployment, error) {
+	items, err := ListOf[*appsv1.Deployment](ctx, src, "deployments", q)
 	if err != nil {
 		return nil, err
 	}
 
-	rows := make([]Deployment, 0, len(list.Items))
-	for _, d := range list.Items {
+	rows := make([]Deployment, 0, len(items))
+	for _, d := range items {
 		rows = append(rows, Deployment{
 			Meta:      metaOf(d.ObjectMeta),
 			Desired:   replicas(d.Spec.Replicas),
