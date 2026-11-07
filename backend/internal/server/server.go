@@ -50,6 +50,8 @@ func New(cfg Config, manager *clusters.Manager, live *collector.Set, history *me
 
 	// The cluster's collector: what its watch cache holds (also beats {resource}).
 	mux.HandleFunc("GET /api/clusters/{id}/live", getLiveStatus(manager, live))
+	// What changed in it, as server-sent events (beats {resource}/{name}).
+	mux.HandleFunc("GET /api/clusters/{id}/live/stream", streamLive(manager, live))
 
 	// Live CPU and memory usage from metrics-server.
 	mux.HandleFunc("GET /api/clusters/{id}/metrics/nodes", getNodeMetrics(manager, live, history))

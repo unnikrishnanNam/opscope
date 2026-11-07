@@ -276,6 +276,12 @@ type KindStatus struct {
 
 // Status says how each kind is read, and how far its cache is.
 func (c *Collector) Status() Status {
+	return c.status(true)
+}
+
+// status leaves the object counts out unless counts is set: the live stream
+// checks it every second, and counting a large cache isn't free.
+func (c *Collector) status(counts bool) Status {
 	s := Status{Enabled: true, Kinds: make([]KindStatus, 0, len(c.kinds))}
 	waiting, partial := false, false
 	for _, k := range c.kinds {
@@ -283,7 +289,9 @@ func (c *Collector) Status() Status {
 		ks := KindStatus{Resource: k.Resource, Mode: k.mode, Reason: k.reason}
 		if cached(k.mode) && k.synced() {
 			ks.Synced = true
-			ks.Objects = len(k.store.ListKeys())
+			if counts {
+				ks.Objects = len(k.store.ListKeys())
+			}
 		}
 		if !k.lastChange.IsZero() {
 			t := k.lastChange

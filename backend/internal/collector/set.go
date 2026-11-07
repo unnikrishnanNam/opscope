@@ -79,6 +79,16 @@ func (s *Set) Get(id string) (*Collector, bool) {
 // Status is a cluster's collector status, or "off" when collectors are
 // turned off. ok is false for a cluster the set doesn't know.
 func (s *Set) Status(id string) (status Status, ok bool) {
+	return s.status(id, true)
+}
+
+// Modes is Status without the object counts, which are the costly part:
+// for checking often whether a cluster's state or a kind's mode changed.
+func (s *Set) Modes(id string) (status Status, ok bool) {
+	return s.status(id, false)
+}
+
+func (s *Set) status(id string, counts bool) (Status, bool) {
 	if !s.enabled {
 		return Status{Enabled: false, State: "off", Kinds: []KindStatus{}}, true
 	}
@@ -86,5 +96,21 @@ func (s *Set) Status(id string) (status Status, ok bool) {
 	if !ok {
 		return Status{}, false
 	}
-	return c.Status(), true
+	return c.status(counts), true
+}
+
+// Enabled reports whether collectors run at all (OPSCOPE_LIVE).
+func (s *Set) Enabled() bool {
+	return s.enabled
+}
+
+// Subscribe follows every collector's events on the set's bus. Close the
+// subscription when done.
+func (s *Set) Subscribe(buffer int) *bus.Subscription {
+	return s.bus.Subscribe(buffer)
+}
+
+// Done is closed when the set's context ends: Opscope is shutting down.
+func (s *Set) Done() <-chan struct{} {
+	return s.ctx.Done()
 }

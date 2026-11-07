@@ -68,6 +68,31 @@ export const allPages = sections.flatMap((section) =>
   section.items.map((item) => ({ ...item, group: section.group })),
 );
 
+// The kinds GET /overview counts (backend/internal/resources/overview.go).
+export const overviewKinds = [
+  "namespaces",
+  "nodes",
+  "pods",
+  "deployments",
+  "statefulsets",
+  "daemonsets",
+  "jobs",
+  "cronjobs",
+  "gateways",
+  "httproutes",
+  "persistentvolumeclaims",
+  "persistentvolumes",
+];
+
+// kindsOn lists the kinds a page shows, for the top bar's live status: a
+// list page (or a detail page under it) its own, the overview its counts
+// and recent warnings.
+export function kindsOn(page) {
+  if (page?.resource) return [page.resource];
+  if (page?.path === "overview") return [...overviewKinds, "events"];
+  return undefined;
+}
+
 // pageFor finds the page a URL belongs to, from the part after /c/<id>/:
 // "workloads/pods" itself, or a detail page under it like
 // "workloads/pods/web/api-1". Undefined for anything else.

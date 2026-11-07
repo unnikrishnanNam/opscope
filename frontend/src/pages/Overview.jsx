@@ -13,10 +13,11 @@ import StatusBadge, { statusTone } from "../components/StatusBadge.jsx";
 import Tooltip from "../components/Tooltip.jsx";
 import { Sparkline, UsageBar } from "../components/Usage.jsx";
 import { CpuIcon, MemoryIcon, NodesIcon, PodsIcon, RefreshIcon, SuccessIcon, WarningIcon } from "../components/icons.jsx";
-import { allPages, detailPath, nsQuery } from "../sections.js";
+import { allPages, detailPath, nsQuery, overviewKinds } from "../sections.js";
 import { USAGE_OFF, isNearlyFull } from "../volumeUsage.js";
 import "./Overview.css";
 
+// Without live updates (see live.js), or for kinds that can't be watched.
 const REFRESH_MS = 10_000;
 const WARNINGS_SHOWN = 8;
 const WARNINGS_ID = "recent-warnings";
@@ -53,12 +54,15 @@ export default function Overview({ page }) {
 
   const query = namespace ? `?namespace=${encodeURIComponent(namespace)}` : "";
   const base = reachable ? `/clusters/${cluster.id}` : null;
-  const overview = useApi(base && `${base}/overview${query}`, { refreshMs: REFRESH_MS });
-  const nodes = useApi(base && `${base}/nodes`, { refreshMs: REFRESH_MS });
+  const overview = useApi(base && `${base}/overview${query}`, { refreshMs: REFRESH_MS, live: overviewKinds });
+  const nodes = useApi(base && `${base}/nodes`, { refreshMs: REFRESH_MS, live: "nodes" });
   // Usage is cluster-wide (it comes from the nodes), whatever namespace is picked.
   const usage = useApi(base && `${base}/metrics/nodes`, { refreshMs: METRICS_REFRESH_MS });
   const warningsQuery = namespace ? `&namespace=${encodeURIComponent(namespace)}` : "";
-  const warnings = useApi(base && `${base}/events?type=Warning${warningsQuery}`, { refreshMs: REFRESH_MS });
+  const warnings = useApi(base && `${base}/events?type=Warning${warningsQuery}`, {
+    refreshMs: REFRESH_MS,
+    live: "events",
+  });
   // How full the claims are, when volume usage is on. Only asked for when there are claims.
   const hasClaims = overview.data?.storage?.find((s) => s.resource === "persistentvolumeclaims")?.total > 0;
   const volumes = useApi(base && hasClaims && `${base}/metrics/volumes${query}`, {

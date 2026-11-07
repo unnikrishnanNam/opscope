@@ -314,17 +314,18 @@ Goal: without `watch`, or with only some namespaces readable, Opscope still work
 Goal: lists and the overview update within a couple of seconds of a
 change, without a timer.
 
-- [ ] `GET /api/clusters/{id}/live/stream`: `changed` at most once a second per resource, `status`,
+- [x] `GET /api/clusters/{id}/live/stream`: `changed` at most once a second per resource, `status`,
       a heartbeat every 15 s; closes cleanly when the client goes or the server stops
-- [ ] `src/live.js`: one stream per cluster per tab, paused while the tab is hidden, a full refetch
+- [x] `src/live.js`: one stream per cluster per tab, paused while the tab is hidden, a full refetch
       on reconnect
-- [ ] `useApi` `live` option with the 2-second limit and the polling fallback; lists and the overview
-      use it
-- [ ] `LiveStatus` in `/kit` (every state, both themes), then in the top bar
-- [ ] Works through `kubectl port-forward` and the Vite dev proxy
-- [ ] Frontend tests for matching messages to paths and for the fallback
-- [ ] `docs/api.md` for both `live` endpoints
-- [ ] Browser checks: light and dark, keyboard, screen reader label, 375 px and wide
+- [~] `useApi` `live` option with the 2-second limit and the polling fallback; lists and the overview
+      use it (the fallback rule changed; see notes)
+- [~] `LiveStatus` in `/kit` (every state, both themes), then in the top bar (opens on click, not
+      hover; see notes)
+- [x] Works through `kubectl port-forward` and the Vite dev proxy
+- [x] Frontend tests for matching messages to paths and for the fallback
+- [x] `docs/api.md` for both `live` endpoints
+- [x] Browser checks: light and dark, keyboard, screen reader label, 375 px and wide
 
 ## Phase L6: Scenarios and sizing
 
@@ -577,3 +578,82 @@ Goal: v1.4.0 is ready to tag.
   - Pausing the kind node: `unreachable` within 15 s, pages showed the cluster's timeout error;
     after the unpause, `live` again, with one warning and one info line in the log.
 - The L3 comparison against multipass was run again on this code: all 237 endpoints still match.
+
+### L5: Live pages (2026-11-07)
+
+- `GET /api/clusters/{id}/live/stream` (`server/live.go`) subscribes to the bus with a queue of
+  1,024 and keeps one cluster's changes per resource, with the namespaces they were in. A resource
+  is sent at most once a second; the first change after a quiet second goes out within 250 ms.
+  Every 250 ms it also checks the cluster's state and modes (`Set.Modes`, the status without object
+  counts, which are the costly part) and sends `status` when they change. A heartbeat goes every
+  15 s. The stream ends when the browser goes, when Opscope shuts down (the set's context), or
+  when the cluster is removed. Shutting down with a stream open took no time, not the 10 s timeout.
+- Added to the plan:
+  - A `resync` message, for a stream that fell behind and lost events (a `subscriber_lagged`
+    gap). The browser fetches everything on screen again. Other gaps need nothing: a relist's
+    changes are published as changes, and an unreachable cluster shows in `status`.
+  - With live data off the stream answers `204`, which tells `EventSource` not to reconnect.
+  - A cluster whose collector hasn't started yet answers `503`.
+  - The heartbeat is an event, not a comment, so the browser can see it: a stream silent for 45 s
+    (a port-forward that died without closing) is reopened.
+- `src/live.js`: `LiveConnection` holds one `EventSource` per cluster for the tab, shared through
+  `LiveProvider` in `Layout`. It closes while the tab is hidden, and a reopened stream sends
+  `resync` to every page. When `EventSource` gives up (any answer but a stream), it asks `/live`
+  whether live data is off. If it isn't, it tries again after 5 s, then 10, 20, 30.
+- `useApi(path, { live, refreshMs })`: the first load, the timer and the stream are three separate
+  effects, so the stream opening doesn't load the page twice. A matching change loads again at
+  once, or 2 s after the last load, with one load covering everything in between. Lists, the
+  overview (its kinds listed in `Overview.jsx`), its nodes and warnings, and the namespace picker
+  use it. Detail pages and usage keep their timers.
+- Changed from the plan: the fallback timer runs only for kinds the stream can't speak for:
+  `direct` and `pending`, or every kind while the stream is down or the cluster unreachable.
+  Polled kinds don't need it, since each poll publishes what changed. `forbidden` and
+  `not_installed` kinds don't either: their answer stays the same until a probe finds otherwise,
+  which arrives as a new `status`. A hidden tab runs no live timers.
+- Changed from the plan: the indicator opens a panel on click instead of a tooltip on hover, so
+  touch and keyboard reach it. The panel names the kinds that aren't watched, grouped by how
+  they're read, with the reason. Its button's accessible name is "Updates: Live" (and so on); a
+  warning or error gets an icon as well as a colour, as `StatusBadge` does. Nothing moves.
+- Changed from the plan: the indicator's label is about the page on screen, not the whole cluster.
+  The slowest of the page's kinds decides: **Every 30 s** if one is polled, **Every 10 s** if one
+  is `direct`, otherwise **Live**. The overview counts its kinds and Events, and a detail page
+  its list's kind. The panel still lists every kind that isn't watched. A label for the whole
+  cluster was wrong both ways:
+  - A user who can read one namespace saw "Live", although every page refreshed on the 10-second
+    timer.
+  - A default install, without `secrets-access.yaml`, showed "Every 10 s" with a warning on every
+    page, for Secrets alone.
+- `/kit` has a "Live status" section with every state in both themes, including the panel.
+- Tests: the stream on a fake feed with a real bus (headers, first status, changes from two
+  namespaces in one message, another cluster's left out, a cluster-wide kind without namespaces, a
+  mode change, `resync` on a lagged gap and not on a relist gap, the end on shutdown and on a
+  removed cluster), its answers (`204` off, `404`, `503`), and the once-a-second limit. Removing
+  the limit or the `resync` makes them fail, checked once each. Frontend: matching messages to
+  paths (namespaces, several kinds, `resync`), the fallback rule for every mode and connection
+  state, the descriptions, and `LiveConnection` with a fake `EventSource`, document and timers
+  (messages, resync on reconnect only, pause and resume, the 45-second watchdog, off, the backoff).
+- Checked on multipass (read-only) and a throwaway kind cluster, both through the Vite dev proxy,
+  deleted afterwards:
+  - multipass: every kind watched; the stream works through the proxy.
+  - kind: scaling a deployment from 1 to 3 showed the new pods 184 ms later, and their Running
+    status 2 s after that. A pod created in another namespace didn't reload the page, and no
+    10-second timer ran for 25 s. A new deployment that can't pull its image showed on the
+    overview without a reload.
+  - `no-watch` (polled): "Every 30 s"; a scale-down appeared 13 s later, at the next poll, with
+    one fetch.
+  - `team-a` (direct): the 10-second timer ran, and the indicator said "Live", which led to the
+    label change above.
+  - The default install's own service account: "Live" on Pods and the overview, "Every 10 s" on
+    Secrets.
+  - Backend stopped and started: "Reconnecting" at once, the 10-second timer meanwhile, then
+    "Live" and a full refetch.
+  - Through `kubectl port-forward` to Opscope running in the cluster (this branch's image): a
+    change reached the stream in about 250 ms, three times out of three, and the same after the
+    stream had been idle for 50 s. The page fetched 168 ms after a scale. The app's browser pane
+    hides the page when it's in the background, which paused the stream as designed. No request
+    was made for the 8 minutes it was hidden, and showing it again reopened the stream within
+    70 ms, with one refetch.
+  - Light and dark, Enter and Escape on the indicator (focus returns to it), and 375 px wide.
+    Found and fixed: the panel ran off the left edge on phones, where the indicator starts the
+    second row; the open button lost its warning colour; "Not installed" repeated its reason; and
+    Events and Namespaces showed their API names.

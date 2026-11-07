@@ -138,6 +138,10 @@ It checks again every five minutes, so a permission granted later is picked up w
 When a cluster stops answering, pages read it directly and show the error, rather than a copy that
 may be out of date, until it answers again.
 
+The top bar says which applies: **Live** when pages update within a few seconds of a change,
+**Every 30 s** or **Every 10 s** when some kinds can't be watched or listed across namespaces.
+Click it for the kinds and the reason.
+
 ### Turning live data off
 
 `OPSCOPE_LIVE=false` turns this off: Opscope keeps no copy, and every page asks the cluster when it
@@ -221,6 +225,13 @@ There are two safe ways to let people in:
   signs people in before passing requests on.
 
 Don't expose Opscope with an Ingress, a Gateway or a `LoadBalancer` Service without such a proxy.
+
+Each browser tab keeps one connection open for live updates
+([server-sent events](api.md#get-apiclustersidlivestream)), with a message at least every 15
+seconds. A proxy in front of Opscope must pass it on without buffering and without closing it
+sooner than that; nginx is told not to buffer it, and other proxies' defaults are usually fine.
+If the connection can't be kept, pages fall back to asking every 10 seconds, and the top bar says
+**Reconnecting**.
 
 ## Keeping clusters added in the UI
 
