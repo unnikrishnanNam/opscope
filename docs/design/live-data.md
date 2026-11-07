@@ -17,7 +17,7 @@ build phases 0–8 or the D, G, P, R and S phases. All work happens on the `docs
 one commit per phase; each phase is reviewed before it is committed, and the next phase starts only
 after that.
 
-**Status (2026-11-02):** planned.
+**Status (2026-11-07):** L0–L7 done, released in v1.4.0.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -350,14 +350,14 @@ Goal: checked against failure cases, with published memory numbers.
 
 Goal: v1.4.0 is ready to tag.
 
-- [ ] Bugs found on the way fixed, one commit each
-- [ ] README feature list, screenshots that show the indicator
-- [ ] Every check CI runs: `make test`, `go vet`, `gofmt`, the frontend build, `make docker-build`
-- [ ] Full browser pass: light and dark, keyboard only, 375 px and wide, with and without
+- [x] Bugs found on the way fixed, one commit each
+- [x] README feature list, screenshots that show the indicator
+- [x] Every check CI runs: `make test`, `go vet`, `gofmt`, the frontend build, `make docker-build`
+- [x] Full browser pass: light and dark, keyboard only, 375 px and wide, with and without
       metrics-server and Gateway API, two clusters connected
-- [ ] Image tag in `deploy/kubernetes/opscope.yaml` and the manifest URLs in the README and
+- [x] Image tag in `deploy/kubernetes/opscope.yaml` and the manifest URLs in the README and
       `docs/deployment.md` set to v1.4.0
-- [ ] Status line, design record table, release notes drafted (the tag is pushed by the maintainer)
+- [x] Status line, design record table, release notes drafted (the tag is pushed by the maintainer)
 
 ## Not in this release
 
@@ -734,3 +734,32 @@ Goal: v1.4.0 is ready to tag.
 - Open question 4 (Events): an event takes a tenth of a pod's memory, so the proposal is to keep
   them cached; it's marked for review. Question 3 (`/metrics`) is unchanged: these measurements
   didn't need it.
+
+### L7: Release (2026-11-07)
+
+- Every check CI runs, on the branch: `go vet`, `gofmt`, `go test ./...` (also with `-race`), the
+  102 frontend tests, the frontend build, `make docker-build`, and the image for `linux/amd64` as
+  CI builds it. `.github/scripts/check-manifest-tag.sh v1.4.0` passes on the manifest.
+- Browser pass on a build served by the Go server as v1.4.0, with two clusters connected:
+  multipass (read-only), which has metrics-server and Gateway API, and a throwaway kind cluster
+  with `test/scenarios/workloads.yaml`, which has neither (deleted afterwards).
+  - Every page on both clusters: the indicator read "Live", no console errors. On kind, the usage
+    and Gateway API pages said what isn't installed, as before.
+  - Keyboard only: the skip link, back into the top bar, Enter opens the indicator's panel,
+    Escape closes it and returns focus, ⌘K finds the `oom` pod and opens it.
+  - 375 px: the panel stays on screen and the page doesn't scroll sideways. Light and dark in
+    `/kit` and in the screenshots.
+- Found and fixed (its own commit): detail pages said "Live", but they're read on their 10-second
+  timer, since live detail pages aren't in this release. A detail page now passes no live kinds,
+  and the indicator says "Every 10 s" in a neutral tone, explaining that lists and the overview
+  update live. The panel still lists the kinds that aren't watched. In `/kit` as "Detail page",
+  with a test; `docs/deployment.md` says so.
+- README: a "Live updates" feature, tables no longer described as refreshing on their own, and
+  Secret values dropped from the live copy in the Security section. The overview, pods and pod
+  screenshots were retaken on multipass, light and dark, so they show the indicator, the same way
+  as before (1440 × 900 at 2×, scaled to 1600 × 1000), now from a small script driving headless
+  Chrome over its DevTools protocol, which waits until the page has settled.
+- Version: the manifest's image, the manifest URLs in the README and `docs/deployment.md`, the
+  image tag table, the health example in `docs/api.md` and the bug report placeholder say v1.4.0.
+  The record is in the design records table.
+- Open questions 3 and 4 are still open, with their proposals.
