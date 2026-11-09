@@ -118,6 +118,11 @@ after that.
 - **Memory is measured, and the manifest follows the numbers.** The cache holds every object of the
   listed kinds, so L6 measures memory per 1,000 objects and on the test clusters, and updates the
   manifest's requests and limits (256Mi today) and a sizing table in `docs/deployment.md`.
+- **Events are cached like every other kind.** An event takes about 1.3 KiB, a tenth of a pod, so
+  10,000 events are about 13 MiB (measured in L6). (Answered in review, 2026-11-09.)
+- **No `/metrics` endpoint in v1.4.** Opscope's own metrics for Prometheus (collector lag, cache
+  size) come with the Helm chart and multiple replicas in v1.8; L6's measurements didn't need them.
+  (Answered in review, 2026-11-09.)
 
 ## Design
 
@@ -248,7 +253,7 @@ front of Opscope doesn't hold messages back.
 Goal: this record is reviewed and merged before the work starts.
 
 - [x] Record written on `docs/live-data` and reviewed
-- [ ] Open questions answered and moved into Decisions
+- [x] Open questions answered and moved into Decisions (the last two after the release; see notes)
 - [~] ~~Merged into `main`~~ Kept on this branch with the rest of v1.4.0 (see notes)
 
 ## Phase L1: Object UIDs
@@ -364,7 +369,7 @@ Goal: v1.4.0 is ready to tag.
 - **Topology (v1.5)** builds on the cache and the bus. Before it starts, its record writes down why
   the G0–G7 attempt was removed.
 - **Opscope's own `/metrics` for Prometheus** (collector lag, cache size): planned with the
-  storage design's cloud-native work (see Open questions, 3).
+  storage design's cloud-native work, in v1.8 (see Decisions).
 - **Watching only some namespaces** (`OPSCOPE_NAMESPACES`): added only if L6's numbers show the
   need. Until then, a user who can't list across namespaces gets `direct` mode.
 - **Live detail pages:** detail pages keep polling; a later release can listen for their own object.
@@ -374,10 +379,9 @@ Goal: v1.4.0 is ready to tag.
 1. ~~**Secrets in the cache.**~~ Answered: watched, values dropped in the transform (see
    Decisions).
 2. ~~**Kill switch.**~~ Answered: documented as a fallback (see Decisions).
-3. **`/metrics` endpoint.** Proposed: not in v1.4; it comes with the Helm chart and multiple
-   replicas (v1.8). Bring it forward if you'd rather measure the collectors with it in L6.
-4. ~~**Events in the cache.**~~ Proposed answer from L6's numbers: keep them cached. An event
-   takes about 1.3 KiB, a tenth of a pod, so 10,000 events are about 13 MiB. Waiting for review.
+3. ~~**`/metrics` endpoint.**~~ Answered: not in v1.4; it comes with the Helm chart and multiple
+   replicas in v1.8 (see Decisions).
+4. ~~**Events in the cache.**~~ Answered: kept in the cache, from L6's numbers (see Decisions).
 
 ## Phase notes
 
@@ -763,3 +767,5 @@ Goal: v1.4.0 is ready to tag.
   image tag table, the health example in `docs/api.md` and the bug report placeholder say v1.4.0.
   The record is in the design records table.
 - Open questions 3 and 4 are still open, with their proposals.
+- After the release (2026-11-09): both answered in review as proposed, before v1.5 starts, and
+  moved into Decisions.
