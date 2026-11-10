@@ -24,7 +24,7 @@ type Config struct {
 }
 
 // New returns an http.Handler with every route registered.
-func New(cfg Config, manager *clusters.Manager, live *collector.Set, history *metrics.History, logger *slog.Logger) http.Handler {
+func New(cfg Config, manager *clusters.Manager, live *collector.Set, graphs graphReader, history *metrics.History, logger *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
 
 	// API routes. Go 1.22+ lets us put the HTTP method and {placeholders}
@@ -52,6 +52,10 @@ func New(cfg Config, manager *clusters.Manager, live *collector.Set, history *me
 	mux.HandleFunc("GET /api/clusters/{id}/live", getLiveStatus(manager, live))
 	// What changed in it, as server-sent events (beats {resource}/{name}).
 	mux.HandleFunc("GET /api/clusters/{id}/live/stream", streamLive(manager, live))
+
+	// The graph of how objects connect (beats {resource}/{name} and
+	// {resource}/{namespace}/{name}).
+	registerGraph(mux, manager, graphs, live.Source)
 
 	// Live CPU and memory usage from metrics-server.
 	mux.HandleFunc("GET /api/clusters/{id}/metrics/nodes", getNodeMetrics(manager, live, history))

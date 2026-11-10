@@ -20,7 +20,7 @@ build phases 0–8 or the D, G, L, P, R and S phases. All work happens on the `d
 one commit per phase, as in v1.4; each phase is reviewed before it is committed, and the next phase
 starts only after that.
 
-**Status (2026-11-10):** T0–T2 done; T3 next.
+**Status (2026-11-10):** T0–T3 done; T4 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -379,12 +379,13 @@ Goal: a graph per cluster is kept up to date from the bus, with the three new ki
 
 Goal: every query in the plan answers over HTTP.
 
-- [ ] `Node`, `Find`, `Neighbors`, `Upstream`, `Downstream`, `Path`, `Subgraph`, `Namespace`;
+- [x] `Node`, `Find`, `Neighbors`, `Upstream`, `Downstream`, `Path`, `Subgraph`, `Namespace`;
       `ErrNoHistory` for a non-zero `at`; hubs stop a walk
-- [ ] The `/graph` endpoints, with `partial` and `built` in every answer
-- [ ] Graph search: `using <name>` and `on <node>`
-- [ ] `docs/api.md`
-- [ ] Go tests on fakes for every endpoint, including a cluster without the Secret role and one with
+- [~] The `/graph` endpoints, with `partial` and `built` in every answer (node IDs in the query
+      string; see notes)
+- [x] Graph search: `using <name>` and `on <node>`
+- [x] `docs/api.md`
+- [x] Go tests on fakes for every endpoint, including a cluster without the Secret role and one with
       live data off
 
 ## Phase T4: Detail pages on the graph
@@ -629,3 +630,57 @@ Goal: v1.5.0 is ready to tag.
   clearly. Each of these fails when its part is taken out, checked once each: gaps not marking
   kinds stale, `Replace` keeping what's gone, an unreachable cluster counting as complete, a
   stopped collector not dropped. All pass five times in a row with `-race`.
+
+### T3: Query API (2026-11-10)
+
+- `graph/query.go` has the queries, each taking a `Query` with `At` (anything but zero is
+  `resources.ErrNoHistory`), `Depth` (2 by default, at most 10) and `Kinds` (edge kinds to follow).
+  `Neighbors` is `Subgraph` one step both ways; `Upstream` and `Downstream` are `Subgraph` up and
+  down. A subgraph is the nodes a walk reached and every edge between them that it follows, with
+  `focus`, the node it started from.
+- A walk reaches a Node, StorageClass or GatewayClass but doesn't go on through it, unless it
+  starts there; `Path` doesn't go through one either. With the stop taken out, a pod's
+  neighbourhood reached every other pod on its node, which the tests check.
+- `Path` is breadth first in either direction, in order from `from`; `ErrNoPath` when nothing
+  joins the two. `Namespace` is everything in a namespace and what it's joined to outside it one
+  edge away (nodes, volumes, classes), so the Topology page gets one namespace's picture.
+- The graph keeps an index of edges by node, both ways, so a walk doesn't scan every edge.
+  `TestDeletingEverythingLeavesNothing` checks it empties too.
+- Nodes have their `status` now, from `resources.StatusOf(resource, object)`: the status each
+  list page shows, worked out by the same code (`podStatus`, `nodeStatus`, `jobStatus`, ready
+  counts as "2/3", the storage phase, the Gateway API conditions), with a test per kind. It's set
+  when an object is added or changes, since the graph keeps no object.
+- Search: `ParseSearch` reads `[kind] using <name>` and `[kind] on <node>`; "uses" counts as
+  "using", and filler words ("what", "runs", "show", ...) are skipped, so "what runs on node-3"
+  and "what uses db-creds" read naturally. The kind can be a resource, its singular, its kind or
+  kubectl's short name (`deploy`, `svc`, `pvc`). `<name>` can be `namespace/name`. "using" matches
+  every edge to an object of that name, whatever its kind; "on" only `runs-on` edges to a node. The
+  answer has the matches, what they matched and the edges between, with `matches` listing the
+  first. A phrase it can't read is an error that says what it can.
+- Changed from the plan: node IDs go in the query string (`graph/node?id=`,
+  `graph/upstream?id=`), not the path (`graph/nodes/{uid}`): a placeholder's ID has slashes
+  (`missing:secrets/shop/stripe-key`). The paths are `find`, `node`, `upstream`, `downstream`,
+  `path`, `subgraph` and `search`, all under `/api/clusters/{id}/graph/`. Each answer is `built`,
+  `partial`, then the subgraph's `focus`, `nodes`, `edges` and, for search, `matches`.
+- Every endpoint passes `?namespace=` to the engine, so a graph built on request (pods readable only
+  per namespace, or live data off) is built for the namespace the page shows.
+- Errors: a node that isn't there and two that nothing joins are `404`; a bad depth, edge kind,
+  direction or search phrase `400`, with what's allowed; the cluster's own errors as on every other
+  page (`403` for forbidden, `502` for the rest).
+- `server.New` takes the engine (`graphReader`, an interface, so tests pass a fake).
+- `docs/api.md` has a "Graph" section: the answer's shape, the edge kinds, each endpoint, and the
+  three new kinds under "Resource types".
+- Tests: the queries on the T1 test namespace (finding objects and placeholders, what a Deployment
+  needs, only `owns`, what depends on a Secret, a pod's neighbours, a walk stopping at a node and
+  one starting there, a path in order and one only a node joins, a namespace without another
+  namespace's pods, every query refusing an earlier time, and searches with and without a kind and
+  a namespace). The endpoints on a fake reader: every endpoint's answer, every error, a cluster
+  error, and an answer built on request without the Secret role, with Secrets unknown and the
+  namespace passed on. Taking out the hub stop in walks or in paths, or the namespace passed to
+  the engine, each makes a test fail, checked once each.
+- Checked on multipass (read-only), with this branch's server on port 8090: a Service in
+  `calico-system` found with its pods, EndpointSlice and the Tigera owner; a pod's upstream (its
+  node, Secret and ServiceAccount) and downstream (its ReplicaSet, Deployment, Service,
+  EndpointSlice); the namespace (91 nodes, 184 edges); the path from the pod to its Service;
+  "what runs on kubeworker1" (15 pods) and "pods using kube-proxy" (3). Every answer took under a
+  millisecond, `built` was `live`, and the log had no warnings.

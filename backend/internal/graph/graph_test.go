@@ -252,8 +252,9 @@ func TestDeletingEverythingLeavesNothing(t *testing.T) {
 	if len(s.Nodes) != 0 || len(s.Edges) != 0 {
 		t.Errorf("%d nodes and %d edges left: %v", len(s.Nodes), len(s.Edges), s.Nodes)
 	}
-	if len(g.wanting) != 0 || len(g.watching) != 0 || len(g.degree) != 0 || len(g.groups) != 0 {
-		t.Errorf("indexes left: wanting %d, watching %d, degree %d, groups %d", len(g.wanting), len(g.watching), len(g.degree), len(g.groups))
+	if len(g.wanting) != 0 || len(g.watching) != 0 || len(g.degree) != 0 || len(g.groups) != 0 || len(g.out) != 0 || len(g.in) != 0 {
+		t.Errorf("indexes left: wanting %d, watching %d, degree %d, groups %d, out %d, in %d",
+			len(g.wanting), len(g.watching), len(g.degree), len(g.groups), len(g.out), len(g.in))
 	}
 }
 

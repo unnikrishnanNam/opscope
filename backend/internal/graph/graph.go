@@ -45,7 +45,8 @@ type Graph struct {
 	groups  map[string]map[string]bool // "resource/namespace" → node IDs, for matches
 	nodes   map[string]*Node           // present and placeholder nodes, by ID
 	edges   map[string]*edgeState
-	degree  map[string]int // edges touching each placeholder node
+	degree  map[string]int             // edges touching each placeholder node
+	out, in map[string]map[string]bool // node ID → IDs of the edges from it, and to it
 
 	wanting  map[string]map[string]bool // target key → readers that name it
 	watching map[string]map[string]bool // "resource/namespace" → readers whose matches look there
@@ -95,6 +96,8 @@ func New(readable []string) *Graph {
 		nodes:    map[string]*Node{},
 		edges:    map[string]*edgeState{},
 		degree:   map[string]int{},
+		out:      map[string]map[string]bool{},
+		in:       map[string]map[string]bool{},
 		wanting:  map[string]map[string]bool{},
 		watching: map[string]map[string]bool{},
 	}
@@ -156,6 +159,7 @@ func (g *Graph) Upsert(o Object) {
 	// built from the cluster).
 	e.name, e.labels, e.rv, e.seen = m.GetName(), m.GetLabels(), m.GetResourceVersion(), o.Seen
 	g.nodes[id].ResourceVersion = e.rv
+	g.nodes[id].Status = resources.StatusOf(o.Resource, o.Object)
 	e.refs = refsOf(o.Resource, o.Object)
 	g.resolve(e)
 
@@ -401,6 +405,8 @@ func (g *Graph) contribute(e *entry, from, to, kind string, ev Evidence) {
 	if !ok {
 		es = &edgeState{from: from, to: to, kind: kind}
 		g.edges[id] = es
+		addTo(g.out, from, id)
+		addTo(g.in, to, id)
 		g.touch(from, 1)
 		g.touch(to, 1)
 	}
@@ -424,9 +430,7 @@ func (g *Graph) retract(e *entry, from, to string, ref Ref) {
 		e.gave = slices.DeleteFunc(e.gave, func(g string) bool { return g == id })
 	}
 	if len(es.evidence) == 0 {
-		delete(g.edges, id)
-		g.touch(es.from, -1)
-		g.touch(es.to, -1)
+		g.removeEdge(id, es)
 	}
 }
 
@@ -438,9 +442,7 @@ func (g *Graph) withdraw(e *entry) {
 		es := g.edges[id]
 		es.evidence = slices.DeleteFunc(es.evidence, func(r readerEvidence) bool { return r.reader == e.id })
 		if len(es.evidence) == 0 {
-			delete(g.edges, id)
-			g.touch(es.from, -1)
-			g.touch(es.to, -1)
+			g.removeEdge(id, es)
 		}
 	}
 	e.gave = nil
@@ -451,6 +453,14 @@ func (g *Graph) withdraw(e *entry) {
 		removeFrom(g.watching, group, e.id)
 	}
 	e.wants, e.watches = nil, nil
+}
+
+func (g *Graph) removeEdge(id string, es *edgeState) {
+	delete(g.edges, id)
+	removeFrom(g.out, es.from, id)
+	removeFrom(g.in, es.to, id)
+	g.touch(es.from, -1)
+	g.touch(es.to, -1)
 }
 
 // touch counts the edges at a placeholder, removing it when none are left.

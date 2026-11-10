@@ -110,7 +110,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           server.New(cfg, manager, collectors, history, logger),
+		Handler:           server.New(cfg, manager, collectors, graphs, history, logger),
 		ReadHeaderTimeout: 10 * time.Second, // don't let a slow client hold a connection open forever
 	}
 
