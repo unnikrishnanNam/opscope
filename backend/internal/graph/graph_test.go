@@ -137,12 +137,12 @@ func TestGaps(t *testing.T) {
 		metav1.OwnerReference{APIVersion: "argoproj.io/v1alpha1", Kind: "Rollout", Name: "web", UID: "uid-rollout"}))
 	s = Build(readable, objects).Snapshot()
 	findEdge(t, s, "pods/shop/api-7d9f-x1", "unknown:secrets/shop/db-creds", References)
-	findEdge(t, s, "unknown:Rollout.argoproj.io/shop/web", "pods/shop/canary", Owns)
+	findEdge(t, s, "unknown:Rollout.argoproj.io/web@uid-rollout", "pods/shop/canary", Owns)
 	for _, n := range s.Nodes {
 		if n.Presence == Missing && n.Resource == "secrets" {
 			t.Errorf("%s: a Secret is missing when Secrets can't be read", n.ID)
 		}
-		if n.ID == "unknown:Rollout.argoproj.io/shop/web" && n.Kind != "Rollout" {
+		if n.ID == "unknown:Rollout.argoproj.io/web@uid-rollout" && (n.Kind != "Rollout" || n.Name != "web" || n.Namespace != "") {
 			t.Errorf("unknown owner's kind is %q", n.Kind)
 		}
 	}
@@ -375,4 +375,15 @@ func firstDifference(got, want string) string {
 		}
 	}
 	return "lengths differ"
+}
+
+// The graph keeps only what a match reads, never an object's spec or data:
+// a graph built from the cluster directly mustn't hold Secret values.
+func TestGraphKeepsNoObjectData(t *testing.T) {
+	s := &corev1.Secret{ObjectMeta: om("secrets", "shop", "db-creds"), Data: map[string][]byte{"password": []byte("hunter2")}}
+	s.Annotations = map[string]string{"kubectl.kubernetes.io/last-applied-configuration": `{"data":{"password":"aHVudGVyMg=="}}`}
+	g := Build(nil, append(shop(), Object{Resource: "secrets", Object: s, Seen: seen}))
+	if b, _ := json.Marshal(g.Snapshot()); strings.Contains(string(b), "hunter2") || strings.Contains(string(b), "aHVudGVy") {
+		t.Error("a Secret value reached the graph")
+	}
 }

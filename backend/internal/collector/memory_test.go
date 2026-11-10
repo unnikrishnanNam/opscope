@@ -13,6 +13,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -110,6 +111,12 @@ func newObject(kind string) k8sruntime.Object {
 		return &appsv1.Deployment{}
 	case "Job":
 		return &batchv1.Job{}
+	case "ReplicaSet":
+		return &appsv1.ReplicaSet{}
+	case "EndpointSlice":
+		return &discoveryv1.EndpointSlice{}
+	case "ServiceAccount":
+		return &corev1.ServiceAccount{}
 	}
 	return nil
 }
@@ -134,6 +141,10 @@ var memoryKinds = []memoryKind{
 	{"persistentvolumeclaims", "PersistentVolumeClaim", makeClaim},
 	{"namespaces", "Namespace", makeNamespace},
 	{"nodes", "Node", makeNode},
+	// Read only by the graph (v1.5).
+	{"replicasets", "ReplicaSet", makeReplicaSet},
+	{"endpointslices", "EndpointSlice", makeEndpointSlice},
+	{"serviceaccounts", "ServiceAccount", makeServiceAccount},
 }
 
 // objects returns the JSON of 2,000 made-up objects, or of every object in
@@ -157,8 +168,10 @@ func (k memoryKind) objects(b *testing.B) [][]byte {
 
 func gvkOf(kind string) schema.GroupVersionKind {
 	switch kind {
-	case "Deployment":
+	case "Deployment", "ReplicaSet":
 		return appsv1.SchemeGroupVersion.WithKind(kind)
+	case "EndpointSlice":
+		return discoveryv1.SchemeGroupVersion.WithKind(kind)
 	case "Job":
 		return batchv1.SchemeGroupVersion.WithKind(kind)
 	}
@@ -540,4 +553,55 @@ func makeNode(i int) k8sruntime.Object {
 		})
 	}
 	return n
+}
+
+// makeReplicaSet is a Deployment's ReplicaSet: the Deployment's template,
+// which the transform drops, and an owner.
+func makeReplicaSet(i int) k8sruntime.Object {
+	app := appOf(i)
+	labels := appLabels(i)
+	labels["pod-template-hash"] = templateHash(i)
+	rs := &appsv1.ReplicaSet{ObjectMeta: objectMeta(app+"-"+templateHash(i), nsOf(i), i, labels)}
+	rs.OwnerReferences = []metav1.OwnerReference{{APIVersion: "apps/v1", Kind: "Deployment", Name: fmt.Sprintf("%s-%d", app, i),
+		UID: types.UID(fmt.Sprintf("1f2e%04x-aaaa-4bbb-8ccc-%012x", i, i)), Controller: &[]bool{true}[0], BlockOwnerDeletion: &[]bool{true}[0]}}
+	rs.Annotations = map[string]string{"deployment.kubernetes.io/revision": "14", "deployment.kubernetes.io/desired-replicas": "3", "deployment.kubernetes.io/max-replicas": "4"}
+	rs.Spec = appsv1.ReplicaSetSpec{
+		Replicas: &[]int32{3}[0],
+		Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": app, "pod-template-hash": templateHash(i)}},
+		Template: corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: labels}, Spec: podSpec(app, i)},
+	}
+	rs.ManagedFields = managed("kube-controller-manager", "kube-controller-manager/status")
+	rs.Status = appsv1.ReplicaSetStatus{Replicas: 3, FullyLabeledReplicas: 3, ReadyReplicas: 3, AvailableReplicas: 3, ObservedGeneration: 1}
+	return rs
+}
+
+// makeEndpointSlice is a Service's slice with three ready pods.
+func makeEndpointSlice(i int) k8sruntime.Object {
+	app := appOf(i)
+	service := fmt.Sprintf("%s-%d", app, i)
+	labels := map[string]string{"kubernetes.io/service-name": service, "endpointslice.kubernetes.io/managed-by": "endpointslice-controller.k8s.io"}
+	s := &discoveryv1.EndpointSlice{ObjectMeta: objectMeta(service+"-x7k2p", nsOf(i), i, labels), AddressType: discoveryv1.AddressTypeIPv4}
+	s.OwnerReferences = []metav1.OwnerReference{{APIVersion: "v1", Kind: "Service", Name: service,
+		UID: types.UID(fmt.Sprintf("5a6b%04x-aaaa-4bbb-8ccc-%012x", i, i)), Controller: &[]bool{true}[0], BlockOwnerDeletion: &[]bool{true}[0]}}
+	s.ManagedFields = managed("endpointslice-controller.k8s.io")
+	for p := range 3 {
+		pod := fmt.Sprintf("%s-%s-%05d", app, templateHash(i), i*3+p)
+		s.Endpoints = append(s.Endpoints, discoveryv1.Endpoint{
+			Addresses:  []string{fmt.Sprintf("10.244.%d.%d", (i*3+p)%250, p+2)},
+			Conditions: discoveryv1.EndpointConditions{Ready: &[]bool{true}[0], Serving: &[]bool{true}[0], Terminating: &[]bool{false}[0]},
+			NodeName:   &[]string{fmt.Sprintf("node-%02d", (i*3+p)%50)}[0],
+			TargetRef:  &corev1.ObjectReference{Kind: "Pod", Namespace: nsOf(i), Name: pod, UID: types.UID(fmt.Sprintf("9a8b%04x-aaaa-4bbb-8ccc-%012x", i, p))},
+			Zone:       &[]string{"eu-west-1a"}[0],
+		})
+	}
+	s.Ports = []discoveryv1.EndpointPort{{Name: &[]string{"http"}[0], Port: &[]int32{8080}[0], Protocol: &[]corev1.Protocol{"TCP"}[0]}}
+	return s
+}
+
+func makeServiceAccount(i int) k8sruntime.Object {
+	app := appOf(i)
+	sa := &corev1.ServiceAccount{ObjectMeta: objectMeta(fmt.Sprintf("%s-%d", app, i), nsOf(i), i, appLabels(i))}
+	sa.Annotations = lastApplied(sa)
+	sa.ManagedFields = managed("kubectl-client-side-apply")
+	return sa
 }

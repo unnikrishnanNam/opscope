@@ -173,3 +173,63 @@ one warning. After the unpause it's `live` again, with one line in the log.
 ```bash
 kind delete cluster --name opscope-live
 ```
+
+## Topology
+
+`topology.yaml` gives the graph something for every edge kind, and every kind of gap: an object
+referred to that doesn't exist, and a selector that matches nothing. `topology-gateway-api.yaml`
+adds a Gateway and an HTTPRoute, for a cluster with the Gateway API CRDs (no controller needed:
+the graph reads the objects, not their status).
+
+```bash
+kind create cluster --name opscope-graph --kubeconfig /tmp/opscope-graph.kubeconfig
+export KUBECONFIG=/tmp/opscope-graph.kubeconfig
+until kubectl apply -f test/scenarios/topology.yaml; do sleep 2; done
+```
+
+Install the Gateway API CRDs with `kubectl apply --server-side -f` and the `standard-install.yaml`
+of a [Gateway API release](https://github.com/kubernetes-sigs/gateway-api/releases), or copy them
+from a cluster that has them, keeping each one's `api-approved.kubernetes.io` annotation; create
+copies with `kubectl create` rather than `apply`, whose own annotation makes the HTTPRoute CRD too
+large. Then:
+
+```bash
+kubectl apply -f test/scenarios/topology-gateway-api.yaml
+```
+
+Until the Topology page exists, the graph is checked with a Go test that reads the cluster, builds
+the graph the way Opscope does, and logs what it found:
+
+```bash
+cd backend
+OPSCOPE_TEST_KUBECONFIG=/tmp/opscope-graph.kubeconfig OPSCOPE_TEST_EXPECT=all \
+  go test ./internal/graph -run TestLiveCluster -v
+```
+
+In `graph-test`, it should find:
+
+| Edge                                                    | From the scenario                                        |
+| ------------------------------------------------------- | -------------------------------------------------------- |
+| `owns`: Deployment `api` → its ReplicaSet → its pods    | ownerReferences; CronJob `nightly` → each Job → its pod  |
+| `references`: pods and the `api` Deployment → `app-config`, `db-creds`, claim `data`, ServiceAccount `api` | volumes, env, the account; `flags` is missing but optional |
+| `references`: StatefulSet `db` → claim `data-db-0`      | its claim template                                       |
+| `references`: Ingress `web`, Gateway `edge` → `tls-cert` | TLS                                                     |
+| `binds`: claims `data` and `data-db-0` → their volumes → `standard`; claim `pending` → missing `slow` | volumeName, storageClassName |
+| `runs-on`: every pod → the node                         | nodeName                                                 |
+| `selects`: Service `api` → its pods; `ghost` dangling   | `ghost`'s selector `app=nobody` matches nothing          |
+| `endpoints`: the `api` EndpointSlice → its pods, ready  | the slice's targetRefs                                   |
+| `routes`: Ingress `web` → `api` and missing `old-api`; HTTPRoute `store` → `api` and missing `missing-svc` | backends |
+| `attaches`: HTTPRoute `store` → Gateway `edge` → GatewayClass `graph-test` | parentRefs, gatewayClassName |
+| Pod `broken` → missing Secret `stripe-key` and missing ConfigMap `missing-config` | env and a volume |
+
+`OPSCOPE_TEST_WATCH=2m` keeps the graph running for two minutes before it's compared with one built
+from the cluster, while you change things (scale `api`, create `stripe-key`, relabel a pod, delete
+`app-config`): the two must still match. To read as one of the users in `permissions.yaml`, use
+their kubeconfig; for `team-a`, add `OPSCOPE_TEST_NAMESPACE=team-a OPSCOPE_TEST_BUILT=on_request`,
+since it can't list across namespaces.
+
+### Clean up
+
+```bash
+kind delete cluster --name opscope-graph
+```

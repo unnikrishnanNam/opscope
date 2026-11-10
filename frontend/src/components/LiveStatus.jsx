@@ -5,9 +5,16 @@ import { usePopover } from "./Popover.jsx";
 import { ErrorIcon, WarningIcon } from "./icons.jsx";
 import "./LiveStatus.css";
 
-// "Pods", "PersistentVolumeClaims", ... for a resource's API name. Two
-// kinds have no list page of their own.
-const OTHER_LABELS = { events: "Events", namespaces: "Namespaces" };
+// "Pods", "PersistentVolumeClaims", ... for a resource's API name. These
+// kinds have no list page of their own; the last three are read only for
+// the topology.
+const OTHER_LABELS = {
+  events: "Events",
+  namespaces: "Namespaces",
+  replicasets: "ReplicaSets",
+  endpointslices: "EndpointSlices",
+  serviceaccounts: "ServiceAccounts",
+};
 const labelOf = (resource) =>
   allPages.find((p) => p.resource === resource)?.label ?? OTHER_LABELS[resource] ?? resource;
 

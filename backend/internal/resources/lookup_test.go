@@ -33,13 +33,23 @@ func TestLookup(t *testing.T) {
 	if _, ok := Lookup("rollouts"); ok {
 		t.Error("found a kind Opscope doesn't know")
 	}
-	// The graph's own kinds aren't listed or collected until T2.
+	// The graph's own kinds are collected, with a way to list them directly.
+	got := map[string]bool{}
 	for _, k := range Kinds() {
-		if _, ok := graphOnly[k.Resource]; ok {
-			t.Errorf("%s is in Kinds() already", k.Resource)
-		}
+		got[k.Resource] = true
 		if k.KindName == "" {
 			t.Errorf("%s has no kind name", k.Resource)
+		}
+		if _, ok := typedLists[k.Resource]; !ok && !k.Custom {
+			t.Errorf("%s has no typed list for the Direct source", k.Resource)
+		}
+	}
+	for resource := range graphOnly {
+		if !got[resource] {
+			t.Errorf("%s isn't collected", resource)
+		}
+		if _, ok := Listers[resource]; ok {
+			t.Errorf("%s has a lister; graphOnly is for kinds without pages", resource)
 		}
 	}
 }

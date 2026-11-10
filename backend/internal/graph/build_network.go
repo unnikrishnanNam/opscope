@@ -8,7 +8,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,9 +39,8 @@ func serviceSelector(obj runtime.Object, r *Refs) {
 	r.Matching(Selects, Match{
 		Resource:  "pods",
 		Namespace: svc.Namespace,
-		Selects: func(obj runtime.Object) bool {
-			m, err := meta.Accessor(obj)
-			return err == nil && selector.Matches(labels.Set(m.GetLabels()))
+		Selects: func(_ string, l map[string]string) bool {
+			return selector.Matches(labels.Set(l))
 		},
 		Dangling: "matches no pods",
 	}, "spec.selector", "")

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"opscope/internal/resources"
@@ -53,7 +54,7 @@ type Graph struct {
 // entry is a present object and what it contributes to the graph.
 type entry struct {
 	id, resource, key, group string
-	obj                      runtime.Object
+	name                     string
 	labels                   map[string]string
 	rv                       string
 	seen                     time.Time
@@ -62,12 +63,20 @@ type entry struct {
 	matched map[int]map[string]bool // for each Match in refs (by index), the node IDs it picks
 	wants   []string                // keys this object is registered under in wanting
 	watches []string                // groups this object is registered under in watching
-	gave    map[string]bool         // edges it contributed evidence to
+	gave    []string                // edges it contributed evidence to
 }
 
+// edgeState is an edge and its evidence. Nearly every edge has one or two
+// pieces, from one object, so they're a slice rather than a map by object:
+// a map per edge was the largest part of a graph's memory.
 type edgeState struct {
 	from, to, kind string
-	evidence       map[string][]Evidence // by the node ID of the object it was read from
+	evidence       []readerEvidence
+}
+
+type readerEvidence struct {
+	reader string // the node ID of the object it was read from
+	Evidence
 }
 
 // New makes an empty graph. readable names the kinds whose objects it will
@@ -119,11 +128,7 @@ func (g *Graph) Upsert(o Object) {
 	if err != nil {
 		return
 	}
-	key := objectKey(o.Resource, m.GetNamespace(), m.GetName())
-	id := string(m.GetUID())
-	if id == "" {
-		id = "object:" + key // only objects made up in tests have no UID
-	}
+	key, id := identify(o.Resource, m)
 	// Another object under the same name is one that was deleted and made
 	// again, its delete missed. It's gone now.
 	if other, ok := g.byKey[key]; ok && other != id {
@@ -146,7 +151,10 @@ func (g *Graph) Upsert(o Object) {
 			Namespace: m.GetNamespace(), Name: m.GetName(), Presence: Present,
 		}
 	}
-	e.obj, e.labels, e.rv, e.seen = o.Object, m.GetLabels(), m.GetResourceVersion(), o.Seen
+	// Only what a Match may read is kept, the name and labels: the graph
+	// never holds an object's spec or data (a Secret's values, when it's
+	// built from the cluster).
+	e.name, e.labels, e.rv, e.seen = m.GetName(), m.GetLabels(), m.GetResourceVersion(), o.Seen
 	g.nodes[id].ResourceVersion = e.rv
 	e.refs = refsOf(o.Resource, o.Object)
 	g.resolve(e)
@@ -156,6 +164,35 @@ func (g *Graph) Upsert(o Object) {
 	}
 	if matchable {
 		g.rematch(e, true)
+	}
+}
+
+// identify gives an object's key (resource, namespace, name) and node ID.
+func identify(resource string, m metav1.Object) (key, id string) {
+	key = objectKey(resource, m.GetNamespace(), m.GetName())
+	id = string(m.GetUID())
+	if id == "" {
+		id = "object:" + key // only objects made up in tests have no UID
+	}
+	return key, id
+}
+
+// Replace makes a kind's objects exactly these: each is added or updated,
+// and objects of that kind not among them are deleted. It's how a kind is
+// read again after a gap, when changes may have been missed.
+func (g *Graph) Replace(resource string, objects []Object) {
+	keep := map[string]bool{}
+	for _, o := range objects {
+		if m, err := meta.Accessor(o.Object); err == nil {
+			_, id := identify(resource, m)
+			keep[id] = true
+			g.Upsert(o)
+		}
+	}
+	for _, id := range slices.Sorted(maps.Keys(g.objects)) {
+		if e, ok := g.objects[id]; ok && e.resource == resource && !keep[id] {
+			g.Delete(id)
+		}
 	}
 }
 
@@ -258,7 +295,7 @@ func (g *Graph) resolve(e *entry) {
 			addTo(g.watching, group, e.id)
 			picked := map[string]bool{}
 			for id := range g.groups[group] {
-				if id != e.id && m.Selects(g.objects[id].obj) {
+				if c := g.objects[id]; id != e.id && m.Selects(c.name, c.labels) {
 					g.contribute(e, e.id, id, ref.Kind, evidenceOf(e, ref))
 					picked[id] = true
 				}
@@ -285,7 +322,7 @@ func (g *Graph) rematch(c *entry, present bool) {
 				continue
 			}
 			was := w.matched[i][c.id]
-			now := present && ref.Match.Selects(c.obj)
+			now := present && ref.Match.Selects(c.name, c.labels)
 			switch {
 			case now && !was:
 				g.contribute(w, w.id, c.id, ref.Kind, evidenceOf(w, ref))
@@ -362,16 +399,15 @@ func (g *Graph) contribute(e *entry, from, to, kind string, ev Evidence) {
 	id := EdgeID(from, to, kind)
 	es, ok := g.edges[id]
 	if !ok {
-		es = &edgeState{from: from, to: to, kind: kind, evidence: map[string][]Evidence{}}
+		es = &edgeState{from: from, to: to, kind: kind}
 		g.edges[id] = es
 		g.touch(from, 1)
 		g.touch(to, 1)
 	}
-	if e.gave == nil {
-		e.gave = map[string]bool{}
+	if !slices.Contains(e.gave, id) {
+		e.gave = append(e.gave, id)
 	}
-	e.gave[id] = true
-	es.evidence[e.id] = append(es.evidence[e.id], ev)
+	es.evidence = append(es.evidence, readerEvidence{reader: e.id, Evidence: ev})
 }
 
 // retract takes back the evidence one reference gave to one edge.
@@ -381,15 +417,12 @@ func (g *Graph) retract(e *entry, from, to string, ref Ref) {
 	if !ok {
 		return
 	}
-	left := slices.DeleteFunc(es.evidence[e.id], func(ev Evidence) bool {
-		return ev.Builder == ref.Builder && ev.Field == ref.Field
+	es.evidence = slices.DeleteFunc(es.evidence, func(r readerEvidence) bool {
+		return r.reader == e.id && r.Builder == ref.Builder && r.Field == ref.Field
 	})
-	if len(left) > 0 {
-		es.evidence[e.id] = left
-		return
+	if !slices.ContainsFunc(es.evidence, func(r readerEvidence) bool { return r.reader == e.id }) {
+		e.gave = slices.DeleteFunc(e.gave, func(g string) bool { return g == id })
 	}
-	delete(es.evidence, e.id)
-	delete(e.gave, id)
 	if len(es.evidence) == 0 {
 		delete(g.edges, id)
 		g.touch(es.from, -1)
@@ -401,9 +434,9 @@ func (g *Graph) retract(e *entry, from, to string, ref Ref) {
 // left with none, the placeholders left with no edges, and its places in
 // wanting and watching.
 func (g *Graph) withdraw(e *entry) {
-	for id := range e.gave {
+	for _, id := range e.gave {
 		es := g.edges[id]
-		delete(es.evidence, e.id)
+		es.evidence = slices.DeleteFunc(es.evidence, func(r readerEvidence) bool { return r.reader == e.id })
 		if len(es.evidence) == 0 {
 			delete(g.edges, id)
 			g.touch(es.from, -1)
@@ -466,12 +499,13 @@ func (g *Graph) node(id string) Node {
 func (g *Graph) edge(id string) Edge {
 	es := g.edges[id]
 	e := Edge{ID: id, From: es.from, To: es.to, Kind: es.kind, Optional: true}
-	for _, reader := range slices.Sorted(maps.Keys(es.evidence)) {
-		e.Evidence = append(e.Evidence, es.evidence[reader]...)
-	}
-	slices.SortStableFunc(e.Evidence, func(a, b Evidence) int {
-		return cmp.Or(cmp.Compare(a.Builder, b.Builder), cmp.Compare(a.Field, b.Field))
+	sorted := slices.Clone(es.evidence)
+	slices.SortFunc(sorted, func(a, b readerEvidence) int {
+		return cmp.Or(cmp.Compare(a.Builder, b.Builder), cmp.Compare(a.Field, b.Field), cmp.Compare(a.reader, b.reader))
 	})
+	for _, r := range sorted {
+		e.Evidence = append(e.Evidence, r.Evidence)
+	}
 	for _, ev := range e.Evidence {
 		e.Optional = e.Optional && ev.Optional
 	}

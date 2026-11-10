@@ -186,12 +186,8 @@ func statefulSetClaims(obj runtime.Object, r *Refs) {
 		r.Matching(References, Match{
 			Resource:  "persistentvolumeclaims",
 			Namespace: sts.Namespace,
-			Selects: func(obj runtime.Object) bool {
-				m, err := meta.Accessor(obj)
-				if err != nil {
-					return false
-				}
-				ordinal, ok := strings.CutPrefix(m.GetName(), prefix)
+			Selects: func(name string, _ map[string]string) bool {
+				ordinal, ok := strings.CutPrefix(name, prefix)
 				return ok && isDigits(ordinal)
 			},
 		}, fmt.Sprintf("spec.volumeClaimTemplates[%d]", i), "claim template "+t.Name)

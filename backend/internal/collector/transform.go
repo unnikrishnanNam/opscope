@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/tools/cache"
@@ -38,8 +39,19 @@ func trim(obj any) (any, error) {
 		dropSecretValues(o)
 	case *corev1.ConfigMap:
 		hashConfigMap(o)
+	case *appsv1.ReplicaSet:
+		dropTemplate(o)
 	}
 	return obj, nil
+}
+
+// dropTemplate empties a ReplicaSet's pod template. A Deployment keeps ten
+// old ReplicaSets by default, each about the size of the Deployment, and
+// nothing reads their templates from the cache: the graph reads the
+// Deployment's, which is the current one. Owner, selector, replica counts,
+// status and the revision annotation stay.
+func dropTemplate(rs *appsv1.ReplicaSet) {
+	rs.Spec.Template = corev1.PodTemplateSpec{}
 }
 
 // trimMeta drops what every kind carries that the cache doesn't need:

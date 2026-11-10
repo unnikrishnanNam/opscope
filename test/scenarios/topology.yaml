@@ -1,0 +1,219 @@
+# Topology scenarios: something for every edge kind the graph builds, and
+# every kind of gap (a missing object, a selector that matches nothing).
+# Run them on a throwaway kind cluster; see README.md in this folder.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: graph-test
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: graph-test
+data:
+  app.yaml: "debug: false"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-creds
+  namespace: graph-test
+stringData:
+  password: not-a-real-password
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tls-cert
+  namespace: graph-test
+stringData:
+  note: not a real certificate; nothing serves it
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: api
+  namespace: graph-test
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data
+  namespace: graph-test
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: { storage: 1Gi }
+---
+# A claim asking for a StorageClass that doesn't exist: stays Pending.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pending
+  namespace: graph-test
+spec:
+  storageClassName: slow
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: { storage: 1Gi }
+---
+# The healthy app: a Deployment using a ConfigMap, a Secret, a claim and its
+# own ServiceAccount, with a Service in front.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: graph-test
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: api }
+  template:
+    metadata:
+      labels: { app: api }
+    spec:
+      serviceAccountName: api
+      containers:
+        - name: api
+          image: registry.k8s.io/pause:3.10
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: db-creds, key: password }
+          envFrom:
+            - configMapRef: { name: flags, optional: true } # doesn't exist, and doesn't need to
+          volumeMounts:
+            - { name: config, mountPath: /etc/app }
+            - { name: data, mountPath: /data }
+      volumes:
+        - name: config
+          configMap: { name: app-config }
+        - name: data
+          persistentVolumeClaim: { claimName: data }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: graph-test
+spec:
+  selector: { app: api }
+  ports:
+    - { port: 80, targetPort: 8080 }
+---
+# A Service whose selector matches no pods: dangling.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ghost
+  namespace: graph-test
+spec:
+  selector: { app: nobody }
+  ports:
+    - { port: 80 }
+---
+# A pod that refers to a Secret and a ConfigMap that don't exist. It never
+# starts: CreateContainerConfigError, or ContainerCreating for the volume.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: broken
+  namespace: graph-test
+spec:
+  containers:
+    - name: app
+      image: registry.k8s.io/pause:3.10
+      env:
+        - name: STRIPE_KEY
+          valueFrom:
+            secretKeyRef: { name: stripe-key, key: key }
+      volumeMounts:
+        - { name: config, mountPath: /etc/app }
+  volumes:
+    - name: config
+      configMap: { name: missing-config }
+---
+# An Ingress to the api Service, and to one that doesn't exist. No ingress
+# controller is needed: the graph reads the object, not its status.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web
+  namespace: graph-test
+spec:
+  tls:
+    - hosts: [shop.example]
+      secretName: tls-cert
+  rules:
+    - host: shop.example
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service: { name: api, port: { number: 80 } }
+          - path: /old
+            pathType: Prefix
+            backend:
+              service: { name: old-api, port: { number: 80 } }
+---
+# A StatefulSet with a claim template: the claim data-db-0.
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: graph-test
+spec:
+  clusterIP: None
+  selector: { app: db }
+  ports:
+    - { port: 5432 }
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db
+  namespace: graph-test
+spec:
+  serviceName: db
+  replicas: 1
+  selector:
+    matchLabels: { app: db }
+  template:
+    metadata:
+      labels: { app: db }
+    spec:
+      containers:
+        - name: db
+          image: registry.k8s.io/pause:3.10
+          volumeMounts:
+            - { name: data, mountPath: /data }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests: { storage: 1Gi }
+---
+# A CronJob that runs every minute: Jobs and their pods come and go, which
+# keeps the graph changing.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: nightly
+  namespace: graph-test
+spec:
+  schedule: "* * * * *"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: run
+              image: busybox:1.36
+              command: ["true"]

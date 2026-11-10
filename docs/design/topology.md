@@ -20,7 +20,7 @@ build phases 0–8 or the D, G, L, P, R and S phases. All work happens on the `d
 one commit per phase, as in v1.4; each phase is reviewed before it is committed, and the next phase
 starts only after that.
 
-**Status (2026-11-10):** T0–T1 done; T2 next.
+**Status (2026-11-10):** T0–T2 done; T3 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -358,21 +358,22 @@ reads it yet.
 
 Goal: a graph per cluster is kept up to date from the bus, with the three new kinds cached.
 
-- [ ] ReplicaSets, EndpointSlices and ServiceAccounts: the `graphOnly` table, `typedLists`, the
+- [x] ReplicaSets, EndpointSlices and ServiceAccounts: the `graphOnly` table, `typedLists`, the
       ReplicaSet trim, the ClusterRole and the permissions table in `docs/deployment.md`
-- [ ] The engine follows the bus: initial adds, changes, gaps (one kind, a lagging subscriber, a
+- [x] The engine follows the bus: initial adds, changes, gaps (one kind, a lagging subscriber, a
       stopped collector); a cluster's graph goes with its collector
-- [ ] Built on request from a `Source` when live data is off or a kind it needs is `direct` or
-      `pending`; kept for 10 seconds
-- [ ] `test/scenarios/topology.yaml`: a workload using a ConfigMap, a Secret, a claim and a named
+- [~] Built on request from a `Source` when live data is off or ~~a kind it needs is `direct` or
+      `pending`~~ a kind is `pending` or pods are `direct` (see notes); kept for 10 seconds
+- [~] `test/scenarios/topology.yaml`: a workload using a ConfigMap, a Secret, a claim and a named
       ServiceAccount; a pod referring to a Secret and a ConfigMap that don't exist; an Ingress to a
-      Service that doesn't exist; a Service whose selector matches nothing (the existing
-      `no-endpoints` too). `test/scenarios/gateway-api/`: a route to a missing Service, for a
-      cluster with the Gateway API CRDs. A table in the README of the edges each should give
-- [ ] Every edge kind found on the scenario cluster and on multipass (read-only); the graph after a
+      Service that doesn't exist; a Service whose selector matches nothing (~~the existing
+      `no-endpoints` too~~). ~~`test/scenarios/gateway-api/`~~ `topology-gateway-api.yaml`: a
+      route to a missing Service, for a cluster with the Gateway API CRDs. A table in the README of
+      the edges each should give
+- [x] Every edge kind found on the scenario cluster and on multipass (read-only); the graph after a
       change matches a graph built from scratch on the same cluster
-- [ ] Memory per 1,000 objects for the new kinds and for the graph; the manifest and the "Memory"
-      section follow the numbers
+- [~] Memory per 1,000 objects for the new kinds and for the graph; ~~the manifest and~~ the
+      "Memory" section follows the numbers (the manifest's limit stays; see notes)
 
 ## Phase T3: Query API
 
@@ -528,3 +529,103 @@ Goal: v1.5.0 is ready to tag.
   checked once each: not resolving again when a wanted object appears, not checking selectors on a
   new object, a label change or a delete, keeping an edge a selector no longer gives, not skipping
   `kube-root-ca.crt`, and never dropping placeholders. All pass five times in a row with `-race`.
+
+### T2: The graph on the cache (2026-11-10)
+
+- ReplicaSets, EndpointSlices and ServiceAccounts are in `resources.Kinds()` now, so every
+  collector keeps them; `typedLists` lists them for the `Direct` source. They have no lister, so no
+  page or `/names` entry, with a test. The ClusterRole grants `get`, `list` and `watch` on them,
+  and the permissions table says they're for the topology. The live panel names them
+  ("ReplicaSets", not "replicasets"). `test/scenarios/permissions.yaml`'s two users can read them
+  too, as they can everything else `opscope.yaml` grants.
+- Added: `TestClusterRolesCoverEveryKind` reads the manifests and fails when a collected kind lacks
+  `get`, `list` or `watch` (Secrets from `secrets-access.yaml`). Taking ReplicaSets out of the
+  ClusterRole makes it fail.
+- The transform empties a ReplicaSet's pod template: 11.6 MiB per 1,000 made-up ReplicaSets
+  without it, 3.3 MiB with it. Owner, selector, replicas, status and the revision annotation stay,
+  with a test.
+- `collector.Set.Cached(cluster, resource)` hands the engine a kind's whole cache, when that kind
+  is cached and has its first list. The graph imports `collector` for this and for the modes; the
+  collector still doesn't know the graph exists.
+- The engine (`graph/engine.go`) subscribes when it's made, which `main.go` does before the first
+  collector starts. One goroutine applies events: adds and updates are `Upsert`, deletes `Delete`.
+  Every second, and after each gap, it compares each kind's mode with the graph: a kind newly in
+  the cache, or marked stale by a gap, is read in full from the cache (`Graph.Replace`, which adds
+  what's there and deletes what isn't); one that can't be read is dropped. A gap for one kind marks
+  that kind, an unreachable cluster's gap every kind of that cluster, a lagging subscriber's every
+  kind of every cluster. A stopped collector's gap drops the cluster's graph; a collector started
+  again for it is read from its own cache when it's next needed. Events that reach the engine
+  before the cache they're in has its first list are ignored, and the cache is read once it has.
+- `Engine.Read(ctx, cluster, src, namespace, fn)` runs a query on the live graph under a read
+  lock, or on a graph built on request.
+- **Changed from the plan: a `direct` kind doesn't stop the graph being live.** A default install,
+  without `secrets-access.yaml`, reads Secrets `direct`, so by T0's rule it would never have a live
+  graph, and would list 20 kinds again for every view after 10 seconds. Now a `direct` kind is left
+  out of the live graph like a forbidden one: named in `partial` (with the collector's reason,
+  "listing across all namespaces isn't allowed") and its objects Unknown. That's contract 12's
+  example: Topology without Secret access still shows which pods reference a Secret, read from the
+  pods. The exception is pods: when pods are read per namespace (a user who can read only some
+  namespaces), a live graph would hold almost nothing, so requests build the graph on request, in
+  the namespace asked about. Live data off, an unreachable cluster, a kind not probed yet and a cache
+  on its first list also build on request.
+- On request, every kind is listed from the pages' `Source` in parallel, in the namespace asked
+  about, and the graph is kept for 10 seconds; one build at a time per cluster and namespace, and
+  graphs nobody has asked for in a minute are dropped. Forbidden and not installed kinds are left
+  out and named; any other error fails the request ("reading pods: connection refused").
+- **Found: a graph built on request would have kept Secret values.** The graph kept each object it
+  was given, for its matches, and a `Direct` list of Secrets has their values. Now the graph keeps
+  only each object's name and labels, which is all a `Match` sees (`Selects(name, labels)`), with a
+  test that no Secret value reaches it. It saved memory too (below).
+- **Found on multipass: owners of kinds Opscope doesn't know were split by namespace.** Tigera's
+  cluster-wide `APIServer` named `default` owns objects in two namespaces and became two unknown
+  nodes. Opscope can't tell from an owner reference whether a kind is namespaced, but the reference
+  has the owner's UID, so such an owner is keyed by it now: `unknown:APIServer.operator.tigera.io/default@<uid>`,
+  one node.
+- **Memory.** The graph's own structures were 4.1 MiB per 1,000 objects at first: each edge had a
+  map of evidence by object, and each object a map of the edges it gave, though nearly every edge
+  has one or two pieces from one object. Small slices instead brought it to 2.9 MiB, and keeping
+  names and labels rather than an object to 2.7 MiB (`BenchmarkGraphMemory`, 11,050 made-up
+  objects). Building that cluster takes 46 ms; one pod's status changing, 3.5 µs. The cache's
+  benchmark measures the three new kinds: ReplicaSets 3.3, EndpointSlices 2.7 and ServiceAccounts
+  1.5 MiB per 1,000.
+- `docs/deployment.md`'s "Memory" section has the three kinds and the graph, and its table is
+  worked out again: 500 pods need about 17 MiB for the copy and the graph (12 before), 2,000 pods
+  70 MiB (50), 5,000 pods 185 MiB (130). Changed from the plan: the manifest stays as it is. The
+  256 MiB default still covers 2,000 pods with room, and the request (64 MiB) is above what the
+  scenario cluster used.
+- Measured on a kind cluster with the scenarios, 40 more apps and 1,500 more ConfigMaps (about
+  1,950 objects in the graph): v1.4.0 and this branch side by side for 4 minutes, built as
+  binaries, while a loop loaded five lists from each every 5 seconds and scaled a Deployment every
+  30. v1.4.0 went from 44 to 51 MiB and stayed there; this branch from 51 to 60 MiB, level for the
+  last 3 minutes. 9 MiB more matches the graph's 5.7 MiB with the garbage collector's room on top.
+  Shorter than L6's 10 minutes: the benchmarks give the numbers, and this checks they hold in a
+  running process that settles.
+- `test/scenarios/topology.yaml` (namespace `graph-test`) and `topology-gateway-api.yaml`, with a
+  table in the README. Changed from the plan: one Gateway API file rather than a folder, and the
+  dangling Service is `ghost` in the topology scenario rather than `no-endpoints` from the
+  workloads, so one file covers every edge kind. A CronJob that runs every minute keeps the graph
+  changing. `TestLiveCluster` (skipped unless `OPSCOPE_TEST_KUBECONFIG` is set) runs a collector
+  and the engine against a real cluster, as Opscope does, and checks that the live graph is the
+  graph built from the cluster directly, trying again for up to 45 seconds since polled kinds are
+  up to 30 seconds behind.
+- Checked on multipass (read-only, through the `multipass` context in the default kubeconfig; the
+  one in `data/` points at an older cluster): live in 1.2 s, 296 objects, every edge kind (159
+  `owns`, 172 `references`, 28 `selects`, 28 `endpoints`, ...), and the same graph as one built
+  from the cluster. Its only missing objects are two ConfigMaps that MetalLB and Tigera refer to as
+  optional, which the edges say.
+- Checked on a throwaway kind cluster with the scenarios and the Gateway API CRDs copied from
+  multipass, deleted afterwards: every edge kind and every gap in the README's table. For two
+  minutes, a script scaled `api` to 3, created `stripe-key`, relabelled a pod (so `ghost` selected
+  it and stopped dangling), deleted `app-config` and deleted `broken`, while the CronJob made and
+  removed Jobs: the live graph still matched one built from the cluster. As Opscope's own service
+  account from `opscope.yaml`: live, Secrets left out as "listing across all namespaces isn't
+  allowed" and the pods' Secrets Unknown. As `no-watch` (everything polled): live, the same graph
+  as one built from the cluster. As `team-a`: built on request in `team-a`, its Deployment,
+  ReplicaSet and pod, with nodes and the cluster-wide kinds named as not allowed.
+- Tests: the engine on a fake feed with a real bus: reading the cache; following adds, updates
+  (a relabel) and deletes on two clusters; reading a kind again after each kind of gap; dropping a
+  stopped cluster and reading the new cache; kinds it can't read, and one that becomes readable;
+  building on request for each reason, reusing the graph for 10 seconds and not longer; failing
+  clearly. Each of these fails when its part is taken out, checked once each: gaps not marking
+  kinds stale, `Replace` keeping what's gone, an unreachable cluster counting as complete, a
+  stopped collector not dropped. All pass five times in a row with `-race`.

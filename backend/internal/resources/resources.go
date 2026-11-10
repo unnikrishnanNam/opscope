@@ -79,7 +79,7 @@ var listOnly = map[string]kindInfo{
 }
 
 // graphOnly are kinds the graph reads that have no list or detail page
-// (docs/design/topology.md). They join the cache in phase T2.
+// (docs/design/topology.md). They're collected like every other kind.
 var graphOnly = map[string]kindInfo{
 	"replicasets":     {group("apps", "v1", "replicasets"), "ReplicaSet", true},
 	"endpointslices":  {group("discovery.k8s.io", "v1", "endpointslices"), "EndpointSlice", true},
@@ -121,19 +121,17 @@ func LookupKind(group, kind string) (Kind, bool) {
 	return Kind{}, false
 }
 
-// Kinds returns every resource type in Listers, sorted by name. A lister
-// without an entry in kinds or listOnly is a mistake caught by the tests.
+// Kinds returns every resource type a collector keeps: those in Listers and
+// those only the graph reads (graphOnly), sorted by name. A lister without
+// an entry in kinds or listOnly is a mistake caught by the tests.
 func Kinds() []Kind {
 	var out []Kind
-	for _, resource := range slices.Sorted(maps.Keys(Listers)) {
-		info, ok := kinds[resource]
-		if !ok {
-			info, ok = listOnly[resource]
+	names := append(slices.Collect(maps.Keys(Listers)), slices.Collect(maps.Keys(graphOnly))...)
+	slices.Sort(names)
+	for _, resource := range names {
+		if k, ok := Lookup(resource); ok {
+			out = append(out, k)
 		}
-		if !ok {
-			continue
-		}
-		out = append(out, kindOf(resource, info))
 	}
 	return out
 }

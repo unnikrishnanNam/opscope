@@ -65,16 +65,22 @@ type Target struct {
 
 // key is how a target, or an object, is found by name: the resource, the
 // namespace when there is one, and the name. A kind Opscope doesn't know is
-// keyed by its kind and group instead.
+// keyed by its kind and group instead, and, when the reference has one
+// (an owner reference), by its UID too: Opscope can't tell whether such a
+// kind is namespaced, so the name alone could be two objects, or the
+// namespace of what refers to it could split one into several.
 func (t Target) key() string {
-	resource := t.Resource
-	if resource == "" {
-		resource = t.Kind
-		if t.Group != "" {
-			resource += "." + t.Group
-		}
+	if t.Resource != "" {
+		return objectKey(t.Resource, t.Namespace, t.Name)
 	}
-	return objectKey(resource, t.Namespace, t.Name)
+	kind := t.Kind
+	if t.Group != "" {
+		kind += "." + t.Group
+	}
+	if t.UID != "" {
+		return kind + "/" + t.Name + "@" + t.UID
+	}
+	return objectKey(kind, t.Namespace, t.Name)
 }
 
 func objectKey(resource, namespace, name string) string {
@@ -89,9 +95,10 @@ func objectKey(resource, namespace, name string) string {
 type Match struct {
 	Resource  string
 	Namespace string
-	// Selects may read only an object's name and labels: matches are
-	// checked again when objects come and go or their labels change.
-	Selects func(obj runtime.Object) bool
+	// Selects sees only an object's name and labels: matches are checked
+	// again when objects come and go or their labels change, and the graph
+	// keeps nothing else of an object.
+	Selects func(name string, labels map[string]string) bool
 	// Dangling, when set, is recorded on the node if nothing matches
 	// ("matches no pods").
 	Dangling string
@@ -140,6 +147,8 @@ func (r *Refs) ToKind(edgeKind, group, kind, namespace, name, uid, field, note s
 		if !k.Namespaced {
 			t.Namespace = ""
 		}
+	} else if uid != "" {
+		t.Namespace = "" // it may be cluster-wide; the UID says which object it is
 	}
 	r.add(Ref{Kind: edgeKind, Field: field, Note: note, Reverse: reverse, Target: &t})
 }

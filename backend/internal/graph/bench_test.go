@@ -2,6 +2,7 @@ package graph
 
 import (
 	"fmt"
+	"runtime"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -153,4 +154,30 @@ func BenchmarkPodRelabel(b *testing.B) {
 		pod.Labels = map[string]string{"app": "app-000", "n": fmt.Sprint(i % 2)}
 		g.Upsert(p)
 	}
+}
+
+// BenchmarkGraphMemory reports how much the graph itself holds per 1,000
+// objects, on top of the cache: in a live graph the objects are the
+// cache's, and the graph keeps its nodes, edges, evidence and indexes.
+//
+//	go test ./internal/graph -run '^$' -bench GraphMemory -benchtime 3x
+func BenchmarkGraphMemory(b *testing.B) {
+	names, objects := nodeNames(50)
+	for i := range 50 {
+		objects = append(objects, apps(fmt.Sprintf("ns-%02d", i), 20, 5, names)...)
+	}
+	var total float64
+	for range b.N {
+		runtime.GC()
+		var before, after runtime.MemStats
+		runtime.ReadMemStats(&before)
+		g := Build(nil, objects)
+		runtime.GC()
+		runtime.ReadMemStats(&after)
+		runtime.KeepAlive(g)
+		total += float64(after.HeapAlloc) - float64(before.HeapAlloc)
+	}
+	b.ReportMetric(float64(len(objects)), "objects")
+	b.ReportMetric(total/float64(b.N)/float64(len(objects))*1000/1024, "KiB/1000")
+	b.ReportMetric(0, "ns/op")
 }

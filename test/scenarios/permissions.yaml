@@ -56,16 +56,19 @@ metadata:
   name: opscope-test-no-watch
 rules:
   - apiGroups: [""]
-    resources: [namespaces, nodes, pods, services, configmaps, events, persistentvolumeclaims, persistentvolumes]
+    resources: [namespaces, nodes, pods, services, configmaps, events, persistentvolumeclaims, persistentvolumes, serviceaccounts]
     verbs: [get, list]
   - apiGroups: [apps]
-    resources: [deployments, statefulsets, daemonsets]
+    resources: [deployments, statefulsets, daemonsets, replicasets]
     verbs: [get, list]
   - apiGroups: [batch]
     resources: [jobs, cronjobs]
     verbs: [get, list]
   - apiGroups: [networking.k8s.io]
     resources: [ingresses]
+    verbs: [get, list]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
     verbs: [get, list]
   - apiGroups: [storage.k8s.io]
     resources: [storageclasses]
@@ -98,8 +101,8 @@ metadata:
   name: opscope-test-team-a
   namespace: team-a
 rules:
-  - apiGroups: ["", apps, batch]
-    resources: [pods, services, configmaps, events, deployments, statefulsets, daemonsets, jobs, cronjobs]
+  - apiGroups: ["", apps, batch, discovery.k8s.io]
+    resources: [pods, services, configmaps, events, serviceaccounts, deployments, statefulsets, daemonsets, replicasets, jobs, cronjobs, endpointslices]
     verbs: [get, list, watch]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
