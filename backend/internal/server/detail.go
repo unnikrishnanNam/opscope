@@ -11,6 +11,7 @@ import (
 
 	"opscope/internal/clusters"
 	"opscope/internal/collector"
+	"opscope/internal/graph"
 	"opscope/internal/resources"
 )
 
@@ -18,7 +19,12 @@ import (
 // GET /api/clusters/{id}/{resource}/{name}               (cluster-wide kinds, e.g. a node)
 //
 // Everything the detail page shows about one object.
-func getDetail(manager *clusters.Manager, live *collector.Set) http.HandlerFunc {
+//
+// The object itself is read from the cluster; what it's connected to (the
+// pods using a claim, what uses a Secret, whether a link's object exists)
+// comes from the graph, so the page and the Topology page agree. If the
+// graph can't be read, the page is shown without those parts.
+func getDetail(manager *clusters.Manager, live *collector.Set, graphs graphReader) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cluster, ok := findCluster(w, r, manager)
 		if !ok {
@@ -26,17 +32,28 @@ func getDetail(manager *clusters.Manager, live *collector.Set) http.HandlerFunc 
 		}
 
 		// For the cluster-wide route there's no {namespace}; PathValue gives "".
-		detail, err := resources.GetDetail(r.Context(), clientsOf(cluster), live.Source(cluster),
-			r.PathValue("resource"), r.PathValue("namespace"), r.PathValue("name"))
+		resource := r.PathValue("resource")
+		src := live.Source(cluster)
+		detail, err := resources.GetDetail(r.Context(), clientsOf(cluster), src, resource, r.PathValue("namespace"), r.PathValue("name"))
 		switch {
 		case errors.Is(err, resources.ErrUnknownKind):
-			writeError(w, http.StatusNotFound, err.Error()+": "+r.PathValue("resource"))
+			writeError(w, http.StatusNotFound, err.Error()+": "+resource)
 		case err != nil:
 			writeClusterError(w, err, cluster)
 		default:
+			addRelations(r.Context(), graphs, cluster.ID, src, detail, resource)
 			writeJSON(w, http.StatusOK, detail)
 		}
 	}
+}
+
+// addRelations completes a detail page from the cluster's graph, read for
+// the page's namespace (which a graph built on request needs).
+func addRelations(ctx context.Context, graphs graphReader, cluster string, src resources.Source, d *resources.Detail, resource string) {
+	_ = graphs.Read(ctx, cluster, src, d.Namespace, func(g *graph.Graph, _ graph.Info) error {
+		resources.AddRelations(ctx, src, d, resource, g.Relations())
+		return nil
+	})
 }
 
 const (

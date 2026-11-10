@@ -20,7 +20,7 @@ build phases 0–8 or the D, G, L, P, R and S phases. All work happens on the `d
 one commit per phase, as in v1.4; each phase is reviewed before it is committed, and the next phase
 starts only after that.
 
-**Status (2026-11-10):** T0–T3 done; T4 next.
+**Status (2026-11-10):** T0–T4 done; T5 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -392,13 +392,14 @@ Goal: every query in the plan answers over HTTP.
 
 Goal: detail links come from the graph, and ConfigMaps and Secrets show what uses them.
 
-- [ ] Owners, node, storage links, pod volumes, a claim's users, a StatefulSet's claims and a
-      StorageClass's counts read from the graph; the old lookups removed
-- [ ] "Used by" on ConfigMaps and Secrets
-- [ ] A test that every detail page gives the same links as before this phase, on the same objects
-- [ ] On multipass and the scenario cluster: the same links as v1.4, and "Used by" matches what
+- [~] Owners, node, storage links, pod volumes, a claim's users, a StatefulSet's claims and a
+      StorageClass's counts read from the graph; the old lookups removed (links named in the
+      object are still read from it, with the graph saying whether they exist; see notes)
+- [x] "Used by" on ConfigMaps and Secrets
+- [x] A test that every detail page gives the same links as before this phase, on the same objects
+- [x] On multipass and the scenario cluster: the same links as v1.4, and "Used by" matches what
       kubectl shows
-- [ ] Browser: light and dark, keyboard, 375 px and wide
+- [x] Browser: light and dark, keyboard, 375 px and wide
 
 ## Phase T5: The map in `/kit`
 
@@ -684,3 +685,54 @@ Goal: v1.5.0 is ready to tag.
   EndpointSlice); the namespace (91 nodes, 184 edges); the path from the pod to its Service;
   "what runs on kubeworker1" (15 pods) and "pods using kube-proxy" (3). Every answer took under a
   millisecond, `built` was `live`, and the log had no warnings.
+
+### T4: Detail pages on the graph (2026-11-10)
+
+- The detail page's object is still read from the cluster, as decided; `resources.GetDetail` no
+  longer lists anything else. The server then reads the cluster's graph, for the page's namespace,
+  and `resources.AddRelations` completes the page from it through a small interface,
+  `resources.Relations` (`Presence` and `Related`), which `graph.Graph.Relations()` implements.
+  `resources` can't import the graph (the graph imports it), hence the interface. The graph is read
+  after the object, so a slow cluster never holds the graph's lock. If the graph can't be read,
+  the page is shown without those parts.
+- Changed from the plan: the links an object names itself (its owners, a pod's volumes and node, a
+  claim's volume and class, a volume's claim and class, a claim template's class) are still read
+  from the object, by the same code as v1.4. What the graph decides is whether each one exists. A
+  link to an object that doesn't exist now says "(not found)" and links nowhere, everywhere: v1.4
+  did that only for StorageClasses. What can only be known from other objects comes from the graph
+  alone: a claim's pods, a StatefulSet's claims, a StorageClass's counts, and "Used by". Reading
+  both kinds from the graph's edges as well would have given the same links by a longer road; the
+  graph decides presence and the connections, which is what can disagree.
+- The old lookups are gone (`addRelated`, `checkClass`, `claimUsers`, `statefulSetClaims`,
+  `storageClassUsage`, `claimOf`, `madeFromTemplate`). A StatefulSet's claims still read the claims'
+  capacity from the cache, since the graph keeps no object; the claims themselves come from the
+  graph.
+- Added: a pod's node is a link now, to the node's page, and says "(not found)" for a node that's
+  gone.
+- **"Used by"** on ConfigMaps and Secrets: kind, name (linked), how ("env DB_PASSWORD, volume
+  creds", from the edges' evidence) and, for a workload, how many of its pods use it. Workloads
+  come first, then pods no listed workload owns, then the rest (an Ingress's TLS, a Gateway's
+  certificate). A pod counts under every listed workload above it, up to three owners away, so a
+  CronJob and its Job both count the Job's pod. (Found in a test: counting only under the nearest
+  owner left the CronJob saying 0.)
+- The detail page shows its tables before a ConfigMap's data, so "Used by" isn't below a long
+  certificate. No other kind has both data and tables.
+- `TestDetailLinksMatchV14`: `TestRecordV14Links` recorded every link on 14 detail pages from
+  v1.4's code before the change, from client-go fakes with workloads, every storage state and
+  missing objects (`testdata/detail-links-v1.4.json`). The new code must give the same, apart from
+  the changes above, which the test lists. Taking out "(not found)", the pods counted under
+  workloads or a claim's users each makes it fail. The storage tests in `resources` that read
+  related objects moved to `server/storage_relations_test.go`, unchanged in what they check (pods
+  in another namespace using a claim of the same name, claims without an ordinal, another
+  StatefulSet's claims, counts per class), with a new one for "Used by".
+- Checked on multipass (read-only): v1.4.0 and this branch side by side, every one of 178 detail
+  pages compared. Apart from the intended changes (46 pods' nodes linked, 3 links to missing
+  objects, 37 ConfigMaps and Secrets with "Used by", 43 rows), none differed. "Used by" was
+  compared with what kubectl shows of every pod and workload template: 36 ConfigMaps and Secrets,
+  no difference.
+- Checked on a throwaway kind cluster with the topology, workloads and storage scenarios (deleted
+  afterwards): 91 detail pages, none differing but as intended; "Used by" as the scenarios set it
+  up; the `broken` pod's missing ConfigMap "(not found)".
+- In the browser: a ConfigMap with four users, a pod's node link, a StorageClass's counts and a
+  Secret's users, in dark and in light at 375 px (no sideways scroll); the names are links, so
+  Tab reaches them. No console errors.

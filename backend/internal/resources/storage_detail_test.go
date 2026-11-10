@@ -88,34 +88,10 @@ func TestClaimDetail(t *testing.T) {
 	if l := fieldLink(d, "StorageClass"); l == nil || *l != (Link{Resource: "storageclasses", Name: "standard"}) {
 		t.Errorf("class link = %+v", l)
 	}
-
-	users := table(d, "Used by")
-	if users == nil || len(users.Rows) != 1 || users.Rows[0][0] != "db-0" || users.Rows[0][2] != "worker-1" {
-		t.Fatalf("used by = %+v", users)
-	}
-	if l := users.Links[0][0]; l == nil || *l != (Link{Resource: "pods", Namespace: "data", Name: "db-0"}) {
-		t.Errorf("pod link = %+v", l)
-	}
+	// The pods using it come from the graph: see server/storage_relations_test.go.
 }
 
-func TestClaimWithMissingClass(t *testing.T) {
-	missing := "does-not-exist"
-	clients := relatedClients(t, map[string]runtime.Object{
-		"persistentvolumeclaims": &corev1.PersistentVolumeClaim{
-			ObjectMeta: meta("data", "db"),
-			Spec:       corev1.PersistentVolumeClaimSpec{StorageClassName: &missing},
-			Status:     corev1.PersistentVolumeClaimStatus{Phase: corev1.ClaimPending},
-		},
-	})
-
-	d, err := GetDetail(context.Background(), clients, Direct(clients), "persistentvolumeclaims", "data", "db")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !hasField(d, "StorageClass", "does-not-exist (not found)") || fieldLink(d, "StorageClass") != nil {
-		t.Errorf("fields = %+v", d.Fields)
-	}
-}
+// A claim whose class doesn't exist: server/storage_relations_test.go.
 
 func TestClaimDetailWithoutPodAccess(t *testing.T) {
 	clients := relatedClients(t, map[string]runtime.Object{
@@ -213,8 +189,7 @@ func TestStorageClassDetail(t *testing.T) {
 	for label, value := range map[string]string{
 		"Provisioner": "rancher.io/local-path", "Default": "Yes", "Reclaim policy": "Delete",
 		"Binding mode": "Immediate", "Volume expansion": "No", "Mount options": "noatime",
-		"Volumes": "1", "Claims": "2",
-	} {
+	} { // Volumes and Claims come from the graph: server/storage_relations_test.go
 		if !hasField(d, label, value) {
 			t.Errorf("want field %s = %q; fields = %+v", label, value, d.Fields)
 		}
@@ -306,14 +281,7 @@ func TestStatefulSetClaims(t *testing.T) {
 	if templates == nil || !reflect.DeepEqual(templates.Rows, [][]string{{"data", "1 GiB", "ReadWriteOnce", "fast"}}) {
 		t.Errorf("templates = %+v", templates)
 	}
-	claims := table(d, "Claims")
-	want := [][]string{{"data-db-0", "Bound", "1 GiB", "pv-a"}, {"data-db-1", "Bound", "1 GiB", "pv-b"}}
-	if claims == nil || !reflect.DeepEqual(claims.Rows, want) {
-		t.Fatalf("claims = %+v", claims)
-	}
-	if l := claims.Links[0][3]; l == nil || *l != *volumeLink("pv-a") {
-		t.Errorf("volume link = %+v", l)
-	}
+	// The claims made from them come from the graph: server/storage_relations_test.go.
 }
 
 func TestAddRowKeepsLinksAligned(t *testing.T) {

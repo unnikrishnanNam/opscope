@@ -248,6 +248,24 @@ function Summary({ d, cluster, resource }) {
         </Section>
       )}
 
+      {/* Before a ConfigMap's data, which can be long: "Used by" is what
+          someone opening it usually wants. No other kind has both. */}
+      {d.tables.map((t) => (
+        <Section key={t.title} title={t.title}>
+          <SimpleTable
+            label={t.title}
+            columns={t.columns.map((label) => ({ label }))}
+            // Plain strings stay strings, so empty cells still get their dash.
+            rows={t.rows.map((row, r) =>
+              row.map((cell, c) => {
+                const link = t.links?.[r]?.[c];
+                return link && cell ? <ObjectLink cluster={cluster} link={link} text={cell} search={search} /> : cell;
+              }),
+            )}
+          />
+        </Section>
+      ))}
+
       {d.data.length > 0 && (
         <Section title="Data" aside={d.data.length}>
           <div className="detail-data">
@@ -273,22 +291,6 @@ function Summary({ d, cluster, resource }) {
           </div>
         </Section>
       )}
-
-      {d.tables.map((t) => (
-        <Section key={t.title} title={t.title}>
-          <SimpleTable
-            label={t.title}
-            columns={t.columns.map((label) => ({ label }))}
-            // Plain strings stay strings, so empty cells still get their dash.
-            rows={t.rows.map((row, r) =>
-              row.map((cell, c) => {
-                const link = t.links?.[r]?.[c];
-                return link && cell ? <ObjectLink cluster={cluster} link={link} text={cell} search={search} /> : cell;
-              }),
-            )}
-          />
-        </Section>
-      ))}
 
       {d.conditions.length > 0 && (
         <Section title="Conditions">

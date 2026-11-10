@@ -68,8 +68,8 @@ func New(cfg Config, manager *clusters.Manager, live *collector.Set, graphs grap
 	mux.HandleFunc("GET /api/clusters/{id}/secrets/{namespace}/{name}/{key}", getSecretValue(manager))
 
 	// One object's details: with a namespace, or without for cluster-wide kinds.
-	mux.HandleFunc("GET /api/clusters/{id}/{resource}/{namespace}/{name}", getDetail(manager, live))
-	mux.HandleFunc("GET /api/clusters/{id}/{resource}/{name}", getDetail(manager, live))
+	mux.HandleFunc("GET /api/clusters/{id}/{resource}/{namespace}/{name}", getDetail(manager, live, graphs))
+	mux.HandleFunc("GET /api/clusters/{id}/{resource}/{name}", getDetail(manager, live, graphs))
 
 	// A pod's logs, streamed as plain text.
 	mux.HandleFunc("GET /api/clusters/{id}/pods/{namespace}/{name}/logs", streamLogs(manager))
