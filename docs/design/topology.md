@@ -20,7 +20,7 @@ build phases 0–8 or the D, G, L, P, R and S phases. All work happens on the `d
 one commit per phase, as in v1.4; each phase is reviewed before it is committed, and the next phase
 starts only after that.
 
-**Status (2026-11-09):** T0 done; T1 next.
+**Status (2026-11-10):** T0–T1 done; T2 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -344,13 +344,14 @@ Goal: this record is reviewed before the work starts.
 Goal: a graph can be built from a set of objects, with every edge kind and its evidence; nothing
 reads it yet.
 
-- [ ] `internal/graph`: `Node`, `Edge`, `Evidence`, `Dangling`; node and edge IDs; the builder
+- [x] `internal/graph`: `Node`, `Edge`, `Evidence`, `Dangling`; node and edge IDs; the builder
       registry
-- [ ] Builders for every edge kind in the table, and the dangling selector
-- [ ] Missing and unknown nodes; the lessons kept, each with a test
-- [ ] `Build(objects)` and `Apply(change)`, and a test that applying objects one at a time in any
-      order gives the same graph, IDs included, as building from all of them
-- [ ] Tests with objects in Go for every edge kind and its evidence; a benchmark for building a
+- [x] Builders for every edge kind in the table, and the dangling selector
+- [x] Missing and unknown nodes; the lessons kept, each with a test
+- [~] `Build(objects)` and ~~`Apply(change)`~~ `Upsert` and `Delete`, and a test that applying
+      objects one at a time in any order gives the same graph, IDs included, as building from all
+      of them (see notes)
+- [x] Tests with objects in Go for every edge kind and its evidence; a benchmark for building a
       namespace of 1,000 objects and a cluster of 5,000 pods
 
 ## Phase T2: The graph on the cache
@@ -469,3 +470,61 @@ Goal: v1.5.0 is ready to tag.
 - Reviewed the same day: the four open questions were answered as proposed and moved into
   Decisions (the detail object stays direct, no pages for the new kinds, two search phrases, and
   building on request when a kind isn't cached).
+
+### T1: Graph model and edge builders (2026-11-09)
+
+- `internal/graph` has the model (`model.go`), the builder registry (`refs.go`), the builders in
+  three files by area (`build_workloads.go`, `build_network.go`, `build_storage.go`) and the graph
+  itself (`graph.go`). Nothing outside the package uses it yet.
+- `resources` gained `Lookup(resource)` and `LookupKind(group, kind)` over every kind it knows, a
+  `KindName` on `Kind` ("Pod"), and the `graphOnly` table for ReplicaSets, EndpointSlices and
+  ServiceAccounts. Those three aren't in `Kinds()` yet, so nothing collects them until T2; a test
+  says so.
+- Changed from the plan: there's no `Apply(change)`. The graph has `Upsert(object)` and
+  `Delete(uid)`, and T2 turns bus events into those. `Build` is `New` followed by an `Upsert` per
+  object, so the two can't drift apart.
+- Builders are named by kind and part (`pods.spec`, `pods.node`, `deployments.template`,
+  `services.selector`, `owners`, ...), not by field as the example in the design (`pods.volumes`);
+  the field path is in each piece of evidence anyway. One builder, `owners`, reads every kind.
+- Added to the plan:
+  - Evidence has a `note`: what the field is, briefly ("env DB_PASSWORD", "volume config",
+    "envFrom", "listener https", "port 80", "controller"; "ready" or "not ready" for an
+    EndpointSlice's pod). "Used by" in T4 shows it as how a ConfigMap or Secret is used.
+  - `references` from a StatefulSet to the claims made from its templates
+    (`<template>-<statefulset>-<ordinal>`), found by name since they outlive the pods. T4's "claims
+    made from a StatefulSet" needs it. A claim whose name has no ordinal after the prefix isn't
+    one, with a test.
+  - `binds` from a claim to its StorageClass as well as from its volume, so a pending claim shows
+    the class it waits for, or that the class doesn't exist. kubectl's old
+    `volume.beta.kubernetes.io/storage-class` annotation wins over the field, as on the storage
+    pages.
+  - A pod's generic ephemeral volume refers to its claim, `<pod>-<volume>`.
+  - An owner of a kind Opscope doesn't know (an Argo Rollout, say) is an unknown node keyed by its
+    kind and group: `unknown:Rollout.argoproj.io/<namespace>/<name>`.
+- Changed from the plan: no default StorageClass. A claim without a class gets the default one
+  written into `storageClassName` by the API server when it's made, so the field already names it;
+  a claim that still has none has no class edge.
+- A reference with a UID (owner references, an EndpointSlice's pods) only reaches the object with
+  that UID. A Deployment deleted and made again under the same name doesn't own the old one's
+  ReplicaSet; the ReplicaSet's owner is missing, with a test.
+- `status` isn't filled in yet: nothing shows it until the API in T3, which fills it.
+- **Selectors are checked one object at a time.** The first version checked every selector in a
+  namespace again whenever a pod came, went or changed its labels. Building a namespace of 1,000
+  objects took 424 ms that way, since each new pod checked 110 Services against every pod. Now the
+  graph keeps what each selector picks, and a pod that changes is checked against each selector on
+  its own: the same namespace builds in 5.5 ms, and a pod changing its labels there takes 13 µs
+  instead of 3.9 ms.
+- Benchmarks (Apple M4 Pro): a namespace of 1,000 objects (110 apps of 3 pods) builds in 5.5 ms;
+  a cluster of 5,000 pods (11,050 objects in 50 namespaces on 50 nodes) in 50 ms; one pod's status
+  changing in that cluster takes 4 µs. Memory is measured in T2, with the real cache.
+- Tests: every edge kind with its evidence, field by field; optional references; missing, unknown
+  (a kind the graph isn't given, and one Opscope doesn't know) and dangling; the lessons kept
+  (`kube-root-ca.crt`, the `default` ServiceAccount, static pods, a Gateway's data plane); an object
+  made after what refers to it, and deleted again; an owner made again; selectors following label
+  changes; a kind that stops and starts being readable; deleting everything leaving no node, edge
+  or index entry behind; and `TestOrderDoesntMatter`: 40 random orders of the test namespace, with
+  earlier versions of half the objects and three objects that come and go, each giving the same
+  JSON as building from the final objects at once. Each of these fails when its part is taken out,
+  checked once each: not resolving again when a wanted object appears, not checking selectors on a
+  new object, a label change or a delete, keeping an edge a selector no longer gives, not skipping
+  `kube-root-ca.crt`, and never dropping placeholders. All pass five times in a row with `-race`.
