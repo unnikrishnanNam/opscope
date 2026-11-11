@@ -71,3 +71,31 @@ export const LINE_STYLES = [
 ];
 
 export const LINE_STYLE = Object.fromEntries(LINE_STYLES.flatMap((s) => s.kinds.map((k) => [k, s.style])));
+
+// The kind each resource the graph holds is: "deployments" → "Deployment".
+const KIND_NAMES = {
+  secrets: "Secret",
+  configmaps: "ConfigMap",
+  pods: "Pod",
+  nodes: "Node",
+  serviceaccounts: "ServiceAccount",
+  replicasets: "ReplicaSet",
+  endpointslices: "EndpointSlice",
+  persistentvolumes: "PersistentVolume",
+  persistentvolumeclaims: "PersistentVolumeClaim",
+  storageclasses: "StorageClass",
+  gateways: "Gateway",
+  httproutes: "HTTPRoute",
+  gatewayclasses: "GatewayClass",
+  ingresses: "Ingress",
+  services: "Service",
+  deployments: "Deployment",
+  statefulsets: "StatefulSet",
+  daemonsets: "DaemonSet",
+  jobs: "Job",
+  cronjobs: "CronJob",
+};
+
+export function kindName(resource) {
+  return KIND_NAMES[resource] ?? resource;
+}

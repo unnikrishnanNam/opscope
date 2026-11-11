@@ -150,8 +150,14 @@
   color: var(--text-subtle);
 }
 
+/* Each name stays whole, moving to the next line if it must, and breaks
+   only when it's longer than a line: "Secret order-db-credentials" rather
+   than "order-" at one line's end and "db-credentials" at the next. */
 .topo-list-other {
+  display: inline-block;
+  max-width: 100%;
   color: var(--text);
+  overflow-wrap: anywhere;
 }
 
 .topo-list-other-missing,

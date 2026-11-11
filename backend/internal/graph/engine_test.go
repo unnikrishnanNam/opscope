@@ -269,8 +269,8 @@ func TestEngineKindsItCantRead(t *testing.T) {
 	if info.Built != BuiltLive {
 		t.Errorf("built %s", info.Built)
 	}
-	want := []PartialKind{{Resource: "gateways", Reason: "not installed"}, {Resource: "secrets", Reason: "not allowed"},
-		{Resource: "serviceaccounts", Reason: "not allowed"}}
+	want := []PartialKind{{Resource: "gateways", Code: PartialNotInstalled, Reason: "not installed"}, {Resource: "secrets", Code: PartialForbidden, Reason: "not allowed"},
+		{Resource: "serviceaccounts", Code: PartialForbidden, Reason: "not allowed"}}
 	if !slices.Equal(info.Partial, want) {
 		t.Errorf("partial %+v, want %+v", info.Partial, want)
 	}
@@ -341,7 +341,7 @@ func TestEngineBuildsOnRequest(t *testing.T) {
 			if info.Built != BuiltOnRequest {
 				t.Fatalf("built %s", info.Built)
 			}
-			want := []PartialKind{{Resource: "gateways", Reason: "not installed"}, {Resource: "secrets", Reason: "not allowed"}}
+			want := []PartialKind{{Resource: "gateways", Code: PartialNotInstalled, Reason: "not installed"}, {Resource: "secrets", Code: PartialForbidden, Reason: "not allowed"}}
 			if !slices.Equal(info.Partial, want) {
 				t.Errorf("partial %+v", info.Partial)
 			}

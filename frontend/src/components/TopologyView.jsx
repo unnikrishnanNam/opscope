@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { LINE_STYLES, countOf, pluralKind } from "../graph/kinds.js";
-import { shape } from "../graph/view.js";
+import { LINE_STYLES, countOf, kindName, pluralKind } from "../graph/kinds.js";
+import { shape, unreadable as unreadableKinds } from "../graph/view.js";
 import TopologyGraph from "./TopologyGraph.jsx";
 import TopologyList from "./TopologyList.jsx";
 import TopologyPanel from "./TopologyPanel.jsx";
@@ -13,30 +13,6 @@ const NARROW = "(max-width: 767px)";
 const MIN_HEIGHT = 360;
 const BELOW = 32 + 40; // the page's bottom padding, and the legend under the map
 
-// Kind names for kinds the graph may say it couldn't read.
-const KIND_NAMES = {
-  secrets: "Secret",
-  configmaps: "ConfigMap",
-  pods: "Pod",
-  nodes: "Node",
-  serviceaccounts: "ServiceAccount",
-  replicasets: "ReplicaSet",
-  endpointslices: "EndpointSlice",
-  persistentvolumes: "PersistentVolume",
-  persistentvolumeclaims: "PersistentVolumeClaim",
-  storageclasses: "StorageClass",
-  gateways: "Gateway",
-  httproutes: "HTTPRoute",
-  gatewayclasses: "GatewayClass",
-  ingresses: "Ingress",
-  services: "Service",
-  deployments: "Deployment",
-  statefulsets: "StatefulSet",
-  daemonsets: "DaemonSet",
-  jobs: "Job",
-  cronjobs: "CronJob",
-};
-
 // TopologyView shows a graph answer (GET /api/clusters/{id}/graph/…) as a
 // map with a panel for the selected card, or as a list. On a phone it
 // starts as a list.
@@ -47,9 +23,11 @@ const KIND_NAMES = {
 //   height     the map's height in px; without it, it fills the screen below
 //   fitKey     the map is fitted on screen again when this changes
 //   empty      what to say when there's nothing to show
+//   level      the level of its headings: 3 under a section's h2, 2 when
+//              the map is the page's main content
 //   initial    { mode, selected } to start with ("map" or "list"; a node ID),
 //              for /kit
-export default function TopologyView({ answer, clusterId, label, height, fitKey, empty, initial }) {
+export default function TopologyView({ answer, clusterId, label, height, fitKey, empty, level = 3, initial }) {
   const [mode, setMode] = useState(() => initial?.mode ?? (window.matchMedia?.(NARROW).matches ? "list" : "map"));
   const [selected, setSelected] = useState(initial?.selected ?? null);
   const [expanded, setExpanded] = useState(() => new Set());
@@ -58,7 +36,7 @@ export default function TopologyView({ answer, clusterId, label, height, fitKey,
   const frame = useRef(null);
   const filled = useFillHeight(frame, !height && mode === "map");
   const shown = selected && view.nodes.some((n) => n.id === selected) ? selected : null;
-  const unreadable = (answer.partial ?? []).filter((p) => p.reason !== "not installed");
+  const unreadable = unreadableKinds(answer.partial);
 
   function close() {
     const id = shown;
@@ -100,7 +78,7 @@ export default function TopologyView({ answer, clusterId, label, height, fitKey,
         <p className="topo-unreadable">
           <EyeOffIcon size={14} />
           <span>
-            Opscope can't read {listOf(unreadable.map((p) => pluralKind(KIND_NAMES[p.resource] ?? p.resource)))} here, so they show
+            Opscope can't read {listOf(unreadable.map((p) => pluralKind(kindName(p.resource))))} here, so they show
             as “Can't read”.
           </span>
         </p>
@@ -126,6 +104,7 @@ export default function TopologyView({ answer, clusterId, label, height, fitKey,
                 id={shown}
                 focus={view.focus}
                 clusterId={clusterId}
+                level={level}
                 onSelect={(id) => {
                   setSelected(id);
                   graph.current?.showCard(id);
@@ -139,7 +118,7 @@ export default function TopologyView({ answer, clusterId, label, height, fitKey,
           <Legend view={view} />
         </>
       ) : (
-        <TopologyList view={view} focus={view.focus} clusterId={clusterId} empty={empty} />
+        <TopologyList view={view} focus={view.focus} clusterId={clusterId} empty={empty} level={level} />
       )}
     </div>
   );

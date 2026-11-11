@@ -305,7 +305,7 @@ Every answer has the same shape:
 ```json
 {
   "built": "live",
-  "partial": [{ "resource": "secrets", "reason": "listing across all namespaces isn't allowed" }],
+  "partial": [{ "resource": "secrets", "code": "forbidden", "reason": "listing across all namespaces isn't allowed" }],
   "focus": "3f6c1e2a-…",
   "nodes": [
     {
@@ -352,8 +352,9 @@ Every answer has the same shape:
 - `built` is `live` when the graph is kept up to date from the copy in memory, or `on_request`
   when it was built for this request from the cluster (live data off, the cluster unreachable, or
   pods readable only per namespace); a graph built on request is reused for 10 seconds.
-- `partial` lists the kinds the graph couldn't read, and why. References to their objects are
-  `unknown` nodes.
+- `partial` lists the kinds the graph couldn't read, and why: `code` is `not_installed` (the
+  cluster doesn't have the kind, as with Gateway API) or `forbidden` (Opscope isn't allowed to
+  list it), and `reason` says it in words. References to their objects are `unknown` nodes.
 - `focus` is the node the query was about; `matches` (search only) the nodes that answer it.
 - A node's `id` is its object's UID. An object that's referred to but doesn't exist is a
   `missing` node, `missing:<resource>/<namespace>/<name>`; one whose kind can't be read is
@@ -382,10 +383,10 @@ kinds to follow, comma-separated). A walk reaches a Node, StorageClass or Gatewa
 go on through it, unless it starts there. Node IDs are passed in the query string, since a
 placeholder's has slashes. An unknown node is `404`, a bad parameter `400`.
 
-### `GET /api/clusters/{id}/graph/find?resource=&namespace=&name=`
+### `GET /api/clusters/{id}/graph/find?resource=&namespace=&name=&depth=`
 
-One object, named the way pages name it, and everything one edge away. A missing or unknown object
-is found as its placeholder.
+One object, named the way pages name it, and everything one edge away, or `depth` edges either
+way. A missing or unknown object is found as its placeholder.
 
 ### `GET /api/clusters/{id}/graph/node?id=`
 

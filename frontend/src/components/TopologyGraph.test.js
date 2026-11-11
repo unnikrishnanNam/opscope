@@ -60,6 +60,22 @@ describe("first view", () => {
     expect(Math.abs(middle - size.w / 2)).toBeLessThan(size.w / 4);
   });
 
+  it("starts with no card in sight cut off at the top", () => {
+    // One route to eight Services: the route sits halfway down their column.
+    const services = Array.from({ length: 8 }, (_, i) => node(`svc-${i}`, "services"));
+    const tall = layout({
+      nodes: [node("route", "httproutes"), ...services],
+      edges: services.map((s) => edge("route", s.id, "routes")),
+    });
+    const size = { w: 500, h: 400 };
+    const t = firstView(tall, size);
+    const route = tall.nodes.route;
+    const higher = Object.values(tall.nodes).filter((c) => c.y < route.y && c.x * t.k + t.x < size.w);
+    expect(higher.length).toBeGreaterThan(0); // the case this is about
+    for (const c of higher) expect(c.y * t.k + t.y).toBeGreaterThanOrEqual(24);
+    expect(route.y * t.k + t.y).toBeLessThan(size.h); // and the first card is still in sight
+  });
+
   it("starts at the first card of the first column without one", () => {
     const t = firstView(placed, { w: 500, h: 400 });
     const first = placed.nodes.route;

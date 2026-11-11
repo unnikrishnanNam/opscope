@@ -54,11 +54,20 @@ type Info struct {
 }
 
 // PartialKind is a kind the graph couldn't read. References to its objects
-// are Unknown nodes.
+// are Unknown nodes. Code says why, for a program, with the name index's
+// codes: not_installed (the cluster doesn't have the kind: Gateway API) or
+// forbidden (this user isn't allowed to list it). Reason says it in words.
 type PartialKind struct {
 	Resource string `json:"resource"`
+	Code     string `json:"code"`
 	Reason   string `json:"reason"`
 }
+
+// PartialKind codes.
+const (
+	PartialNotInstalled = "not_installed"
+	PartialForbidden    = "forbidden"
+)
 
 // Engine keeps one graph per cluster, up to date from the bus, and builds
 // graphs on request for clusters it can't keep that way.
@@ -263,13 +272,20 @@ func (e *Engine) sync(cluster string, l *liveGraph) {
 			k.Mode == collector.ModeDirect && resource != "pods"):
 			l.g.SetReadable(resource, false)
 			delete(l.stale, resource)
-			partial = append(partial, PartialKind{Resource: resource, Reason: reasonOf(k)})
+			partial = append(partial, PartialKind{Resource: resource, Code: codeOf(k), Reason: reasonOf(k)})
 		default: // pending, pods read per namespace, or a cache still on its first list
 			l.g.SetReadable(resource, false)
 			complete = false
 		}
 	}
 	l.complete, l.partial = complete, partial
+}
+
+func codeOf(k collector.KindStatus) string {
+	if k.Mode == collector.ModeNotInstalled {
+		return PartialNotInstalled
+	}
+	return PartialForbidden // forbidden, or only per namespace (direct)
 }
 
 func reasonOf(k collector.KindStatus) string {
@@ -364,9 +380,9 @@ func buildFrom(ctx context.Context, src resources.Source, namespace string) (*Gr
 			readable = append(readable, resource)
 			objects = append(objects, objectsOf(resource, results[i].objects, seen)...)
 		case apierrors.IsForbidden(err):
-			info.Partial = append(info.Partial, PartialKind{Resource: resource, Reason: "not allowed"})
+			info.Partial = append(info.Partial, PartialKind{Resource: resource, Code: PartialForbidden, Reason: "not allowed"})
 		case apierrors.IsNotFound(err), errors.Is(err, resources.ErrGatewayAPINotInstalled):
-			info.Partial = append(info.Partial, PartialKind{Resource: resource, Reason: "not installed"})
+			info.Partial = append(info.Partial, PartialKind{Resource: resource, Code: PartialNotInstalled, Reason: "not installed"})
 		default:
 			return nil, Info{}, fmt.Errorf("reading %s: %w", resource, err)
 		}

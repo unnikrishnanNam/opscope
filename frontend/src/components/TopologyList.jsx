@@ -11,7 +11,8 @@ import "./TopologyList.css";
 // object with its status, any gap, and what it needs. It reads the same
 // with a screen reader or on a phone, so nothing a map shows exists only in
 // the picture.
-export default function TopologyList({ view, focus, clusterId, empty = "Nothing to show." }) {
+export default function TopologyList({ view, focus, clusterId, empty = "Nothing to show.", level = 3 }) {
+  const Heading = `h${level}`;
   const search = nsQuery(useLocation().search);
   const placed = useMemo(() => layout(view), [view]);
   const nodes = useMemo(() => new Map(view.nodes.map((n) => [n.id, n])), [view]);
@@ -32,9 +33,9 @@ export default function TopologyList({ view, focus, clusterId, empty = "Nothing 
         // Columns are plain sections under their heading, not landmarks: a
         // list of eleven landmarks is noise to a screen reader.
         <section key={c.key} className="topo-list-column">
-          <h3 className="topo-list-heading">
+          <Heading className="topo-list-heading">
             {c.label} <span className="topo-list-count">{c.ids.length}</span>
-          </h3>
+          </Heading>
           <ul className="topo-list-items">
             {c.ids.map((id) => (
               <Item key={id} n={nodes.get(id)} view={view} nodes={nodes} focus={focus} clusterId={clusterId} search={search} />

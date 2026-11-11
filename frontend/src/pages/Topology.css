@@ -1,0 +1,157 @@
+.topology-page {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* Focused only to keep the keyboard's place when a view changes (see
+   Topology.jsx), like the skip link's target. */
+.topology-page:focus {
+  outline: none;
+}
+
+/* What the map is limited to: an object, or a search, with a way back. */
+.topology-scope {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.topology-scope-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.topology-scope-text {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--space-2);
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.topology-scope-ns {
+  color: var(--text-muted);
+}
+
+.topology-scope-q {
+  font-weight: var(--weight-strong);
+}
+
+.topology-scope-steps {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-strong);
+  color: var(--text-subtle);
+}
+
+.topology-scope-clear {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: var(--control-sm);
+  height: var(--control-sm);
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.topology-scope-clear:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.topology-scope-clear:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+/* All namespaces: pick one. */
+.topology-pick {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.topology-pick-intro {
+  max-width: 64ch;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.topology-pick-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.topology-pick-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.topology-pick-card:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.topology-pick-card:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.topology-pick-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+/* The name over its count, so the name has the card's width; a name too
+   long even for that wraps rather than hiding its end. */
+.topology-pick-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.topology-pick-name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-strong);
+  overflow-wrap: anywhere;
+}
+
+.topology-pick-count {
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A search to type, kept on one line. */
+.topology-example {
+  white-space: nowrap;
+}

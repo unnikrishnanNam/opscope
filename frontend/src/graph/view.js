@@ -150,6 +150,13 @@ export function statusSummary(pods) {
 }
 
 // cardKind is what a card says it is: its kind, or for a group "3 pods".
+// unreadable is the kinds a map should say it couldn't read: those the
+// cluster has but Opscope isn't allowed to list. A kind the cluster doesn't
+// have (Gateway API) has nothing to read, so it isn't a gap.
+export function unreadable(partial) {
+  return (partial ?? []).filter((p) => p.code !== "not_installed");
+}
+
 export function cardKind(n) {
   return n.pods ? countOf(n.pods.members.length, "pod") : n.kind;
 }

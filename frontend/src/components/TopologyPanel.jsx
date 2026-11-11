@@ -23,7 +23,8 @@ function Name({ children }) {
   return <span className="topo-note-name">{children}</span>;
 }
 
-export default function TopologyPanel({ view, id, focus, clusterId, onSelect, onClose, expanded, onExpand }) {
+export default function TopologyPanel({ view, id, focus, clusterId, level = 3, onSelect, onClose, expanded, onExpand }) {
+  const Title = `h${level}`;
   const titleId = useId();
   const titleRef = useRef(null);
   const search = nsQuery(useLocation().search);
@@ -61,9 +62,9 @@ export default function TopologyPanel({ view, id, focus, clusterId, onSelect, on
         <Button variant="quiet" size="sm" icon={CloseIcon} label="Close details" onClick={onClose} />
       </header>
 
-      <h3 id={titleId} ref={titleRef} tabIndex={-1} className="topo-panel-title">
+      <Title id={titleId} ref={titleRef} tabIndex={-1} className="topo-panel-title">
         {n.name}
-      </h3>
+      </Title>
       {n.namespace && (
         <p className="topo-panel-where">
           <NamespaceIcon size={13} />
@@ -111,9 +112,9 @@ export default function TopologyPanel({ view, id, focus, clusterId, onSelect, on
         </div>
       )}
 
-      {n.pods && <Members clusterId={clusterId} n={n} search={search} />}
+      {n.pods && <Members clusterId={clusterId} n={n} search={search} level={level + 1} />}
 
-      <Connections id={id} view={view} nodes={nodes} onSelect={onSelect} />
+      <Connections id={id} view={view} nodes={nodes} onSelect={onSelect} level={level + 1} />
     </aside>
   );
 }
@@ -175,12 +176,13 @@ function Notes({ n, view }) {
 }
 
 // Members lists the pods a group card stands for, with their status.
-function Members({ clusterId, n, search }) {
+function Members({ clusterId, n, search, level }) {
+  const Heading = `h${level}`;
   return (
     <section className="topo-panel-section">
-      <h4 className="topo-panel-heading">
+      <Heading className="topo-panel-heading">
         Pods <span className="topo-panel-count">{n.pods.members.length}</span>
-      </h4>
+      </Heading>
       <ul className="topo-panel-members">
         {n.pods.members.map((pod) => {
           const path = clusterId && detailPath(clusterId, "pods", pod.namespace, pod.name);
@@ -206,7 +208,8 @@ function Members({ clusterId, n, search }) {
 // from it) and what needs it (edges to it), each by how it reads ("Uses",
 // "Selected by"). Each is a button that picks the card at the other end,
 // with what the edge was read from.
-function Connections({ id, view, nodes, onSelect }) {
+function Connections({ id, view, nodes, onSelect, level }) {
+  const Heading = `h${level}`;
   const sides = [
     { out: true, title: "Needs", Icon: ArrowRightIcon, about: "What this object depends on." },
     { out: false, title: "Needed by", Icon: ArrowLeftIcon, about: "What depends on this object." },
@@ -228,10 +231,10 @@ function Connections({ id, view, nodes, onSelect }) {
     .filter((s) => s.total > 0)
     .map((side) => (
       <section key={side.title} className="topo-panel-section">
-        <h4 className="topo-panel-heading" title={side.about}>
+        <Heading className="topo-panel-heading" title={side.about}>
           <side.Icon size={14} />
           {side.title} <span className="topo-panel-count">{side.total}</span>
-        </h4>
+        </Heading>
         {side.groups.map(([words, list]) => (
           <div key={words} className="topo-rel">
             <p className="topo-rel-words">{words}</p>

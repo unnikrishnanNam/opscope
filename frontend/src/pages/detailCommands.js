@@ -1,7 +1,8 @@
 import { copyText } from "../clipboard.js";
-import { CopyIcon, EventsIcon, FileTextIcon, InfoIcon, LogsIcon, NodesIcon } from "../components/icons.jsx";
+import { CopyIcon, EventsIcon, FileTextIcon, InfoIcon, LogsIcon, NodesIcon, TopologyIcon } from "../components/icons.jsx";
 import { kubectlDescribe, kubectlGet, kubectlLogs } from "../kubectl.js";
 import { allPages, detailPath } from "../sections.js";
+import { objectParam } from "./topologyRequest.js";
 
 const GROUP = "This page";
 const TAB_ICONS = { summary: InfoIcon, yaml: FileTextIcon, events: EventsIcon, logs: LogsIcon };
@@ -42,6 +43,20 @@ export function detailCommands({ d, page, clusterId, tab, tabs, openTab, search 
   );
   // On the Logs tab, the log viewer offers its own, for the container shown.
   if (page.resource === "pods" && tab !== "logs") commands.push(kubectl("logs", kubectlLogs(namespace, name)));
+
+  // Its map: the object and what's around it, on the Topology page.
+  const map = new URLSearchParams();
+  if (namespace) map.set("ns", namespace);
+  map.set("object", objectParam(page.resource, namespace, name));
+  commands.push({
+    id: "detail.topology",
+    title: "Show in topology",
+    detail: "what it needs, and what needs it",
+    group: GROUP,
+    icon: TopologyIcon,
+    keywords: ["map", "graph", "uses", "used by"],
+    to: `/c/${clusterId}/topology?${map}`,
+  });
 
   if (namespace) {
     commands.push({

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardKind, shape, statusSummary } from "./view.js";
+import { cardKind, shape, statusSummary, unreadable } from "./view.js";
 
 // Answers shaped like GET /graph/…: node(id) for "resource/namespace/name".
 const KINDS = {
@@ -146,5 +146,16 @@ describe("statusSummary", () => {
     expect(statusSummary([{ status: "Pending" }, { status: "Running" }, { status: "Running" }, { status: "" }])).toBe(
       "2 Running, 1 Pending, 1 Unknown",
     );
+  });
+});
+
+describe("unreadable", () => {
+  it("leaves out kinds the cluster doesn't have", () => {
+    const partial = [
+      { resource: "gateways", code: "not_installed", reason: "not installed on this cluster" },
+      { resource: "secrets", code: "forbidden", reason: "listing across all namespaces isn't allowed" },
+    ];
+    expect(unreadable(partial).map((p) => p.resource)).toEqual(["secrets"]);
+    expect(unreadable(undefined)).toEqual([]);
   });
 });

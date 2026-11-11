@@ -34,6 +34,14 @@ describe("detail page commands", () => {
     expect(openTab).toHaveBeenCalledWith("logs");
   });
 
+  test("its map on the Topology page, from its namespace", () => {
+    expect(byId(detailCommands(base))["detail.topology"].to).toBe("/c/lab/topology?ns=web&object=pods%2Fweb%2Fapi-1");
+    const node = { ...pod, namespace: "", name: "worker-1", fields: [], owners: [] };
+    expect(byId(detailCommands({ ...base, d: node, page: nodes }))["detail.topology"].to).toBe(
+      "/c/lab/topology?object=nodes%2Fworker-1",
+    );
+  });
+
   test("read-only kubectl lines", () => {
     const c = byId(detailCommands(base));
     expect(c["detail.kubectl.get"].detail).toBe("kubectl -n web get pods api-1 -o yaml");

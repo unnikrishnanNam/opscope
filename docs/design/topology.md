@@ -20,7 +20,7 @@ build phases 0–8 or the D, G, L, P, R and S phases. All work happens on the `d
 one commit per phase, as in v1.4; each phase is reviewed before it is committed, and the next phase
 starts only after that.
 
-**Status (2026-11-11):** T0–T5 done; T6 next.
+**Status (2026-11-11):** T0–T6 done; T7 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -302,7 +302,7 @@ type Subgraph struct {
 
 | Endpoint                                                          | Returns                                     |
 | ----------------------------------------------------------------- | ------------------------------------------- |
-| `GET /api/clusters/{id}/graph/find?resource=&namespace=&name=`    | the node, and its neighbours                |
+| `GET /api/clusters/{id}/graph/find?resource=&namespace=&name=&depth=` | the node, and what's `depth` steps away (1) |
 | `GET /api/clusters/{id}/graph/nodes/{uid}`                        | the node, and its neighbours (Neighbors)    |
 | `GET /api/clusters/{id}/graph/nodes/{uid}/upstream?depth=&kinds=` | what it depends on                          |
 | `GET /api/clusters/{id}/graph/nodes/{uid}/downstream?depth=&kinds=` | what depends on it                        |
@@ -418,12 +418,13 @@ Goal: the map and the list are built and checked on sample graphs before any pag
 
 Goal: the Topology page, "Show in topology" and graph search work on real clusters.
 
-- [ ] `pages/Topology.jsx`: a namespace, `?focus=<uid>`, the namespace list for "All namespaces",
-      map and list, live updates
-- [ ] Sidebar entry and `g t`; "Topology", "Show in topology" and graph search in the palette
-- [ ] The page says what it couldn't read (`partial`) and when it was built on request
-- [ ] Browser: light and dark, keyboard only, a screen reader on the list, 375 px and wide, with and
-      without Gateway API, two clusters connected; the 1,000-object namespace stays usable
+- [~] `pages/Topology.jsx`: a namespace, ~~`?focus=<uid>`~~ `?object=<resource>/<namespace>/<name>`
+      and `?q=`, the namespace list for "All namespaces", map and list, live updates
+- [x] Sidebar entry and `g t`; "Topology", "Show in topology" and graph search in the palette
+- [x] The page says what it couldn't read (`partial`) and when it was built on request
+- [~] Browser: light and dark, keyboard only, ~~a screen reader~~ the accessibility tree on the
+      list, 375 px and wide, with and without Gateway API, two clusters connected; the
+      1,000-object namespace stays usable
 
 ## Phase T7: Release
 
@@ -766,3 +767,55 @@ Goal: v1.5.0 is ready to tag.
   arrows, Enter to the panel, Escape back to the card, + − 0), dragging, opening a group into pods
   and back, reduced motion, and axe-core 4.10.3 with no violations on one theme, light or dark.
   No console errors. 26 new frontend tests; 128 in all.
+
+### T6: Topology page and palette (2026-11-11)
+
+- `pages/Topology.jsx` has three ways in, all in the URL: `?ns=` for a namespace's map,
+  `?object=deployments/shop/api` (with `&depth=1` to `3`) for one object and what's around it, and
+  `?q=` for a graph search. With no namespace ("All namespaces") it lists the namespaces and how
+  many objects each holds, instead of a map of everything. Changed from the plan: `?object=` names
+  the object by resource, namespace and name instead of `?focus=<uid>`. A detail page's URL has no
+  UID, so its link needs no lookup, and it still works after the object is recreated. `graph/find`
+  takes a `depth` for it (1 by default, as before).
+- The page says what the map is limited to: the object or the search, with "Steps away" 1 to 3
+  and a way back. It also says what it couldn't read, and when the map was read on request.
+- Each partial kind now has a `code`, `not_installed` or `forbidden`, the same codes the name
+  index uses. Before, the note filtered on the reason's words, and the collector words it
+  differently ("not installed on this cluster"). So on clusters without Gateway API, every map
+  said it couldn't read Gateways.
+- An empty answer says why it's empty: no match, a namespace this cluster doesn't have (as from a
+  link to another cluster), or nothing the topology holds.
+- Palette: "Topology" as a page (`g t`, after the overview in the Cluster group), "Show in
+  topology" on every detail page, and graph search.
+  - Search needed a new hook: a source's `fromQuery(ctx, query)` offers commands made from what's
+    typed, ranked with the rest. `sources/graph.js` offers "Search the topology" for any phrase
+    whose second-to-last word is `using`, `uses` or `on`.
+  - Only the phrase's first word narrows the list, as "pods" would. Otherwise the phrase's own
+    words would hide the command they make.
+- Found in the browser checks and fixed:
+  - The scope bar put a radio group inside a `<p>` (React warned).
+  - The first view of a tall namespace started with cards cut off under the column headings. It
+    now starts at the highest card in sight, unless that would leave the first column's top card
+    off screen.
+  - Long names were cut off on the namespace cards.
+  - At 375 px, names in the list broke at their hyphens.
+  - The list and panel headings jumped from the page's h1 to h3. `TopologyView` now takes a
+    heading level.
+  - A namespace card or the clear button took the keyboard's place with it when the view changed.
+    The page now keeps focus.
+- Checked in headless Chrome over the DevTools protocol, with multipass (Gateway API) and a kind
+  cluster without it connected at once:
+  - light and dark, at 1440 px and at 375 px (the list first, no sideways scroll);
+  - keyboard only: the Tab order, "Steps away" by arrows, the map's one Tab stop, Enter to the
+    panel and Escape back, the clear button, the namespace cards;
+  - the list's accessibility tree and reading order;
+  - axe-core with no violations on eight views, in both themes;
+  - no console errors.
+- Results from those checks:
+  - Creating a missing Secret turned its card present in about 200 ms, without a reload.
+  - The 1,000-object namespace is 873 cards once EndpointSlices and ReplicaSets fold. In the
+    development build, it loaded in under 300 ms, selected a card in 56 ms and panned at 14 ms a
+    frame.
+  - With live data off, the map said it was read on request, and the top bar said "Every 10 s".
+- Not checked with a real screen reader: VoiceOver can't be driven from here.
+- 12 new frontend tests (140 in all), and Go tests for `find` with and without a depth.

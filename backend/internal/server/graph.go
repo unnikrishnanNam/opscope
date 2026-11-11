@@ -104,7 +104,8 @@ func registerGraph(mux *http.ServeMux, manager *clusters.Manager, graphs graphRe
 		mux.HandleFunc("GET /api/clusters/{id}/graph/"+path, serveGraph(manager, graphs, sources, query))
 	}
 
-	// One object, named the way pages name it, and what's one edge away.
+	// One object, named the way pages name it, and what's around it: one
+	// edge away, or ?depth= edges either way.
 	handle("find", func(r *http.Request, g *graph.Graph, q graph.Query) (graph.Subgraph, error) {
 		v := r.URL.Query()
 		if v.Get("resource") == "" || v.Get("name") == "" {
@@ -114,7 +115,10 @@ func registerGraph(mux *http.ServeMux, manager *clusters.Manager, graphs graphRe
 		if err != nil {
 			return graph.Subgraph{}, err
 		}
-		return g.Neighbors(n.ID, q)
+		if q.Depth == 0 {
+			q.Depth = 1
+		}
+		return g.Subgraph(n.ID, graph.Both, q)
 	})
 	// One node by ID, and what's one edge away.
 	handle("node", func(r *http.Request, g *graph.Graph, q graph.Query) (graph.Subgraph, error) {

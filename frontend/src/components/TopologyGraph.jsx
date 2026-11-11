@@ -605,9 +605,11 @@ function headingsTop(t) {
 // firstView shows the whole map if it can be read that way. Otherwise it
 // shows the focused (or selected) card at a readable size, as near the
 // middle as it can without leaving space beside the map that it could
-// fill. With neither, it starts where reading starts: the top card of the
-// first column, at the top left. (A tall namespace's first columns can
-// start well below its top, so the map's own corner may be empty.)
+// fill. With neither, it starts where reading starts: the first column, at
+// the top left, from the highest card in sight so none starts cut off
+// under the headings, unless that would leave the first column's top card
+// below the screen. (A tall namespace's first columns can start well below
+// its top, so the map's own corner may be empty.)
 export function firstView(placed, size, anchor) {
   const whole = fitAll(placed, size);
   if (whole.k >= READABLE) return whole;
@@ -621,12 +623,15 @@ export function firstView(placed, size, anchor) {
       y: fill(size.h / 2 - (card.y + NODE_H / 2) * k, size.h, placed.height),
     };
   }
-  const first = Object.values(placed.nodes).sort((a, b) => a.rank - b.rank || a.y - b.y)[0];
-  return {
-    k,
-    x: fill(PAD - (first?.x ?? 0) * k, size.w, placed.width),
-    y: fill(PAD + COLUMNS_H - (first?.y ?? 0) * k, size.h, placed.height),
-  };
+  const cards = Object.values(placed.nodes);
+  const first = cards.sort((a, b) => a.rank - b.rank || a.y - b.y)[0];
+  const x = fill(PAD - (first?.x ?? 0) * k, size.w, placed.width);
+  let top = first?.y ?? 0;
+  for (const c of cards) {
+    const inSight = (c.x + NODE_W) * k + x > 0 && c.x * k + x < size.w;
+    if (inSight && c.y < top && (first.y - c.y + NODE_H) * k + PAD + COLUMNS_H <= size.h - CONTROLS_H) top = c.y;
+  }
+  return { k, x, y: fill(PAD + COLUMNS_H - top * k, size.h, placed.height) };
 }
 
 // fitAll fits the map on screen, never larger than its real size.

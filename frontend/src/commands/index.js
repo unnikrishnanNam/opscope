@@ -1,4 +1,5 @@
 import { clusters } from "./sources/clusters.jsx";
+import { graph } from "./sources/graph.js";
 import { help } from "./sources/help.js";
 import { namespaces } from "./sources/namespaces.js";
 import { objects } from "./sources/objects.js";
@@ -14,4 +15,4 @@ import { theme } from "./sources/theme.js";
 // here. The order here is the order of their groups in the palette when
 // nothing has been typed yet.
 
-export const globalSources = [pages, namespaces, clusters, theme, help, objects];
+export const globalSources = [pages, namespaces, clusters, theme, help, objects, graph];

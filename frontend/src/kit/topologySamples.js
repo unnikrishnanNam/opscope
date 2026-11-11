@@ -193,7 +193,7 @@ export function gapsAnswer() {
     b.edge(pod, "unknown:secrets/team-a/web-tls", "references", [["spec.volumes[1].secret.secretName", "volume tls"]]);
     b.edge(pod, "unknown:secrets/team-a/registry", "references", [["spec.imagePullSecrets[0].name", "image pull secret"]]);
   }
-  return b.answer({ partial: [{ resource: "secrets", reason: "listing across all namespaces isn't allowed" }] });
+  return b.answer({ partial: [{ resource: "secrets", code: "forbidden", reason: "listing across all namespaces isn't allowed" }] });
 }
 
 // large: a namespace of about 1,000 objects: 110 apps, each a Deployment

@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { globalSources } from "./index.js";
-import { buildList, collect, collectItems } from "./list.js";
+import { buildList, collect, collectFromQuery, collectItems } from "./list.js";
 import { getRecent, remember } from "./recent.js";
 import { createStore } from "./store.js";
 
@@ -49,6 +49,9 @@ import { createStore } from "./store.js";
 //     notes: (ctx, data) => [...],   lines to show under the results about what was
 //                                    loaded ("Secrets aren't searched: ..."); for a
 //                                    searchOnly source, only once something is typed
+//     fromQuery: (ctx, query) => [...],  commands made from what's typed, built on
+//                                    each key press, so cheap (graph search offers
+//                                    "pods using db-creds" as a search)
 //   }
 //
 // `ctx` is what commands may need to know and do, built by whoever shows
@@ -118,11 +121,17 @@ export function useCommandList(ctx, query, within = null) {
     [store, version, ctx, within],
   );
 
+  // Commands made from the query itself, which can't be built ahead of it.
+  const queried = useMemo(
+    () => (within || !query.trim() ? [] : collectFromQuery(store.sources(), ctx, query)),
+    [store, version, ctx, query, within],
+  );
+
   return useMemo(() => {
     // A sub-list keeps its own order (namespaces A to Z); "Recent" is for the top.
-    const list = buildList({ entries, query, recent: within ? [] : getRecent() });
+    const list = buildList({ entries: [...queried, ...entries], query, recent: within ? [] : getRecent() });
     return { ...list, status };
-  }, [entries, status, query, within]);
+  }, [entries, queried, status, query, within]);
 }
 
 // useShortcutCommands returns every command with a `shortcut`, one per

@@ -131,6 +131,8 @@ func TestGraphEndpoints(t *testing.T) {
 		edges int
 	}{
 		{"find?resource=pods&namespace=shop&name=web-1", "uid-web-1", []string{"Node n1", "Pod web-1", "Secret db-creds", "Secret stripe-key", "Service web"}, 4},
+		{"find?resource=secrets&namespace=shop&name=db-creds&depth=2", "uid-db-creds", []string{"Node n1", "Pod web-1", "Secret db-creds", "Secret stripe-key", "Service web"}, 4},
+		{"find?resource=secrets&namespace=shop&name=db-creds", "uid-db-creds", []string{"Pod web-1", "Secret db-creds"}, 1},
 		{"node?id=uid-web-1", "uid-web-1", []string{"Node n1", "Pod web-1", "Secret db-creds", "Secret stripe-key", "Service web"}, 4},
 		{"upstream?id=uid-web-1&depth=1", "uid-web-1", []string{"Node n1", "Pod web-1", "Secret db-creds", "Secret stripe-key"}, 3},
 		{"downstream?id=uid-db-creds&depth=3", "uid-db-creds", []string{"Pod web-1", "Secret db-creds", "Service web"}, 2},
@@ -201,7 +203,7 @@ func TestGraphEndpointErrors(t *testing.T) {
 func TestGraphSaysWhatItCouldntRead(t *testing.T) {
 	graphs := &fakeGraphs{g: shopGraph(false), info: graph.Info{
 		Built:   graph.BuiltOnRequest,
-		Partial: []graph.PartialKind{{Resource: "secrets", Reason: "not allowed"}},
+		Partial: []graph.PartialKind{{Resource: "secrets", Code: graph.PartialForbidden, Reason: "not allowed"}},
 	}}
 	h := graphServer(t, graphs)
 	a := ask(t, h, "find?resource=pods&namespace=shop&name=web-1", http.StatusOK)
