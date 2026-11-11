@@ -548,3 +548,121 @@ export const MemoryIcon = (props) => (
     <rect x="2" y="6" width="20" height="10" rx="2" />
   </Icon>
 );
+
+// ---- The topology map (v1.5) ----
+
+export const ReplicaSetsIcon = (props) => (
+  <Icon {...props}>
+    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+  </Icon>
+);
+
+export const ServiceAccountsIcon = (props) => (
+  <Icon {...props}>
+    <circle cx="12" cy="12" r="10" />
+    <circle cx="12" cy="10" r="3" />
+    <path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662" />
+  </Icon>
+);
+
+export const TopologyIcon = (props) => (
+  <Icon {...props}>
+    <rect x="16" y="16" width="6" height="6" rx="1" />
+    <rect x="2" y="16" width="6" height="6" rx="1" />
+    <rect x="9" y="2" width="6" height="6" rx="1" />
+    <path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3" />
+    <path d="M12 12V8" />
+  </Icon>
+);
+
+export const MapIcon = (props) => (
+  <Icon {...props}>
+    <path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z" />
+    <path d="M15 5.764v15" />
+    <path d="M9 3.236v15" />
+  </Icon>
+);
+
+export const ListIcon = (props) => (
+  <Icon {...props}>
+    <path d="M3 5h.01" />
+    <path d="M3 12h.01" />
+    <path d="M3 19h.01" />
+    <path d="M8 5h13" />
+    <path d="M8 12h13" />
+    <path d="M8 19h13" />
+  </Icon>
+);
+
+export const FitIcon = (props) => (
+  <Icon {...props}>
+    <path d="M3 7V5a2 2 0 0 1 2-2h2" />
+    <path d="M17 3h2a2 2 0 0 1 2 2v2" />
+    <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
+    <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
+  </Icon>
+);
+
+export const CrosshairIcon = (props) => (
+  <Icon {...props}>
+    <circle cx="12" cy="12" r="10" />
+    <line x1="22" x2="18" y1="12" y2="12" />
+    <line x1="6" x2="2" y1="12" y2="12" />
+    <line x1="12" x2="12" y1="6" y2="2" />
+    <line x1="12" x2="12" y1="22" y2="18" />
+  </Icon>
+);
+
+// EndpointSlice: one Service fanning out to its pods (Lucide's "git-fork").
+export const EndpointSlicesIcon = (props) => (
+  <Icon {...props}>
+    <circle cx="12" cy="18" r="3" />
+    <circle cx="6" cy="6" r="3" />
+    <circle cx="18" cy="6" r="3" />
+    <path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9" />
+    <path d="M12 12v3" />
+  </Icon>
+);
+
+// Something referred to that doesn't exist: an outline with nothing in it
+// (Lucide's "circle-dashed").
+export const MissingIcon = (props) => (
+  <Icon {...props}>
+    <path d="M10.1 2.182a10 10 0 0 1 3.8 0" />
+    <path d="M13.9 21.818a10 10 0 0 1-3.8 0" />
+    <path d="M17.609 3.721a10 10 0 0 1 2.69 2.7" />
+    <path d="M2.182 13.9a10 10 0 0 1 0-3.8" />
+    <path d="M20.279 17.609a10 10 0 0 1-2.7 2.69" />
+    <path d="M21.818 10.1a10 10 0 0 1 0 3.8" />
+    <path d="M3.721 6.391a10 10 0 0 1 2.7-2.69" />
+    <path d="M6.391 20.279a10 10 0 0 1-2.69-2.7" />
+  </Icon>
+);
+
+// A selector that matches nothing: a broken link (Lucide's "unlink").
+export const UnlinkIcon = (props) => (
+  <Icon {...props}>
+    <path d="m18.84 12.25 1.72-1.71h-.02a5.004 5.004 0 0 0-.12-7.07 5.006 5.006 0 0 0-6.95 0l-1.72 1.71" />
+    <path d="m5.17 11.75-1.71 1.71a5.004 5.004 0 0 0 .12 7.07 5.006 5.006 0 0 0 6.95 0l1.71-1.71" />
+    <line x1="8" x2="8" y1="2" y2="5" />
+    <line x1="2" x2="5" y1="8" y2="8" />
+    <line x1="16" x2="16" y1="19" y2="22" />
+    <line x1="19" x2="22" y1="16" y2="16" />
+  </Icon>
+);
+
+// The direction of a connection in the panel: what this needs, what needs it.
+export const ArrowRightIcon = (props) => (
+  <Icon {...props}>
+    <path d="M5 12h14" />
+    <path d="m12 5 7 7-7 7" />
+  </Icon>
+);
+
+export const ArrowLeftIcon = (props) => (
+  <Icon {...props}>
+    <path d="m12 19-7-7 7-7" />
+    <path d="M19 12H5" />
+  </Icon>
+);

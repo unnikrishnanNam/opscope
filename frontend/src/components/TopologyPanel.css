@@ -1,0 +1,358 @@
+/* The selected card's details, over the map's right side. On a narrow
+   screen it covers the map. */
+
+.topo-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  width: min(360px, 100%);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-3) var(--space-4) var(--space-6);
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  cursor: auto;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+@media (max-width: 599px) {
+  .topo-panel {
+    width: 100%;
+    border-left: 0;
+  }
+}
+
+.topo-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-right: -6px;
+}
+
+.topo-panel-kind {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-strong);
+  color: var(--text-subtle);
+}
+
+.topo-panel-kind svg {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.topo-panel-title {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-title);
+  line-height: var(--leading-tight);
+  overflow-wrap: anywhere;
+}
+
+/* The title takes focus when the panel opens, so a screen reader starts
+   there. It isn't something to act on, so it shows no ring; the next Tab
+   reaches the close button, which does. */
+.topo-panel-title:focus {
+  outline: none;
+}
+
+.topo-panel-where {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.topo-panel-where svg {
+  flex-shrink: 0;
+  color: var(--text-subtle);
+}
+
+.topo-panel-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
+  margin: var(--space-3) 0 0;
+}
+
+.topo-panel-facts dt {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-strong);
+  color: var(--text-subtle);
+}
+
+.topo-panel-facts dd {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-strong);
+}
+
+/* What a gap means: an icon and a sentence. Neutral, not an alarm. */
+.topo-panel-notes {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.topo-note {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.topo-note-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--text-muted);
+}
+
+.topo-note-title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-strong);
+}
+
+.topo-note-text {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  line-height: var(--leading);
+}
+
+.topo-note-name {
+  font-weight: var(--weight-strong);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.topo-note-field {
+  display: inline-block;
+  margin-top: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.topo-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.topo-panel-section {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.topo-panel-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-strong);
+}
+
+.topo-panel-heading svg {
+  color: var(--text-subtle);
+}
+
+.topo-panel-count {
+  color: var(--text-subtle);
+  font-weight: var(--weight-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.topo-panel-quiet {
+  color: var(--text-subtle);
+  font-size: var(--text-sm);
+}
+
+.topo-panel-alone {
+  margin: var(--space-5) 0 0;
+}
+
+.topo-panel-members {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.topo-panel-members li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 3px 0;
+  font-size: var(--text-sm);
+}
+
+.topo-panel-members li > :first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topo-panel-link {
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 2px;
+}
+
+.topo-panel-link:hover {
+  text-decoration-color: currentColor;
+}
+
+/* ---- Connections ---- */
+
+.topo-rel + .topo-rel {
+  margin-top: var(--space-3);
+}
+
+.topo-rel-words {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-strong);
+  color: var(--text-subtle);
+}
+
+.topo-rel-list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.topo-rel-item {
+  min-width: 0;
+}
+
+.topo-pick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  min-height: 30px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.topo-pick:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.topo-pick:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.topo-pick-missing,
+.topo-pick-unknown {
+  border-style: dashed;
+  background: transparent;
+}
+
+.topo-pick-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.topo-pick-kind {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-strong);
+  color: var(--text-subtle);
+}
+
+.topo-pick-name {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: var(--weight-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topo-pick-tag {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-strong);
+}
+
+.topo-rel-notes {
+  margin: 3px 0 0 8px;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.topo-rel-fields {
+  margin: 2px 0 0 8px;
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+}
+
+.topo-rel-fields summary {
+  width: fit-content;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.topo-rel-fields summary:hover {
+  color: var(--text);
+}
+
+.topo-rel-fields summary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.topo-rel-fields ul {
+  display: grid;
+  gap: 2px;
+  margin: var(--space-1) 0 0;
+  padding: 0 0 0 var(--space-3);
+  list-style: none;
+}
+
+.topo-rel-fields code {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}

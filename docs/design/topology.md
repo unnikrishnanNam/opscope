@@ -20,7 +20,7 @@ build phases 0–8 or the D, G, L, P, R and S phases. All work happens on the `d
 one commit per phase, as in v1.4; each phase is reviewed before it is committed, and the next phase
 starts only after that.
 
-**Status (2026-11-10):** T0–T4 done; T5 next.
+**Status (2026-11-11):** T0–T5 done; T6 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -405,13 +405,13 @@ Goal: detail links come from the graph, and ConfigMaps and Secrets show what use
 
 Goal: the map and the list are built and checked on sample graphs before any page uses them.
 
-- [ ] `graph/layout.js` from G4 with its tests, adjusted to this model (edge kinds, missing and
+- [x] `graph/layout.js` from G4 with its tests, adjusted to this model (edge kinds, missing and
       unknown nodes, dangling marks, grouped pods)
-- [ ] The map: cards over an SVG layer of edges, pan and zoom, the panel; no health colours
-- [ ] The list view of the same graph
-- [ ] Keyboard (one Tab stop, arrows along edges, Enter, Escape), accessible names for cards, and
+- [x] The map: cards over an SVG layer of edges, pan and zoom, the panel; no health colours
+- [x] The list view of the same graph
+- [x] Keyboard (one Tab stop, arrows along edges, Enter, Escape), accessible names for cards, and
       reduced motion
-- [ ] `/kit` samples: small, missing and unknown, and a generated namespace of 1,000 objects, in
+- [x] `/kit` samples: small, missing and unknown, and a generated namespace of 1,000 objects, in
       both themes, at 375 px and wide
 
 ## Phase T6: Topology page and palette
@@ -736,3 +736,33 @@ Goal: v1.5.0 is ready to tag.
 - In the browser: a ConfigMap with four users, a pod's node link, a StorageClass's counts and a
   Secret's users, in dark and in light at 375 px (no sideways scroll); the names are links, so
   Tab reaches them. No console errors.
+
+### T5: The map in `/kit` (2026-11-10)
+
+- `graph/view.js` shapes an answer for drawing: EndpointSlices aren't drawn (a Service shows its
+  ready and not-ready pods instead), a Deployment's ReplicaSets fold into it unless a rollout has
+  more than one with pods, and two or more pods of one owner are one card, unless opened up or the
+  map's own object. `graph/layout.js` and its tests are G4's, without the cluster view's boxes,
+  grid and strip, with edges by kind and ID and an arrowhead at what each edge needs.
+- The map (`TopologyGraph`): cards with the kind's icon, name and list status; gaps tagged with an
+  icon ("Missing", "Can't read", "Selects nothing"); no health colours. Selecting a card puts a
+  veil over the rest and draws its edges strong on top; hovering draws a card's edges strong. The
+  panel (`TopologyPanel`) says what a gap means, lists a group's pods, and splits connections into
+  "Needs" and "Needed by", each with the fields it was read from. `TopologyList` is the same graph
+  as text, where phones start. `TopologyView` holds them, with a legend of only what's on the map
+  and a note naming kinds Opscope can't read.
+- Found in the browser checks and fixed: a selected card could open under its panel; "team-a"
+  broke at its hyphen; "from 3 pods" read backwards (now "in all 3 pods" on a group's panel);
+  tall namespaces started on empty space; the dot grid turned into a moiré far out, and headings
+  into "Gat…" (both fixed); the focus ring went under the veil; axe found duplicate IDs and
+  landmark noise in the list.
+- Selecting a card on the 1,000-object map took 139 ms in the development build, mostly
+  restyling 560 cards; with one veil and a top layer of edges, 100 ms, the rest being React's
+  development build. Panning and zooming take one frame (17 ms). Shaping and laying out that
+  namespace: 12 and 72 ms. Tried and not kept: Nodes after Pods (fewer crossings, but each app's
+  Service, Deployment and pods fell out of line) and more row sweeps (no change).
+- Checked in headless Chrome over the DevTools protocol (the app's browser pane was hidden, so
+  its screenshots were stale): light and dark, 1440 px and 375 px, keyboard (one Tab stop,
+  arrows, Enter to the panel, Escape back to the card, + − 0), dragging, opening a group into pods
+  and back, reduced motion, and axe-core 4.10.3 with no violations on one theme, light or dark.
+  No console errors. 26 new frontend tests; 128 in all.
