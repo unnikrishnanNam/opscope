@@ -13,6 +13,7 @@ describe how Opscope got there.
 | [repositioning.md](repositioning.md)      | Opscope as an operations tool: licence, documentation, positioning | v1.3.0   |
 | [storage.md](storage.md)                  | Storage pages: PersistentVolumeClaims, PersistentVolumes, StorageClasses, volume usage | v1.3.0   |
 | [live-data.md](live-data.md)              | Live data: a watch cache per cluster, the event bus, pages that update as the cluster changes | v1.4.0   |
+| [topology.md](topology.md)                | Topology: a graph per cluster of how objects connect, detail pages' links from it, the Topology page and graph search | v1.5.0   |
 
 ## When to write one
 
@@ -64,7 +65,7 @@ Goal: <what works at the end of this phase>.
 Each phase ends with Opscope working, the tests passing and its notes written. Number phases with a
 letter not used before, so phase names never collide across records. Taken so far: the numbers
 0–8 (the first build) and the letters D, G (the first topology attempt, taken out of `main`), L, P,
-R and S.
+R, S and T.
 
 Once the work is released, update the status line and add the record to the table above. Its content
 then stays as it was: later changes get their own record or are described in the current

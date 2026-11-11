@@ -38,12 +38,20 @@ machine or inside the cluster it shows.
   StatefulSets show their volumes and claims, and the overview counts claims that can't bind and
   volumes left behind. Optionally, how full each volume is
   ([volume usage](docs/deployment.md#volume-usage), off by default).
+- **Topology:** a map of how objects connect in a namespace or around one object: what owns what,
+  which Services select which pods, what each pod uses (ConfigMaps, Secrets, claims, its
+  ServiceAccount), where traffic goes from Ingresses and routes, and which node each pod runs on.
+  Every connection says which field it was read from, and something referred to that doesn't
+  exist (a missing Secret, a Service with no pods) is shown as missing. The map updates live and
+  also comes as a list, for the keyboard and screen readers.
 - **Detail pages:** a summary, containers, conditions, events and YAML for every object, links to
-  owners and nodes, and pod logs with the previous run and live follow.
+  owners and nodes, what uses a ConfigMap or Secret, and pod logs with the previous run and live
+  follow. Links to objects that don't exist say so.
 - **Live usage:** CPU and memory per node and pod from metrics-server, with the last 15 minutes as
   a trend.
-- **Command palette:** press ⌘K (Ctrl+K) to jump to any page, object, namespace or cluster, and to
-  run what the current page offers, such as copying a read-only kubectl command.
+- **Command palette:** press ⌘K (Ctrl+K) to jump to any page, object, namespace or cluster, to ask
+  what uses an object ("pods using db-creds") or what runs on a node, and to run what the current
+  page offers, such as copying a read-only kubectl command.
 - **Keyboard shortcuts** for pages and tabs, listed in the app with `?`.
 - **Multiple clusters:** connect clusters from kubeconfig files, the pod's service account, or the
   UI, and switch between them.
@@ -76,7 +84,7 @@ clusters, and cleaning up.
 In the cluster Opscope should show:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.4.0/deploy/kubernetes/opscope.yaml
+kubectl apply -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.5.0/deploy/kubernetes/opscope.yaml
 ```
 
 ```bash
@@ -117,9 +125,12 @@ Press ⌘K (Ctrl+K on Windows and Linux), or the search box in the top bar, and 
 - a page: "pods", or kubectl's short names such as `po`, `svc` and `cm`
 - an object's name, of any kind ("argocd-server"); start with a kind to search only that kind
   (`po api`, `gtw main`). Objects in the selected namespace come first
+- what uses something, or what runs on a node: `using db-creds`, `pods using app-config`,
+  `on node-3`. It opens the Topology page with the answer
 - a namespace, another cluster ("switch to"), or the theme
 - what the current page offers: open a tab, copy the name, the YAML or a kubectl command (`get`,
-  `describe`, `logs`; read-only commands only), follow logs, go to the owner or the node
+  `describe`, `logs`; read-only commands only), follow logs, go to the owner or the node, show the
+  object in the topology
 
 Enter runs the highlighted command, ⌘/Ctrl+Enter opens a link in a new tab, and Escape clears the
 search, then closes the palette. Recently used commands come first when nothing is typed.
@@ -127,6 +138,7 @@ search, then closes the palette. Recently used commands come first when nothing 
 | Keys                         | Action                                                |
 | ---------------------------- | ----------------------------------------------------- |
 | `g` then `o` `n` `p` `d` `s` | Overview, Nodes, Pods, Deployments, Services          |
+| `g` then `t`                 | Topology                                              |
 | `g` then `c`                 | Manage clusters                                       |
 | `1` `2` `3` `4`              | An object's Summary, YAML, Events and Logs tabs       |
 | `/`                          | Filter the current list                               |
@@ -163,6 +175,8 @@ Shortcuts are ignored while you type in a field.
 | Pods | A pod's detail page |
 | --- | --- |
 | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pods-dark.png"><img src="docs/screenshots/pods-light.png" alt="The pods list, with status, readiness, restarts and live usage"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pod-dark.png"><img src="docs/screenshots/pod-light.png" alt="A crash-looping pod's detail page: facts, containers and conditions"></picture> |
+| **Topology of a namespace** | **Around one object** |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/topology-dark.png"><img src="docs/screenshots/topology-light.png" alt="The Topology map of a namespace: a GatewayClass, Gateway and HTTPRoutes sending traffic to Services, which select the pods of their Deployments"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/topology-object-dark.png"><img src="docs/screenshots/topology-object-light.png" alt="The map around a crash-looping Deployment, two steps away: its ReplicaSets and pods, the ConfigMap and Secrets they use, and the panel listing what it needs and the field each connection was read from"></picture> |
 | **PersistentVolumeClaims** | **A claim's detail page** |
 | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/claims-dark.png"><img src="docs/screenshots/claims-light.png" alt="The PersistentVolumeClaims list, with status, volume, capacity, how full each volume is, and claims that are pending"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/claim-dark.png"><img src="docs/screenshots/claim-light.png" alt="A nearly full claim's detail page: its volume and StorageClass, used and free space, and the pod that uses it"></picture> |
 
