@@ -109,20 +109,27 @@ in memory:
 | PersistentVolumeClaims and volumes    | about 4 MiB                              |
 | Services                              | about 2 MiB                              |
 | ConfigMaps, Secrets                   | about 2 MiB, whatever their values' size |
+| ReplicaSets                           | about 3.3 MiB (without their pod template) |
+| EndpointSlices                        | about 2.7 MiB                            |
+| ServiceAccounts                       | about 1.5 MiB                            |
 | Events, Namespaces                    | about 1.3 MiB                            |
 
-On top of that copy, the process needs about 25 MiB. Go's garbage collector also lets memory grow
+ReplicaSets, EndpointSlices and ServiceAccounts are kept for the topology: they have no pages of
+their own. The topology's graph of how objects connect adds about 2.7 MiB per 1,000 objects of
+every kind but Events and Namespaces; it shares the objects with the copy above.
+
+On top of that copy and the graph, the process needs about 25 MiB. Go's garbage collector also lets memory grow
 to about twice what Opscope holds before it cleans up, unless `GOMEMLIMIT` tells it to work harder
 near a limit. The manifest sets it to 230 MiB, under its 256 MiB limit.
 
 Pods and Events are most of it. Roughly, for one cluster:
 
-| Cluster                                          | Copy kept | Memory used | Memory limit (`GOMEMLIMIT`)    |
-| ------------------------------------------------ | --------- | ----------- | ------------------------------ |
-| 500 pods, 2,000 events, 1,000 other objects      | 12 MiB    | 40–60 MiB   | 256 MiB (230 MiB), the default |
-| 2,000 pods, 10,000 events, 4,000 other objects   | 50 MiB    | 100–130 MiB | 256 MiB (230 MiB), the default |
-| 5,000 pods, 25,000 events, 10,000 other objects  | 130 MiB   | 200–280 MiB | 512 MiB (460 MiB)              |
-| 10,000 pods, 50,000 events, 20,000 other objects | 250 MiB   | 400–530 MiB | 1 GiB (920 MiB)                |
+| Cluster                                          | Copy and graph | Memory used | Memory limit (`GOMEMLIMIT`)    |
+| ------------------------------------------------ | -------------- | ----------- | ------------------------------ |
+| 500 pods, 2,000 events, 1,000 other objects      | 17 MiB         | 45–70 MiB   | 256 MiB (230 MiB), the default |
+| 2,000 pods, 10,000 events, 4,000 other objects   | 70 MiB         | 130–170 MiB | 256 MiB (230 MiB), the default |
+| 5,000 pods, 25,000 events, 10,000 other objects  | 185 MiB        | 300–400 MiB | 512 MiB (460 MiB)              |
+| 10,000 pods, 50,000 events, 20,000 other objects | 360 MiB        | 550–750 MiB | 1 GiB (920 MiB)                |
 
 Each connected cluster adds its own copy. To count a cluster's pods and events:
 
@@ -158,6 +165,9 @@ cluster each time you open them.
 | core (`""`)                 | persistentvolumeclaims, persistentvolumes             | Storage                |
 | `storage.k8s.io`            | storageclasses                                        | Storage                |
 | `gateway.networking.k8s.io` | gateways, httproutes, gatewayclasses                  | Gateway API (optional) |
+| `apps`                      | replicasets                                           | Topology               |
+| `discovery.k8s.io`          | endpointslices                                        | Topology               |
+| core (`""`)                 | serviceaccounts                                       | Topology               |
 | `metrics.k8s.io`            | nodes, pods                                           | CPU and memory usage   |
 | core (`""`)                 | secrets (`secrets-access.yaml` only)                  | Secrets pages, Reveal  |
 | core (`""`)                 | nodes/proxy (`get`, `volume-usage.yaml` only)         | Volume usage (opt-in)  |

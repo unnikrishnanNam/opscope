@@ -294,6 +294,131 @@ moment after it's added) answers `503`.
 
 After reconnecting, fetch everything again: changes made while disconnected aren't replayed.
 
+## Graph
+
+Opscope keeps a graph of how each cluster's objects connect: what a pod uses, what selects it, what
+it runs on, what routes traffic to a Service. Every edge says which field it was read from. These
+endpoints query it; the Topology page and detail pages' links are built on them.
+
+Every answer has the same shape:
+
+```json
+{
+  "built": "live",
+  "partial": [{ "resource": "secrets", "code": "forbidden", "reason": "listing across all namespaces isn't allowed" }],
+  "focus": "3f6c1e2a-…",
+  "nodes": [
+    {
+      "id": "3f6c1e2a-…",
+      "resource": "pods",
+      "kind": "Pod",
+      "namespace": "shop",
+      "name": "web-7d9f-x1",
+      "presence": "present",
+      "status": "Running",
+      "health": null,
+      "resourceVersion": "48211"
+    },
+    {
+      "id": "missing:secrets/shop/stripe-key",
+      "resource": "secrets",
+      "kind": "Secret",
+      "namespace": "shop",
+      "name": "stripe-key",
+      "presence": "missing",
+      "health": null
+    }
+  ],
+  "edges": [
+    {
+      "id": "9b2e…",
+      "from": "3f6c1e2a-…",
+      "to": "missing:secrets/shop/stripe-key",
+      "kind": "references",
+      "evidence": [
+        {
+          "builder": "pods.spec",
+          "field": "spec.containers[0].env[1].valueFrom.secretKeyRef.name",
+          "note": "env STRIPE_KEY",
+          "resourceVersion": "48211",
+          "seen": "2026-11-10T12:00:00Z"
+        }
+      ]
+    }
+  ]
+}
+```
+
+- `built` is `live` when the graph is kept up to date from the copy in memory, or `on_request`
+  when it was built for this request from the cluster (live data off, the cluster unreachable, or
+  pods readable only per namespace); a graph built on request is reused for 10 seconds.
+- `partial` lists the kinds the graph couldn't read, and why: `code` is `not_installed` (the
+  cluster doesn't have the kind, as with Gateway API) or `forbidden` (Opscope isn't allowed to
+  list it), and `reason` says it in words. References to their objects are `unknown` nodes.
+- `focus` is the node the query was about; `matches` (search only) the nodes that answer it.
+- A node's `id` is its object's UID. An object that's referred to but doesn't exist is a
+  `missing` node, `missing:<resource>/<namespace>/<name>`; one whose kind can't be read is
+  `unknown`. A Service whose selector matches nothing has a `dangling` entry
+  (`{"kind":"selects","field":"spec.selector","reason":"matches no pods"}`).
+- `status` is what the node's list page shows, for display. `health` is always `null` for now.
+- An edge points from the object that needs to the one it needs: Pod → Secret, Service → Pod,
+  HTTPRoute → Service. Its `id` is derived from its two ends and kind, so it's the same in every
+  answer. Each piece of `evidence` is one field that makes it; `optional` is set when every
+  reference behind it is marked optional.
+
+| Edge `kind`  | From → To                                                                 |
+| ------------ | ------------------------------------------------------------------------- |
+| `owns`       | Deployment → ReplicaSet → Pod; StatefulSet, DaemonSet, Job → Pod; CronJob → Job; Service → EndpointSlice; any owner → what it owns |
+| `references` | Pod or workload → ConfigMap, Secret, PersistentVolumeClaim, ServiceAccount; StatefulSet → its claims; Ingress, Gateway → TLS Secret |
+| `binds`      | PersistentVolumeClaim → PersistentVolume → StorageClass; claim → StorageClass |
+| `runs-on`    | Pod → Node                                                                |
+| `selects`    | Service → Pod                                                             |
+| `endpoints`  | EndpointSlice → Pod (`note`: `ready` or `not ready`)                      |
+| `routes`     | Ingress, HTTPRoute → Service                                              |
+| `attaches`   | HTTPRoute → Gateway → GatewayClass                                        |
+
+Every endpoint takes `?namespace=`: a graph built on request reads that namespace (and the
+cluster-wide kinds). Walks take `?depth=` (steps, 2 by default, at most 10) and `?kinds=` (edge
+kinds to follow, comma-separated). A walk reaches a Node, StorageClass or GatewayClass but doesn't
+go on through it, unless it starts there. Node IDs are passed in the query string, since a
+placeholder's has slashes. An unknown node is `404`, a bad parameter `400`.
+
+### `GET /api/clusters/{id}/graph/find?resource=&namespace=&name=&depth=`
+
+One object, named the way pages name it, and everything one edge away, or `depth` edges either
+way. A missing or unknown object is found as its placeholder.
+
+### `GET /api/clusters/{id}/graph/node?id=`
+
+One node by ID, and everything one edge away.
+
+### `GET /api/clusters/{id}/graph/upstream?id=&depth=&kinds=`
+
+What a node depends on: its edges followed forward.
+
+### `GET /api/clusters/{id}/graph/downstream?id=&depth=&kinds=`
+
+What depends on a node: its edges followed backward. For a Secret, every pod and workload that uses
+it, and what sends traffic to those.
+
+### `GET /api/clusters/{id}/graph/path?from=&to=&kinds=`
+
+The shortest chain of edges between two nodes, in either direction, in order from `from`. `404`
+when nothing joins them.
+
+### `GET /api/clusters/{id}/graph/subgraph?id=&depth=&direction=&kinds=`
+### `GET /api/clusters/{id}/graph/subgraph?namespace=`
+
+With `id`, a node's neighbourhood: `direction` is `up`, `down` or `both` (the default). Without, a
+whole namespace, with what it's joined to outside it one edge away.
+
+### `GET /api/clusters/{id}/graph/search?q=&namespace=`
+
+Graph search, as the command palette asks it. `q` is `using <name>` (what has an edge to any object
+of that name) or `on <node>` (what runs on that node), with an optional kind first: `pods using
+db-creds`, `what runs on node-3`. `<name>` can be `namespace/name`. With `namespace`, only answers
+in that namespace or cluster-wide count. A phrase it can't read is `400`, with what it can.
+
 ## Usage
 
 CPU and memory usage comes from metrics-server. Without it, these endpoints answer `404` with
@@ -371,7 +496,8 @@ The values of `{resource}`:
 | `storageclasses`         | StorageClass          | cluster   | `storage.k8s.io`            | yes         |
 
 The list is defined in `backend/internal/resources/resources.go` (`Listers`) and, for detail
-pages, `detail.go`.
+pages, `detail.go`. The graph also reads ReplicaSets (`apps`), EndpointSlices (`discovery.k8s.io`)
+and ServiceAccounts (core), which have no endpoints of their own (`graphOnly`).
 
 ## Examples
 

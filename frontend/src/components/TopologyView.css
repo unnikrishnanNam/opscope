@@ -1,0 +1,91 @@
+.topo-view {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.topo-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+
+.topo-toolbar-about {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.topo-unreadable {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.topo-unreadable svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.topo-frame {
+  position: relative;
+  min-height: 240px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+}
+
+/* ---- Legend ---- */
+
+.topo-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.topo-legend-intro {
+  margin: 0;
+  color: var(--text-subtle);
+}
+
+.topo-legend ul {
+  display: contents;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.topo-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.topo-legend-arrow {
+  fill: var(--neutral-mark);
+}
+
+.topo-legend-icon {
+  color: var(--text-muted);
+}
+
+.topo-legend-here {
+  width: 16px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--signal);
+}

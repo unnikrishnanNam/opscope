@@ -136,7 +136,7 @@ func podSections(d *Detail, obj *unstructured.Unstructured) error {
 		return err
 	}
 	d.add("Status", podStatus(&pod))
-	d.add("Node", pod.Spec.NodeName)
+	d.addLink("Node", pod.Spec.NodeName, &Link{Resource: "nodes", Name: pod.Spec.NodeName})
 	d.add("Pod IP", pod.Status.PodIP)
 	d.add("Service account", pod.Spec.ServiceAccountName)
 	d.add("QoS class", string(pod.Status.QOSClass))

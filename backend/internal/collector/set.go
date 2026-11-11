@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"opscope/internal/bus"
 	"opscope/internal/clusters"
 )
@@ -97,6 +99,33 @@ func (s *Set) status(id string, counts bool) (Status, bool) {
 		return Status{}, false
 	}
 	return c.status(counts), true
+}
+
+// Cached returns every object of one kind in a cluster's cache, when the
+// kind is read from the cache (watch or poll) and has its first list. ok is
+// false otherwise: the caller can't tell what the cluster holds from it.
+// The objects are shared with the cache and must not be changed.
+func (s *Set) Cached(id, resource string) (objects []runtime.Object, ok bool) {
+	c, found := s.Get(id)
+	if !found {
+		return nil, false
+	}
+	k := c.kind(resource)
+	if k == nil {
+		return nil, false
+	}
+	k.mu.Lock()
+	mode, store, synced := k.mode, k.store, k.synced
+	k.mu.Unlock()
+	if !cached(mode) || !synced() {
+		return nil, false
+	}
+	for _, item := range store.List() {
+		if obj, isObj := item.(runtime.Object); isObj {
+			objects = append(objects, obj)
+		}
+	}
+	return objects, true
 }
 
 // Enabled reports whether collectors run at all (OPSCOPE_LIVE).

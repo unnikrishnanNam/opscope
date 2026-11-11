@@ -111,6 +111,17 @@ var typedLists = map[string]typedList{
 	"storageclasses": func(ctx context.Context, k kubernetes.Interface, _ string) (runtime.Object, error) {
 		return k.StorageV1().StorageClasses().List(ctx, metav1.ListOptions{})
 	},
+
+	// Read only by the graph.
+	"replicasets": func(ctx context.Context, k kubernetes.Interface, ns string) (runtime.Object, error) {
+		return k.AppsV1().ReplicaSets(ns).List(ctx, metav1.ListOptions{})
+	},
+	"endpointslices": func(ctx context.Context, k kubernetes.Interface, ns string) (runtime.Object, error) {
+		return k.DiscoveryV1().EndpointSlices(ns).List(ctx, metav1.ListOptions{})
+	},
+	"serviceaccounts": func(ctx context.Context, k kubernetes.Interface, ns string) (runtime.Object, error) {
+		return k.CoreV1().ServiceAccounts(ns).List(ctx, metav1.ListOptions{})
+	},
 }
 
 func (d direct) List(ctx context.Context, resource string, q Query) ([]runtime.Object, error) {

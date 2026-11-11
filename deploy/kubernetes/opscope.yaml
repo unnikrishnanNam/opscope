@@ -38,16 +38,22 @@ rules:
     resources: [namespaces, nodes, pods, services, configmaps, events, persistentvolumeclaims, persistentvolumes]
     verbs: [get, list, watch]
   - apiGroups: [""]
+    resources: [serviceaccounts] # the topology: which pods run as which account
+    verbs: [get, list, watch]
+  - apiGroups: [""]
     resources: [pods/log] # the Logs tab
     verbs: [get]
   - apiGroups: [apps]
-    resources: [deployments, statefulsets, daemonsets]
+    resources: [deployments, statefulsets, daemonsets, replicasets] # replicasets: the topology
     verbs: [get, list, watch]
   - apiGroups: [batch]
     resources: [jobs, cronjobs]
     verbs: [get, list, watch]
   - apiGroups: [networking.k8s.io]
     resources: [ingresses]
+    verbs: [get, list, watch]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices] # the topology: which pods are behind each Service
     verbs: [get, list, watch]
   - apiGroups: [storage.k8s.io]
     resources: [storageclasses]

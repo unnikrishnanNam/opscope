@@ -132,3 +132,33 @@ func TestTrimPassesTombstonesThrough(t *testing.T) {
 		t.Errorf("a tombstone holds a cached object and should be left alone: %v %v", got, err)
 	}
 }
+
+func TestTrimDropsReplicaSetTemplates(t *testing.T) {
+	yes, three := true, int32(3)
+	rs := &appsv1.ReplicaSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "web-5d8c", Namespace: "shop",
+			Annotations:     map[string]string{"deployment.kubernetes.io/revision": "7"},
+			OwnerReferences: []metav1.OwnerReference{{Kind: "Deployment", Name: "web", Controller: &yes}},
+		},
+		Spec: appsv1.ReplicaSetSpec{
+			Replicas: &three,
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "web"}},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "web"}},
+				Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "web", Image: "nginx"}}},
+			},
+		},
+		Status: appsv1.ReplicaSetStatus{Replicas: 3, ReadyReplicas: 2},
+	}
+	for range 2 { // idempotent
+		trim(rs)
+	}
+	if len(rs.Spec.Template.Spec.Containers) != 0 || rs.Spec.Template.Labels != nil {
+		t.Errorf("the template stayed: %+v", rs.Spec.Template)
+	}
+	if *rs.Spec.Replicas != 3 || rs.Spec.Selector.MatchLabels["app"] != "web" || rs.Status.ReadyReplicas != 2 ||
+		rs.Annotations["deployment.kubernetes.io/revision"] != "7" || len(rs.OwnerReferences) != 1 {
+		t.Errorf("trimmed too much: %+v", rs)
+	}
+}

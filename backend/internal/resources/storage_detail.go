@@ -5,18 +5,14 @@ package resources
 // links between all of them.
 
 import (
-	"context"
 	"fmt"
 	"reflect"
-	"slices"
 	"sort"
-	"strconv"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -266,169 +262,6 @@ func claimTemplates(sts *appsv1.StatefulSet) Table {
 		t.addRow(text(tpl.Name), text(size), text(accessModeNames(tpl.Spec.AccessModes)), class)
 	}
 	return t
-}
-
-// ---- Related objects ----
-
-// addRelated adds what can only be known by reading other objects: the
-// pods using a claim, the claims made for a StatefulSet, and how much a
-// StorageClass is used. If the user can't list those objects, the section
-// is left out rather than failing the page.
-func addRelated(ctx context.Context, src Source, d *Detail, resource string, obj *unstructured.Unstructured) error {
-	var err error
-	switch resource {
-	case "persistentvolumeclaims":
-		if err = checkClass(ctx, src, d); err == nil {
-			err = claimUsers(ctx, src, d, obj)
-		}
-	case "persistentvolumes":
-		err = checkClass(ctx, src, d)
-	case "statefulsets":
-		err = statefulSetClaims(ctx, src, d, obj)
-	case "storageclasses":
-		err = storageClassUsage(ctx, src, d, obj)
-	}
-	if apierrors.IsForbidden(err) {
-		return nil
-	}
-	return err
-}
-
-// checkClass makes sure the StorageClass a claim or volume names exists.
-// A claim asking for a class that doesn't exist stays Pending for good, so
-// that's worth saying, and a link to it would only lead to an error page.
-// (Static volumes often name a class, like "manual", that is never created.)
-func checkClass(ctx context.Context, src Source, d *Detail) error {
-	for i := range d.Fields {
-		f := &d.Fields[i]
-		if f.Label != "StorageClass" || f.Link == nil {
-			continue
-		}
-		classes, err := ListOf[*storagev1.StorageClass](ctx, src, "storageclasses", Query{})
-		if err != nil {
-			return err
-		}
-		if !slices.ContainsFunc(classes, func(sc *storagev1.StorageClass) bool { return sc.Name == f.Link.Name }) {
-			f.Value += " (not found)"
-			f.Link = nil
-		}
-		return nil
-	}
-	return nil
-}
-
-// claimUsers lists the pods that mount a claim. Pods can only use claims
-// in their own namespace, so that's the only one searched.
-func claimUsers(ctx context.Context, src Source, d *Detail, obj *unstructured.Unstructured) error {
-	pods, err := ListOf[*corev1.Pod](ctx, src, "pods", Query{Namespace: obj.GetNamespace()})
-	if err != nil {
-		return err
-	}
-	// By name, as the API lists them, so the table doesn't depend on the
-	// order the cache keeps them in.
-	slices.SortFunc(pods, func(a, b *corev1.Pod) int { return strings.Compare(a.Name, b.Name) })
-	t := Table{Title: "Used by", Columns: []string{"Pod", "Status", "Node"}}
-	for _, pod := range pods {
-		for _, v := range pod.Spec.Volumes {
-			if claimOf(pod, v) != obj.GetName() {
-				continue
-			}
-			link := &Link{Resource: "pods", Namespace: pod.Namespace, Name: pod.Name}
-			t.addRow(Cell{Text: pod.Name, Link: link}, text(podStatus(pod)), text(pod.Spec.NodeName))
-			break
-		}
-	}
-	d.addTable(t)
-	return nil
-}
-
-// claimOf is the claim a pod volume uses, or "" for other kinds of volume.
-func claimOf(pod *corev1.Pod, v corev1.Volume) string {
-	switch {
-	case v.PersistentVolumeClaim != nil:
-		return v.PersistentVolumeClaim.ClaimName
-	case v.Ephemeral != nil:
-		return pod.Name + "-" + v.Name
-	}
-	return ""
-}
-
-// statefulSetClaims finds the claims made from a StatefulSet's templates.
-// They're matched by name (<template>-<statefulset>-<ordinal>), which is
-// how the StatefulSet controller itself finds them; they usually have no
-// owner reference pointing back.
-func statefulSetClaims(ctx context.Context, src Source, d *Detail, obj *unstructured.Unstructured) error {
-	var sts appsv1.StatefulSet
-	if err := convert(obj, &sts); err != nil {
-		return err
-	}
-	if len(sts.Spec.VolumeClaimTemplates) == 0 {
-		return nil
-	}
-	claims, err := ListOf[*corev1.PersistentVolumeClaim](ctx, src, "persistentvolumeclaims", Query{Namespace: sts.Namespace})
-	if err != nil {
-		return err
-	}
-	t := Table{Title: "Claims", Columns: []string{"Claim", "Status", "Capacity", "Volume"}}
-	slices.SortFunc(claims, func(a, b *corev1.PersistentVolumeClaim) int { return strings.Compare(a.Name, b.Name) })
-	for _, pvc := range claims {
-		if !madeFromTemplate(pvc.Name, &sts) {
-			continue
-		}
-		capacity := ""
-		if size, ok := pvc.Status.Capacity[corev1.ResourceStorage]; ok {
-			capacity = sizeText(size.Value())
-		}
-		volume := Cell{}
-		if pvc.Spec.VolumeName != "" {
-			volume = Cell{Text: pvc.Spec.VolumeName, Link: volumeLink(pvc.Spec.VolumeName)}
-		}
-		t.addRow(
-			Cell{Text: pvc.Name, Link: claimLink(pvc.Namespace, pvc.Name)},
-			text(storageStatus(pvc.ObjectMeta, string(pvc.Status.Phase))),
-			text(capacity),
-			volume,
-		)
-	}
-	d.addTable(t)
-	return nil
-}
-
-func madeFromTemplate(claim string, sts *appsv1.StatefulSet) bool {
-	for _, tpl := range sts.Spec.VolumeClaimTemplates {
-		ordinal, ok := strings.CutPrefix(claim, tpl.Name+"-"+sts.Name+"-")
-		if _, err := strconv.Atoi(ordinal); ok && err == nil {
-			return true
-		}
-	}
-	return false
-}
-
-// storageClassUsage counts the volumes and claims of a StorageClass.
-func storageClassUsage(ctx context.Context, src Source, d *Detail, obj *unstructured.Unstructured) error {
-	volumes, err := ListOf[*corev1.PersistentVolume](ctx, src, "persistentvolumes", Query{})
-	if err != nil {
-		return err
-	}
-	claims, err := ListOf[*corev1.PersistentVolumeClaim](ctx, src, "persistentvolumeclaims", Query{})
-	if err != nil {
-		return err
-	}
-	name := obj.GetName()
-	inUse, claimed := 0, 0
-	for _, pv := range volumes {
-		if volumeClass(pv) == name {
-			inUse++
-		}
-	}
-	for _, pvc := range claims {
-		if claimClass(pvc) == name {
-			claimed++
-		}
-	}
-	d.add("Volumes", strconv.Itoa(inUse))
-	d.add("Claims", strconv.Itoa(claimed))
-	return nil
 }
 
 // ---- Formatting ----

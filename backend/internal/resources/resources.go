@@ -67,6 +67,7 @@ var Listers = map[string]Lister{
 // Kubernetes API: what a collector watches so the lists can be served.
 type Kind struct {
 	Resource   string // the URL name, e.g. "pods"
+	KindName   string // the Kubernetes kind, e.g. "Pod"
 	GVR        schema.GroupVersionResource
 	Namespaced bool
 	Custom     bool // a custom resource (Gateway API), read with the dynamic client
@@ -77,24 +78,60 @@ var listOnly = map[string]kindInfo{
 	"events": {core("events"), "Event", true},
 }
 
-// Kinds returns every resource type in Listers, sorted by name. A lister
-// without an entry in kinds or listOnly is a mistake caught by the tests.
+// graphOnly are kinds the graph reads that have no list or detail page
+// (docs/design/topology.md). They're collected like every other kind.
+var graphOnly = map[string]kindInfo{
+	"replicasets":     {group("apps", "v1", "replicasets"), "ReplicaSet", true},
+	"endpointslices":  {group("discovery.k8s.io", "v1", "endpointslices"), "EndpointSlice", true},
+	"serviceaccounts": {core("serviceaccounts"), "ServiceAccount", true},
+}
+
+func kindOf(resource string, info kindInfo) Kind {
+	return Kind{
+		Resource:   resource,
+		KindName:   info.Kind,
+		GVR:        info.GVR,
+		Namespaced: info.Namespaced,
+		Custom:     info.GVR.Group == gatewayAPI("").Group,
+	}
+}
+
+// Lookup finds a kind by its URL name ("pods") among every kind Opscope
+// knows: listed, with a detail page, or read only by the graph.
+func Lookup(resource string) (Kind, bool) {
+	for _, table := range []map[string]kindInfo{kinds, listOnly, graphOnly} {
+		if info, ok := table[resource]; ok {
+			return kindOf(resource, info), true
+		}
+	}
+	return Kind{}, false
+}
+
+// LookupKind finds a kind by its API group and kind name ("apps",
+// "Deployment"), as owner references and Gateway API references name them.
+// The core group is "".
+func LookupKind(group, kind string) (Kind, bool) {
+	for _, table := range []map[string]kindInfo{kinds, listOnly, graphOnly} {
+		for resource, info := range table {
+			if info.Kind == kind && info.GVR.Group == group {
+				return kindOf(resource, info), true
+			}
+		}
+	}
+	return Kind{}, false
+}
+
+// Kinds returns every resource type a collector keeps: those in Listers and
+// those only the graph reads (graphOnly), sorted by name. A lister without
+// an entry in kinds or listOnly is a mistake caught by the tests.
 func Kinds() []Kind {
 	var out []Kind
-	for _, resource := range slices.Sorted(maps.Keys(Listers)) {
-		info, ok := kinds[resource]
-		if !ok {
-			info, ok = listOnly[resource]
+	names := append(slices.Collect(maps.Keys(Listers)), slices.Collect(maps.Keys(graphOnly))...)
+	slices.Sort(names)
+	for _, resource := range names {
+		if k, ok := Lookup(resource); ok {
+			out = append(out, k)
 		}
-		if !ok {
-			continue
-		}
-		out = append(out, Kind{
-			Resource:   resource,
-			GVR:        info.GVR,
-			Namespaced: info.Namespaced,
-			Custom:     info.GVR.Group == gatewayAPI("").Group,
-		})
 	}
 	return out
 }

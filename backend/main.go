@@ -21,6 +21,7 @@ import (
 	"opscope/internal/bus"
 	"opscope/internal/clusters"
 	"opscope/internal/collector"
+	"opscope/internal/graph"
 	"opscope/internal/metrics"
 	"opscope/internal/server"
 )
@@ -68,6 +69,10 @@ func main() {
 	// One collector per cluster, started as each cluster is loaded below or
 	// added in the UI, and stopped when it's removed or ctx is cancelled.
 	collectors := collector.NewSet(ctx, live, bus.New(), logger)
+	// The Graph engine follows the collectors' events, so it subscribes
+	// before the first collector starts.
+	graphs := graph.NewEngine(collectors, logger)
+	go graphs.Run(ctx)
 	collectors.Follow(manager)
 
 	// 1. Clusters from the environment. A broken setting here is a mistake
@@ -105,7 +110,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           server.New(cfg, manager, collectors, history, logger),
+		Handler:           server.New(cfg, manager, collectors, graphs, history, logger),
 		ReadHeaderTimeout: 10 * time.Second, // don't let a slow client hold a connection open forever
 	}
 

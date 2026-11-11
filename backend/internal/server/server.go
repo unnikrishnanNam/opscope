@@ -24,7 +24,7 @@ type Config struct {
 }
 
 // New returns an http.Handler with every route registered.
-func New(cfg Config, manager *clusters.Manager, live *collector.Set, history *metrics.History, logger *slog.Logger) http.Handler {
+func New(cfg Config, manager *clusters.Manager, live *collector.Set, graphs graphReader, history *metrics.History, logger *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
 
 	// API routes. Go 1.22+ lets us put the HTTP method and {placeholders}
@@ -53,6 +53,10 @@ func New(cfg Config, manager *clusters.Manager, live *collector.Set, history *me
 	// What changed in it, as server-sent events (beats {resource}/{name}).
 	mux.HandleFunc("GET /api/clusters/{id}/live/stream", streamLive(manager, live))
 
+	// The graph of how objects connect (beats {resource}/{name} and
+	// {resource}/{namespace}/{name}).
+	registerGraph(mux, manager, graphs, live.Source)
+
 	// Live CPU and memory usage from metrics-server.
 	mux.HandleFunc("GET /api/clusters/{id}/metrics/nodes", getNodeMetrics(manager, live, history))
 	mux.HandleFunc("GET /api/clusters/{id}/metrics/pods", getPodMetrics(manager))
@@ -64,8 +68,8 @@ func New(cfg Config, manager *clusters.Manager, live *collector.Set, history *me
 	mux.HandleFunc("GET /api/clusters/{id}/secrets/{namespace}/{name}/{key}", getSecretValue(manager))
 
 	// One object's details: with a namespace, or without for cluster-wide kinds.
-	mux.HandleFunc("GET /api/clusters/{id}/{resource}/{namespace}/{name}", getDetail(manager, live))
-	mux.HandleFunc("GET /api/clusters/{id}/{resource}/{name}", getDetail(manager, live))
+	mux.HandleFunc("GET /api/clusters/{id}/{resource}/{namespace}/{name}", getDetail(manager, live, graphs))
+	mux.HandleFunc("GET /api/clusters/{id}/{resource}/{name}", getDetail(manager, live, graphs))
 
 	// A pod's logs, streamed as plain text.
 	mux.HandleFunc("GET /api/clusters/{id}/pods/{namespace}/{name}/logs", streamLogs(manager))

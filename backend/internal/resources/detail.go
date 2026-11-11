@@ -187,9 +187,6 @@ func GetDetail(ctx context.Context, clients Clients, src Source, resource, names
 	if err := addSections(d, resource, obj); err != nil {
 		return nil, fmt.Errorf("reading %s %s: %w", info.Kind, name, err)
 	}
-	if err := addRelated(ctx, src, d, resource, obj); err != nil {
-		return nil, err
-	}
 
 	yamlBytes, err := yaml.Marshal(obj.Object)
 	if err != nil {

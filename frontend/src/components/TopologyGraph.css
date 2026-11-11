@@ -1,0 +1,355 @@
+/* The map: a viewport with a faint dot grid that pans with the content,
+   and inside it the canvas (edges in SVG, cards as buttons) moved and
+   scaled as one. No health colours: v1.5's map says how objects connect,
+   and the Signal engine (v1.6) adds whether they're well. */
+
+.topo {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: clip; /* not even focus may scroll it: panning is ours */
+  background-color: var(--bg);
+  background-image: radial-gradient(circle, var(--border) 1px, transparent 1.4px);
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.topo.is-panning {
+  cursor: grabbing;
+}
+
+.topo-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.topo-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: var(--space-6);
+  color: var(--text-subtle);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+/* ---- Column headings ---- */
+
+.topo-columns {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 28px;
+  pointer-events: none;
+}
+
+/* Over the cards, once the map is panned down: on a band of background. */
+.topo-columns.is-stuck {
+  background: linear-gradient(var(--bg) 72%, transparent);
+}
+
+.topo-column {
+  position: absolute;
+  top: 0;
+  overflow: hidden;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-strong);
+  line-height: 24px;
+  letter-spacing: 0.01em;
+  color: var(--text-subtle);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ---- Edges ---- */
+
+.topo-edges {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* Full strength: a mark needs 3:1 against the background. */
+.topo-edge {
+  fill: none;
+  stroke: var(--neutral-mark);
+  stroke-width: 1.25;
+  transition:
+    stroke-opacity var(--duration-fast) var(--ease),
+    stroke var(--duration-fast) var(--ease);
+}
+
+.topo-edge-dashed {
+  stroke-dasharray: 5 4;
+}
+
+.topo-edge-thin {
+  stroke-width: 0.9;
+}
+
+/* A reference that can't break anything: fainter, on purpose. */
+.topo-edge-optional {
+  stroke-opacity: 0.5;
+}
+
+/* The selected or hovered card's edges. */
+.topo-edge-strong {
+  stroke: var(--text);
+  stroke-opacity: 1;
+  stroke-width: 1.75;
+}
+
+.topo-edge-thin.topo-edge-strong {
+  stroke-width: 1.4;
+}
+
+/* What isn't joined to the selected card steps back behind a veil; what
+   is sits above it, with its edges drawn again on top. */
+.topo-veil {
+  position: absolute;
+  z-index: 2;
+  background: color-mix(in srgb, var(--bg) 62%, transparent);
+  pointer-events: none;
+  animation: topo-veil-in var(--duration) var(--ease);
+}
+
+@keyframes topo-veil-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.topo-edges-top {
+  z-index: 3;
+}
+
+.topo-arrow path {
+  fill: var(--neutral-mark);
+}
+
+.topo-arrow-strong path {
+  fill: var(--text);
+}
+
+/* ---- Cards ---- */
+
+.topo-node {
+  --topo-ring: 0 0 #0000;
+  --topo-stack: 0 0 #0000;
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  min-width: 0;
+  margin: 0;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--topo-ring), var(--topo-stack), var(--shadow-sm);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease),
+    opacity var(--duration-fast) var(--ease);
+}
+
+.topo-node:hover {
+  border-color: var(--border-strong);
+}
+
+.topo-node:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+/* The object the map is about: the orange line, as under the open tab. */
+.topo-focus::after {
+  content: "";
+  position: absolute;
+  right: 10px;
+  bottom: -1px;
+  left: 12px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--signal);
+}
+
+.topo-selected,
+.topo-selected:hover {
+  --topo-ring: 0 0 0 1px var(--text);
+  border-color: var(--text);
+}
+
+/* Above the veil: what's joined to the selected card, a card the pointer
+   is on, and the card with keyboard focus, so its ring is never dimmed. */
+.topo-near,
+.topo-node:focus-visible {
+  z-index: 4;
+}
+
+/* Several pods: cards stacked behind. */
+.topo-group {
+  --topo-stack: 4px -4px 0 -1px var(--surface), 4px -4px 0 0 var(--border-strong), 8px -8px 0 -1px var(--surface),
+    8px -8px 0 0 var(--border);
+}
+
+/* Referred to, but not there: an outline with the page showing through. */
+.topo-missing {
+  border: 1.5px dashed var(--border-strong);
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  box-shadow: var(--topo-ring);
+}
+
+/* Can't be read: the same outline, quieter. */
+.topo-unknown {
+  border: 1.5px dashed var(--border);
+  background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+  box-shadow: var(--topo-ring);
+}
+
+.topo-missing:hover,
+.topo-unknown:hover {
+  border-color: var(--text-subtle);
+}
+
+.topo-missing.topo-selected,
+.topo-unknown.topo-selected {
+  border-style: solid;
+  border-color: var(--text);
+}
+
+.topo-kind {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 18px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-strong);
+  color: var(--text-subtle);
+}
+
+.topo-kind-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.topo-kind-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.topo-tag {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  padding: 0 5px 0 4px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: var(--weight-strong);
+  line-height: 17px;
+  white-space: nowrap;
+}
+
+.topo-tag-missing {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.topo-name {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-strong);
+  line-height: 18px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.topo-unknown .topo-name {
+  color: var(--text-muted);
+}
+
+.topo-status {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.topo-missing .topo-status,
+.topo-unknown .topo-status {
+  color: var(--text-subtle);
+  font-style: italic;
+}
+
+/* ---- Zoom controls, over the bottom-left corner ---- */
+
+.topo-controls {
+  position: absolute;
+  bottom: var(--space-3);
+  left: var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  cursor: default;
+}
+
+.topo-zoom {
+  min-width: 46px;
+  height: var(--control-sm);
+  padding: 0 4px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.topo-zoom:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.topo-zoom:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.topo-controls-sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 3px;
+  background: var(--border);
+}

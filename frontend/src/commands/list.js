@@ -40,6 +40,14 @@ export function collect(sources, ctx, dataFor = () => undefined) {
   return entries;
 }
 
+// collectFromQuery asks the sources that make commands from the query
+// (fromQuery) for theirs. A source that throws is left out, as in collect.
+export function collectFromQuery(sources, ctx, query) {
+  return sources
+    .filter((source) => source.fromQuery)
+    .flatMap((source) => commandsOf({ id: source.id }, () => source.fromQuery(ctx, query)).map((command) => ({ command, source })));
+}
+
 // collectItems lists a sub-list: the commands of one command's `items`.
 export function collectItems(parent, ctx) {
   const source = { id: parent.id };

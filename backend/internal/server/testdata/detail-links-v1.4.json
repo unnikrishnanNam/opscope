@@ -1,0 +1,531 @@
+{
+  "configmaps/shop/app-config": {
+    "fields": [],
+    "owners": [],
+    "tables": []
+  },
+  "deployments/shop/web": {
+    "fields": [
+      {
+        "label": "Replicas",
+        "value": "3 desired, 0 ready, 0 up to date, 0 available"
+      }
+    ],
+    "owners": [],
+    "tables": []
+  },
+  "nodes//n1": {
+    "fields": [
+      {
+        "label": "Status",
+        "value": "Unknown"
+      },
+      {
+        "label": "Schedulable",
+        "value": "true"
+      },
+      {
+        "label": "OS",
+        "value": " (/)"
+      }
+    ],
+    "owners": [],
+    "tables": []
+  },
+  "persistentvolumeclaims/shop/data": {
+    "fields": [
+      {
+        "label": "Status",
+        "value": "Bound"
+      },
+      {
+        "label": "Volume",
+        "value": "pv-data",
+        "link": {
+          "resource": "persistentvolumes",
+          "name": "pv-data"
+        }
+      },
+      {
+        "label": "StorageClass",
+        "value": "fast",
+        "link": {
+          "resource": "storageclasses",
+          "name": "fast"
+        }
+      },
+      {
+        "label": "Capacity",
+        "value": "1 GiB"
+      },
+      {
+        "label": "Volume mode",
+        "value": "Filesystem"
+      }
+    ],
+    "owners": [],
+    "tables": [
+      {
+        "title": "Used by",
+        "columns": [
+          "Pod",
+          "Status",
+          "Node"
+        ],
+        "rows": [
+          [
+            "web-abc-1",
+            "Running",
+            "n1"
+          ]
+        ],
+        "links": [
+          [
+            {
+              "resource": "pods",
+              "namespace": "shop",
+              "name": "web-abc-1"
+            },
+            null,
+            null
+          ]
+        ]
+      }
+    ]
+  },
+  "persistentvolumeclaims/shop/data-db-0": {
+    "fields": [
+      {
+        "label": "Status",
+        "value": "Bound"
+      },
+      {
+        "label": "Volume",
+        "value": "pv-db-0",
+        "link": {
+          "resource": "persistentvolumes",
+          "name": "pv-db-0"
+        }
+      },
+      {
+        "label": "StorageClass",
+        "value": "fast",
+        "link": {
+          "resource": "storageclasses",
+          "name": "fast"
+        }
+      },
+      {
+        "label": "Capacity",
+        "value": "1 GiB"
+      },
+      {
+        "label": "Volume mode",
+        "value": "Filesystem"
+      }
+    ],
+    "owners": [],
+    "tables": [
+      {
+        "title": "Used by",
+        "columns": [
+          "Pod",
+          "Status",
+          "Node"
+        ],
+        "rows": [
+          [
+            "db-0",
+            "Running",
+            "n1"
+          ]
+        ],
+        "links": [
+          [
+            {
+              "resource": "pods",
+              "namespace": "shop",
+              "name": "db-0"
+            },
+            null,
+            null
+          ]
+        ]
+      }
+    ]
+  },
+  "persistentvolumeclaims/shop/orphan": {
+    "fields": [
+      {
+        "label": "Status",
+        "value": "Pending"
+      },
+      {
+        "label": "StorageClass",
+        "value": "slow (not found)"
+      },
+      {
+        "label": "Volume mode",
+        "value": "Filesystem"
+      }
+    ],
+    "owners": [],
+    "tables": []
+  },
+  "persistentvolumes//pv-data": {
+    "fields": [
+      {
+        "label": "Status",
+        "value": "Bound"
+      },
+      {
+        "label": "Claim",
+        "value": "shop/data",
+        "link": {
+          "resource": "persistentvolumeclaims",
+          "namespace": "shop",
+          "name": "data"
+        }
+      },
+      {
+        "label": "StorageClass",
+        "value": "fast",
+        "link": {
+          "resource": "storageclasses",
+          "name": "fast"
+        }
+      },
+      {
+        "label": "Volume mode",
+        "value": "Filesystem"
+      }
+    ],
+    "owners": [],
+    "tables": []
+  },
+  "persistentvolumes//pv-released": {
+    "fields": [
+      {
+        "label": "Status",
+        "value": "Released"
+      },
+      {
+        "label": "Claim",
+        "value": "shop/old (no longer bound)"
+      },
+      {
+        "label": "StorageClass",
+        "value": "manual (not found)"
+      },
+      {
+        "label": "Volume mode",
+        "value": "Filesystem"
+      }
+    ],
+    "owners": [],
+    "tables": []
+  },
+  "pods/shop/db-0": {
+    "fields": [
+      {
+        "label": "Status",
+        "value": "Running"
+      },
+      {
+        "label": "Node",
+        "value": "n1"
+      }
+    ],
+    "owners": [
+      {
+        "kind": "StatefulSet",
+        "name": "db",
+        "resource": "statefulsets"
+      }
+    ],
+    "tables": [
+      {
+        "title": "Volumes",
+        "columns": [
+          "Volume",
+          "Type",
+          "Source",
+          "Mounted at"
+        ],
+        "rows": [
+          [
+            "data",
+            "PersistentVolumeClaim",
+            "data-db-0",
+            ""
+          ]
+        ],
+        "links": [
+          [
+            null,
+            null,
+            {
+              "resource": "persistentvolumeclaims",
+              "namespace": "shop",
+              "name": "data-db-0"
+            },
+            null
+          ]
+        ]
+      }
+    ]
+  },
+  "pods/shop/debug": {
+    "fields": [
+      {
+        "label": "Status",
+        "value": "Running"
+      },
+      {
+        "label": "Node",
+        "value": "n2"
+      }
+    ],
+    "owners": [],
+    "tables": []
+  },
+  "pods/shop/web-abc-1": {
+    "fields": [
+      {
+        "label": "Status",
+        "value": "Running"
+      },
+      {
+        "label": "Node",
+        "value": "n1"
+      }
+    ],
+    "owners": [
+      {
+        "kind": "ReplicaSet",
+        "name": "web-abc"
+      }
+    ],
+    "tables": [
+      {
+        "title": "Volumes",
+        "columns": [
+          "Volume",
+          "Type",
+          "Source",
+          "Mounted at"
+        ],
+        "rows": [
+          [
+            "config",
+            "ConfigMap",
+            "app-config",
+            ""
+          ],
+          [
+            "creds",
+            "Secret",
+            "db-creds",
+            ""
+          ],
+          [
+            "data",
+            "PersistentVolumeClaim",
+            "data",
+            ""
+          ],
+          [
+            "gone",
+            "ConfigMap",
+            "missing-config",
+            ""
+          ],
+          [
+            "scratch",
+            "Ephemeral",
+            "web-abc-1-scratch (ephemeral)",
+            ""
+          ]
+        ],
+        "links": [
+          [
+            null,
+            null,
+            {
+              "resource": "configmaps",
+              "namespace": "shop",
+              "name": "app-config"
+            },
+            null
+          ],
+          [
+            null,
+            null,
+            {
+              "resource": "secrets",
+              "namespace": "shop",
+              "name": "db-creds"
+            },
+            null
+          ],
+          [
+            null,
+            null,
+            {
+              "resource": "persistentvolumeclaims",
+              "namespace": "shop",
+              "name": "data"
+            },
+            null
+          ],
+          [
+            null,
+            null,
+            {
+              "resource": "configmaps",
+              "namespace": "shop",
+              "name": "missing-config"
+            },
+            null
+          ],
+          [
+            null,
+            null,
+            {
+              "resource": "persistentvolumeclaims",
+              "namespace": "shop",
+              "name": "web-abc-1-scratch"
+            },
+            null
+          ]
+        ]
+      }
+    ]
+  },
+  "secrets/shop/db-creds": {
+    "fields": [],
+    "owners": [],
+    "tables": []
+  },
+  "statefulsets/shop/db": {
+    "fields": [
+      {
+        "label": "Replicas",
+        "value": "3 desired, 0 ready"
+      }
+    ],
+    "owners": [],
+    "tables": [
+      {
+        "title": "Volume claim templates",
+        "columns": [
+          "Template",
+          "Size",
+          "Access modes",
+          "StorageClass"
+        ],
+        "rows": [
+          [
+            "data",
+            "",
+            "",
+            "fast"
+          ]
+        ],
+        "links": [
+          [
+            null,
+            null,
+            null,
+            {
+              "resource": "storageclasses",
+              "name": "fast"
+            }
+          ]
+        ]
+      },
+      {
+        "title": "Claims",
+        "columns": [
+          "Claim",
+          "Status",
+          "Capacity",
+          "Volume"
+        ],
+        "rows": [
+          [
+            "data-db-0",
+            "Bound",
+            "1 GiB",
+            "pv-db-0"
+          ],
+          [
+            "data-db-1",
+            "Pending",
+            "",
+            ""
+          ]
+        ],
+        "links": [
+          [
+            {
+              "resource": "persistentvolumeclaims",
+              "namespace": "shop",
+              "name": "data-db-0"
+            },
+            null,
+            null,
+            {
+              "resource": "persistentvolumes",
+              "name": "pv-db-0"
+            }
+          ],
+          [
+            {
+              "resource": "persistentvolumeclaims",
+              "namespace": "shop",
+              "name": "data-db-1"
+            },
+            null,
+            null,
+            null
+          ]
+        ]
+      }
+    ]
+  },
+  "storageclasses//fast": {
+    "fields": [
+      {
+        "label": "Provisioner",
+        "value": "example.com/disk"
+      },
+      {
+        "label": "Default",
+        "value": "No"
+      },
+      {
+        "label": "Reclaim policy",
+        "value": "Delete"
+      },
+      {
+        "label": "Binding mode",
+        "value": "Immediate"
+      },
+      {
+        "label": "Volume expansion",
+        "value": "No"
+      },
+      {
+        "label": "Volumes",
+        "value": "2"
+      },
+      {
+        "label": "Claims",
+        "value": "4"
+      }
+    ],
+    "owners": [],
+    "tables": []
+  }
+}
