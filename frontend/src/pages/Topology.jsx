@@ -1,14 +1,16 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useOutletContext, useSearchParams } from "react-router";
 import { useApi } from "../api.js";
 import Button from "../components/Button.jsx";
 import { Callout, EmptyState } from "../components/Callout.jsx";
+import { Field, TextInput } from "../components/Field.jsx";
 import { Skeleton } from "../components/Loading.jsx";
 import { PageHeader } from "../components/PageHeader.jsx";
 import { SegmentedControl } from "../components/Toggle.jsx";
 import TopologyView from "../components/TopologyView.jsx";
 import { CloseIcon, NamespaceIcon, SearchIcon, TopologyIcon } from "../components/icons.jsx";
 import { countOf, kindIcon, kindName } from "../graph/kinds.js";
+import { typedNamespace } from "../namespaces.js";
 import { GRAPH_KINDS, topologyRequest } from "./topologyRequest.js";
 import "./Topology.css";
 
@@ -204,6 +206,46 @@ function Scope({ icon: Icon, onClear, clearLabel, children }) {
   );
 }
 
+// withNamespace is the URL of a namespace's map: no object, search or depth.
+function withNamespace(params, ns) {
+  const next = new URLSearchParams(params);
+  next.set("ns", ns);
+  next.delete("object");
+  next.delete("q");
+  next.delete("depth");
+  return next;
+}
+
+// OpenNamespace asks for a namespace by name, for a user who can't list them.
+function OpenNamespace() {
+  const [params, setParams] = useSearchParams();
+  const [text, setText] = useState("");
+  const name = typedNamespace(text);
+  const invalid = text.trim() !== "" && !name;
+  return (
+    <form
+      className="topology-open-ns"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (name) setParams(withNamespace(params, name));
+      }}
+    >
+      <Field label="Namespace" error={invalid ? "A namespace's name has lowercase letters, digits and dashes" : null}>
+        <TextInput
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="team-a"
+          autoComplete="off"
+          spellCheck={false}
+        />
+      </Field>
+      <Button type="submit" variant="primary" disabled={!name}>
+        Show its map
+      </Button>
+    </form>
+  );
+}
+
 // NamespacePicker lists the cluster's namespaces with how many objects
 // each holds, for "All namespaces", where a map of everything would be too
 // much to read.
@@ -224,20 +266,28 @@ function NamespacePicker({ names }) {
   }
   const namespaces = [...counts].sort((a, b) => (a[0] < b[0] ? -1 : 1));
   if (namespaces.length === 0) {
+    // A user who may read only some namespaces can't list any kind across
+    // all of them, so the name index is empty: that's no reason to say
+    // there's nothing to map. Let them say which namespace.
+    if (names.data.skipped?.some((s) => s.code === "forbidden")) {
+      return (
+        <EmptyState
+          icon={TopologyIcon}
+          title="Opscope can't list objects across all namespaces"
+          action={<OpenNamespace />}
+        >
+          It may only be allowed to read some namespaces. Enter one to see its map, or type it in the namespace picker
+          above.
+        </EmptyState>
+      );
+    }
     return (
       <EmptyState icon={TopologyIcon} title="Nothing to map yet">
         No namespace holds objects Opscope can read.
       </EmptyState>
     );
   }
-  const linkTo = (ns) => {
-    const next = new URLSearchParams(params);
-    next.set("ns", ns);
-    next.delete("object");
-    next.delete("q");
-    next.delete("depth");
-    return `?${next}`;
-  };
+  const linkTo = (ns) => `?${withNamespace(params, ns)}`;
   return (
     <div className="topology-pick">
       <p className="topology-pick-intro">

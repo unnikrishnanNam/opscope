@@ -54,7 +54,7 @@ The manifests in each release tag use that release's published image, so you can
 straight from GitHub:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.4.0/deploy/kubernetes/opscope.yaml
+kubectl apply -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.5.0/deploy/kubernetes/opscope.yaml
 ```
 
 From a clone of the repository, apply `deploy/kubernetes/opscope.yaml` the same way. Apply the file,
@@ -186,7 +186,8 @@ Opscope works with what the role allows, kind by kind:
   seconds behind.
 - **Without `list` across all namespaces,** for example a kubeconfig user who can read only some
   namespaces, pages read that kind from the cluster each time, in the namespace you choose, as
-  Opscope did before v1.4.
+  Opscope did before v1.4. If it can't list namespaces either, type one in the namespace picker;
+  the Topology page also asks for one by name.
 - **Without `list` at all,** the page for that kind says it isn't allowed.
 
 It checks again every five minutes, so a permission granted later is picked up without a restart.
@@ -217,13 +218,13 @@ only its type and key names, so values are never stored, cached or logged.
 pod can read every Secret in the cluster, and so can anyone who can reach Opscope. To grant it:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.4.0/deploy/kubernetes/secrets-access.yaml
+kubectl apply -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.5.0/deploy/kubernetes/secrets-access.yaml
 ```
 
 To remove it again:
 
 ```bash
-kubectl delete -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.4.0/deploy/kubernetes/secrets-access.yaml
+kubectl delete -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.5.0/deploy/kubernetes/secrets-access.yaml
 ```
 
 The Secrets pages then say that this user isn't allowed to read them.
@@ -325,8 +326,8 @@ Each release is published to the GitHub Container Registry for `linux/amd64` and
 
 | Tag       | Points to                                         |
 | --------- | ------------------------------------------------- |
-| `v1.4.0`  | That release, never moved                         |
-| `1.4`     | The latest release of that minor version          |
+| `v1.5.0`  | That release, never moved                         |
+| `1.5`     | The latest release of that minor version          |
 | `latest`  | The latest release (pre-releases are never tagged `latest`) |
 
 On a server, pin a version tag, so that a restart never upgrades Opscope by surprise. The commands
@@ -376,11 +377,11 @@ Usage history is kept in memory and starts empty after a restart. Each release's
 **In a cluster,** delete the optional roles you applied, then `opscope.yaml`:
 
 ```bash
-kubectl delete -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.4.0/deploy/kubernetes/secrets-access.yaml --ignore-not-found
+kubectl delete -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.5.0/deploy/kubernetes/secrets-access.yaml --ignore-not-found
 ```
 
 ```bash
-kubectl delete -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.4.0/deploy/kubernetes/opscope.yaml
+kubectl delete -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.5.0/deploy/kubernetes/opscope.yaml
 ```
 
 Do the same for `volume-usage.yaml` if you applied it. Deleting `opscope.yaml` deletes the

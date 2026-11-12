@@ -128,6 +128,9 @@ backend/                  Go server
                           detail.go builds detail pages, gatewayapi.go reads Gateway API resources,
                           storage.go and storage_detail.go the storage kinds, names.go builds the
                           search index
+  internal/graph/         the topology: how objects connect, built from the live copy; edge builders
+                          by area (build_workloads.go, build_network.go, build_storage.go), the
+                          engine that keeps a graph per cluster, and the queries behind /graph
   internal/metrics/       live usage from metrics-server and the in-memory history; volumes.go reads
                           volume usage from the kubelets
   internal/server/        HTTP routes, middleware, static file serving
@@ -140,6 +143,7 @@ frontend/                 React app (Vite, plain JavaScript)
   src/commands/           the command registry behind the palette and the shortcuts (sources/ has
                           the commands available on every page)
   src/components/         shared components, each with its own CSS file
+  src/graph/              the topology map: icons and names per kind, how each edge reads, the layout
   src/pages/              one file per page
   src/styles/             design tokens (both themes) and page-wide base styles
   src/kit/                the component kit at /kit (development only)
@@ -219,8 +223,41 @@ runs the Go tests and the frontend tests. Before opening a pull request, also ch
 4. **Frontend:** an entry in `src/sections.js` (with `aliases` for kubectl's short names) and its
    columns in `src/columns.jsx`. The sidebar, the route, the palette's "Go to" and object search
    follow from these.
-5. **Docs:** the resource list in the README, the permissions table in
+5. **Topology:** if the graph should hold it, its name in `NodeKinds` in `internal/graph/graph.go`,
+   its icon and kind name in `src/graph/kinds.js`, and a builder for what it refers to (see
+   [Adding a connection to the topology](#adding-a-connection-to-the-topology)).
+6. **Docs:** the resource list in the README, the permissions table in
    [`docs/deployment.md`](docs/deployment.md) and the resource table in [`docs/api.md`](docs/api.md).
+
+A kind that only the topology needs, with no page of its own (ReplicaSets, EndpointSlices and
+ServiceAccounts), goes in `graphOnly` in `resources.go` instead of `Listers`. It's collected and
+watched like every other kind, but has no list, detail page or search entry. It still needs its
+permissions (step 3), its line in the permissions table, and step 5.
+
+### Adding a connection to the topology
+
+The graph's edges come from builders: functions that read one kind of object and say what it
+refers to. Every edge is read from a field of an object, never guessed from names or values, and
+each one carries that field as evidence.
+
+1. **The builder:** a function in the `build_*.go` file for its area, registered in that file's
+   `init` with `Register(Builder{Name: "pods.spec", Resource: "pods", Refs: ...})`. `Name` is the
+   kind and the part it reads; `Resource` is the kind (`""` reads every kind, as `owners` does).
+   For each reference, `Refs` adds a `Target` (one named object) or a `Match` (every object a
+   label selector picks), with the edge kind, the field path and a short note ("env
+   DB_PASSWORD"). Set `Optional` when Kubernetes allows the target to be absent, so it isn't shown
+   as missing.
+2. **The edge kind:** use one of the kinds in `model.go` (`owns`, `references`, `binds`, `runs-on`,
+   `selects`, `endpoints`, `routes`, `attaches`) when it fits. A new kind also needs a line in
+   `RELATIONS` (how it reads from either end) and `LINE_STYLES` in `src/graph/kinds.js`, and a row
+   in the edge kind table in [`docs/api.md`](docs/api.md).
+3. **Tests:** a case in `TestEveryEdgeKind` in `graph_test.go` with the evidence it gives, and in
+   `TestGaps` if the target can be missing. `TestNodeKindsAreKnown` fails if a builder reads a kind
+   the graph doesn't hold.
+
+A new edge shows on the Topology page, in the panel of both ends, without more work. Detail pages
+ask the graph only for what `resources.AddRelations` asks (links to missing objects, a claim's pods,
+"Used by" and the like); add to it there if a detail page should show the new connection.
 
 ### Adding commands
 

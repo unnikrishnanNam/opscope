@@ -19,6 +19,11 @@ const SEARCH_FROM = 8;
 //   renderValue   optional (option) => content of the button
 //   footer        optional, under the list (e.g. a "Manage clusters" link)
 //   noun          what the options are, for "No namespaces match …"
+//   freeText      optional (typed text) => option, offered at the end of the
+//                 list when what's typed is no option's value: for a value
+//                 that can't be listed (a namespace the user can't list but
+//                 may read). It turns the search box on.
+//   placeholder   the search box's, instead of "Search <noun>…"
 //   disabled      with `title` to say why
 //
 // Keyboard: Enter, Space or Down opens it; typing filters; Up/Down move;
@@ -35,7 +40,9 @@ export default function Combobox({
   noun = "options",
   size = "md",
   align = "start",
-  searchable = options.length >= SEARCH_FROM,
+  freeText,
+  placeholder,
+  searchable = Boolean(freeText) || options.length >= SEARCH_FROM,
   disabled = false,
   title,
 }) {
@@ -52,7 +59,11 @@ export default function Combobox({
   });
 
   const needle = query.trim().toLowerCase();
-  const visible = needle ? options.filter((o) => o.label.toLowerCase().includes(needle)) : options;
+  const typed = freeText && query.trim() ? freeText(query.trim()) : null;
+  const visible = [
+    ...(needle ? options.filter((o) => o.label.toLowerCase().includes(needle)) : options),
+    ...(typed && !options.some((o) => o.value === typed.value) ? [typed] : []),
+  ];
   const selected = options.find((o) => o.value === value);
 
   // Up/Down, Home/End (without a search box) and Enter; see useListNavigation.
@@ -125,7 +136,7 @@ export default function Combobox({
                 aria-activedescendant={activeId}
                 aria-autocomplete="list"
                 aria-label={`Search ${noun}`}
-                placeholder={`Search ${noun}…`}
+                placeholder={placeholder ?? `Search ${noun}…`}
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);

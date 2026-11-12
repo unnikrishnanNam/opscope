@@ -145,7 +145,7 @@ UI. `GET /api/clusters/{id}/live` shows how each kind is read:
 | ---------- | -------------------------------------------------------------------------------------- |
 | The admin  | Every kind `watch`, Gateway API `not_installed`; state `live`                          |
 | `no-watch` | The kinds it may list `poll`, Secrets `direct`; state `partial`. A new pod shows up within 30 seconds |
-| `team-a`   | Namespaced kinds `direct`, cluster-wide kinds `forbidden`. Pods in `team-a` list; across all namespaces, the page says it isn't allowed |
+| `team-a`   | Namespaced kinds `direct`, cluster-wide kinds `forbidden`. Pods in `team-a` list; across all namespaces, the page says it isn't allowed. Typing `team-a` in the namespace picker offers it; Topology, with no namespace, asks for one by name |
 
 Gateway API kinds show as `direct` or `forbidden` for the two users, not `not_installed`: the API
 server checks the permission before it checks that the kind exists.
@@ -197,8 +197,9 @@ large. Then:
 kubectl apply -f test/scenarios/topology-gateway-api.yaml
 ```
 
-Until the Topology page exists, the graph is checked with a Go test that reads the cluster, builds
-the graph the way Opscope does, and logs what it found:
+Run Opscope with `OPSCOPE_KUBECONFIG=/tmp/opscope-graph.kubeconfig` and open the Topology page on
+`graph-test` to see the map. The graph can also be checked without the UI, with a Go test that
+reads the cluster, builds the graph the way Opscope does, and logs what it found:
 
 ```bash
 cd backend

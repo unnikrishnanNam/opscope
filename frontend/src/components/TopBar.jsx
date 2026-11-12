@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { useApi } from "../api.js";
 import { useClusters } from "../clusters.jsx";
+import { typedNamespace } from "../namespaces.js";
 import { modKey } from "../platform.js";
 import { kindsOn, nsQuery, pageFor } from "../sections.js";
 import Button from "./Button.jsx";
@@ -105,7 +106,11 @@ function ClusterPicker({ cluster, pagePath }) {
 function NamespacePicker({ cluster, reachable, clusterScoped }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const selected = searchParams.get("ns") ?? "";
-  const { data: namespaces } = useApi(reachable ? `/clusters/${cluster.id}/namespaces` : null, { live: "namespaces" });
+  const { data: namespaces, error } = useApi(reachable ? `/clusters/${cluster.id}/namespaces` : null, {
+    live: "namespaces",
+  });
+  // A user who may read some namespaces but not list them types one in.
+  const cantList = error?.status === 403;
 
   // On pages like Nodes the namespace doesn't apply. ?ns stays in the URL, so
   // it's still selected when you go back to a namespaced page.
@@ -145,7 +150,15 @@ function NamespacePicker({ cluster, reachable, clusterScoped }) {
       value={selected}
       onChange={choose}
       options={[{ value: "", label: "All namespaces" }, ...names.map((n) => ({ value: n, label: n }))]}
-      disabled={!namespaces}
+      disabled={!namespaces && !cantList}
+      {...(cantList && {
+        freeText: (text) => {
+          const name = typedNamespace(text);
+          return name && { value: name, label: `Open namespace “${name}”` };
+        },
+        placeholder: "Type a namespace…",
+        title: "Opscope isn't allowed to list namespaces: type the name of one it can read",
+      })}
     />
   );
 }

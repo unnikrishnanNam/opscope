@@ -20,7 +20,7 @@ build phases 0–8 or the D, G, L, P, R and S phases. All work happens on the `d
 one commit per phase, as in v1.4; each phase is reviewed before it is committed, and the next phase
 starts only after that.
 
-**Status (2026-11-11):** T0–T6 done; T7 next.
+**Status (2026-11-11):** done, released in v1.5.0.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -430,11 +430,11 @@ Goal: the Topology page, "Show in topology" and graph search work on real cluste
 
 Goal: v1.5.0 is ready to tag.
 
-- [ ] Bugs found on the way fixed, one commit each
-- [ ] README features and screenshots; `CONTRIBUTING.md` (adding an edge builder, the new kinds)
-- [ ] Every check CI runs: `make test`, `go vet`, `gofmt`, the frontend build, `make docker-build`
-- [ ] Image tag in `deploy/kubernetes/opscope.yaml` and the manifest URLs set to v1.5.0
-- [ ] Status line, design record table, release notes drafted (the tag is pushed by the maintainer)
+- [x] Bugs found on the way fixed, one commit each (one, in the pre-release check: see T7 notes)
+- [x] README features and screenshots; `CONTRIBUTING.md` (adding an edge builder, the new kinds)
+- [x] Every check CI runs: `make test`, `go vet`, `gofmt`, the frontend build, `make docker-build`
+- [x] Image tag in `deploy/kubernetes/opscope.yaml` and the manifest URLs set to v1.5.0
+- [x] Status line, design record table, release notes drafted (the tag is pushed by the maintainer)
 
 ## Not in this release
 
@@ -819,3 +819,47 @@ Goal: v1.5.0 is ready to tag.
   - With live data off, the map said it was read on request, and the top bar said "Every 10 s".
 - Not checked with a real screen reader: VoiceOver can't be driven from here.
 - 12 new frontend tests (140 in all), and Go tests for `find` with and without a depth.
+
+### T7: Release (2026-11-11)
+
+- Branched from `main` at `64f761f`, after T0–T6 were merged, as `release/v1.5.0`.
+- Every check CI runs, on the branch: `go vet`, `gofmt`, `go test ./...` (also with `-race`), the
+  140 frontend tests, the frontend build, `make docker-build`, and the image for `linux/amd64` as
+  CI builds it. `.github/scripts/check-manifest-tag.sh v1.5.0` passes on the manifest.
+- Browser pass on a build served by the Go server as v1.5.0, on multipass:
+  - the Topology page on `ecommerce` (62 objects, 100 connections), and around the crash-looping
+    `order-service` Deployment with its panel open;
+  - ⌘K, `pods using order-db-credentials`, Enter: the map of its three pods, drawn 52 ms after
+    Enter in headless Chrome;
+  - no console errors.
+- No bugs found. A map that stayed empty for a few seconds after a search was the browser pane
+  running as a hidden page, which slows animation frames; headless Chrome, in front, drew it at
+  once.
+- README: a Topology feature; detail pages' "Used by" and missing links; graph search and "Show
+  in topology" in the palette section; `g t`; two screenshots (the `ecommerce` namespace, and
+  around `order-service`), light and dark, taken as in v1.4 (1440 × 900 at 2×, scaled to
+  1600 × 1000).
+- `CONTRIBUTING.md`: `internal/graph/` and `src/graph/` in the layout, a Topology step in adding a
+  resource type, kinds only the graph reads (`graphOnly`), and a new section on adding a
+  connection (a builder, an edge kind, the tests).
+- Version: the manifest's image, the manifest URLs in the README and `docs/deployment.md`, the
+  image tag table, the health example in `docs/api.md` and the bug report placeholder say v1.5.0.
+  The record is in the design records table.
+- Pre-release check (2026-11-12), on a build of the branch, against multipass and a throwaway kind
+  cluster with every scenario in `test/scenarios/` (Gateway API CRDs copied from multipass):
+  - the graph endpoints with bad input (depth, edge kinds, IDs, direction, searches): 400 or 404
+    each time, depth capped;
+  - `TestLiveCluster` with `OPSCOPE_TEST_WATCH=75s` while scaling, relabelling, deleting and
+    creating objects and a namespace: the live graph matched one built afresh;
+  - with `OPSCOPE_LIVE=false`, five queries gave the same nodes and edges as the live graph;
+  - the `no-watch` and `team-a` users, a paused kind node (one warning, a 502 after 10 s like the
+    other pages, live again on unpause), 375 px, light and dark, no console errors.
+- **Fixed:** a user who can read only some namespaces had no way into them. The namespace picker
+  was disabled, since listing namespaces is forbidden, and Topology said "No namespace holds
+  objects Opscope can read". The picker now takes a typed name when it can't list namespaces, and
+  Topology says it can't list across namespaces and asks for one (`380a507`). The disabled picker
+  dates from v1.4; the Topology page made it a dead end. 142 frontend tests.
+- Left for later, all visual: kinds the graph doesn't know (an operator's `Installation`) sit in
+  the "Config and claims" column, so their `owns` edges run right to left; `kube-root-ca.crt` and
+  the `default` ServiceAccount are cards with no edges on every namespace's map; a search for
+  something nothing uses reads the same as one for a name that doesn't exist.
