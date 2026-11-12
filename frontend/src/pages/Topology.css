@@ -155,3 +155,24 @@
 .topology-example {
   white-space: nowrap;
 }
+
+/* All namespaces, for a user who can't list them: a namespace by name. */
+.topology-open-ns {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  /* A fixed width, so an error under the field doesn't move it. */
+  width: 360px;
+  max-width: 100%;
+  text-align: start;
+}
+
+.topology-open-ns .field {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Level with the input, under the field's label. */
+.topology-open-ns .button {
+  margin-top: calc(var(--text-sm) * 1.5 + var(--space-1));
+}
