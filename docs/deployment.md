@@ -186,7 +186,8 @@ Opscope works with what the role allows, kind by kind:
   seconds behind.
 - **Without `list` across all namespaces,** for example a kubeconfig user who can read only some
   namespaces, pages read that kind from the cluster each time, in the namespace you choose, as
-  Opscope did before v1.4.
+  Opscope did before v1.4. If it can't list namespaces either, type one in the namespace picker;
+  the Topology page also asks for one by name.
 - **Without `list` at all,** the page for that kind says it isn't allowed.
 
 It checks again every five minutes, so a permission granted later is picked up without a restart.

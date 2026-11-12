@@ -430,7 +430,7 @@ Goal: the Topology page, "Show in topology" and graph search work on real cluste
 
 Goal: v1.5.0 is ready to tag.
 
-- [x] Bugs found on the way fixed, one commit each (none found)
+- [x] Bugs found on the way fixed, one commit each (one, in the pre-release check: see T7 notes)
 - [x] README features and screenshots; `CONTRIBUTING.md` (adding an edge builder, the new kinds)
 - [x] Every check CI runs: `make test`, `go vet`, `gofmt`, the frontend build, `make docker-build`
 - [x] Image tag in `deploy/kubernetes/opscope.yaml` and the manifest URLs set to v1.5.0
@@ -845,3 +845,21 @@ Goal: v1.5.0 is ready to tag.
 - Version: the manifest's image, the manifest URLs in the README and `docs/deployment.md`, the
   image tag table, the health example in `docs/api.md` and the bug report placeholder say v1.5.0.
   The record is in the design records table.
+- Pre-release check (2026-11-12), on a build of the branch, against multipass and a throwaway kind
+  cluster with every scenario in `test/scenarios/` (Gateway API CRDs copied from multipass):
+  - the graph endpoints with bad input (depth, edge kinds, IDs, direction, searches): 400 or 404
+    each time, depth capped;
+  - `TestLiveCluster` with `OPSCOPE_TEST_WATCH=75s` while scaling, relabelling, deleting and
+    creating objects and a namespace: the live graph matched one built afresh;
+  - with `OPSCOPE_LIVE=false`, five queries gave the same nodes and edges as the live graph;
+  - the `no-watch` and `team-a` users, a paused kind node (one warning, a 502 after 10 s like the
+    other pages, live again on unpause), 375 px, light and dark, no console errors.
+- **Fixed:** a user who can read only some namespaces had no way into them. The namespace picker
+  was disabled, since listing namespaces is forbidden, and Topology said "No namespace holds
+  objects Opscope can read". The picker now takes a typed name when it can't list namespaces, and
+  Topology says it can't list across namespaces and asks for one (`380a507`). The disabled picker
+  dates from v1.4; the Topology page made it a dead end. 142 frontend tests.
+- Left for later, all visual: kinds the graph doesn't know (an operator's `Installation`) sit in
+  the "Config and claims" column, so their `owns` edges run right to left; `kube-root-ca.crt` and
+  the `default` ServiceAccount are cards with no edges on every namespace's map; a search for
+  something nothing uses reads the same as one for a name that doesn't exist.
