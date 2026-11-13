@@ -112,7 +112,7 @@ var typedLists = map[string]typedList{
 		return k.StorageV1().StorageClasses().List(ctx, metav1.ListOptions{})
 	},
 
-	// Read only by the graph.
+	// Cached for the graph in v1.5, with pages since v1.6.
 	"replicasets": func(ctx context.Context, k kubernetes.Interface, ns string) (runtime.Object, error) {
 		return k.AppsV1().ReplicaSets(ns).List(ctx, metav1.ListOptions{})
 	},

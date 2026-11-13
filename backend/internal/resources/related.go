@@ -41,10 +41,12 @@ type Related struct {
 //     rather than leading to an error page;
 //   - a claim lists the pods using it, a StatefulSet the claims made from
 //     its templates, and a StorageClass counts its volumes and claims;
-//   - a ConfigMap or Secret lists what uses it ("Used by").
+//   - a ConfigMap, Secret or ServiceAccount lists what uses it ("Used by");
+//   - a ReplicaSet lists its pods.
 //
-// src is only read for a StatefulSet's claims' capacity, which the graph
-// doesn't hold.
+// Some parts come from the cache (src) instead, for what the graph doesn't
+// hold: a StatefulSet's claims' capacity, a Deployment's revision numbers,
+// and a Service's endpoints with their conditions.
 func AddRelations(ctx context.Context, src Source, d *Detail, resource string, rel Relations) {
 	markMissing(d, rel)
 	switch resource {
@@ -56,6 +58,20 @@ func AddRelations(ctx context.Context, src Source, d *Detail, resource string, r
 		storageClassUsage(d, rel)
 	case "configmaps", "secrets":
 		usedBy(d, resource, rel)
+	case "serviceaccounts":
+		usedBy(d, resource, rel)
+		if d.Name == "default" {
+			// The graph leaves out edges to "default", which nearly every pod
+			// would have (docs/design/topology.md), so the table would mislead.
+			d.Tables = slices.DeleteFunc(d.Tables, func(t Table) bool { return t.Title == "Used by" })
+			d.add("Used by", "every pod in "+d.Namespace+" that names no other account")
+		}
+	case "deployments":
+		deploymentRevisions(ctx, src, d)
+	case "replicasets":
+		ownedPods(d, resource, rel)
+	case "services":
+		serviceEndpoints(ctx, src, d)
 	}
 }
 

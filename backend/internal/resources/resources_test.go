@@ -274,6 +274,8 @@ func TestEveryRowHasItsUID(t *testing.T) {
 		&corev1.PersistentVolumeClaim{ObjectMeta: named("persistentvolumeclaims", "web")},
 		&corev1.PersistentVolume{ObjectMeta: named("persistentvolumes", "")},
 		&storagev1.StorageClass{ObjectMeta: named("storageclasses", "")},
+		&corev1.ServiceAccount{ObjectMeta: named("serviceaccounts", "web")},
+		&appsv1.ReplicaSet{ObjectMeta: named("replicasets", "web")},
 	)
 	var gatewayObjects []*unstructured.Unstructured
 	for _, o := range []struct{ kind, resource, namespace string }{

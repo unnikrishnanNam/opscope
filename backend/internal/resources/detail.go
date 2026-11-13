@@ -55,6 +55,13 @@ var kinds = map[string]kindInfo{
 	"persistentvolumeclaims": {core("persistentvolumeclaims"), "PersistentVolumeClaim", true},
 	"persistentvolumes":      {core("persistentvolumes"), "PersistentVolume", false},
 	"storageclasses":         {group("storage.k8s.io", "v1", "storageclasses"), "StorageClass", false},
+
+	// Cached for the graph since v1.5; pages since v1.6 (docs/design/issues.md).
+	// ReplicaSets and EndpointSlices have no sidebar entry: a Deployment shows
+	// its ReplicaSets, a Service its endpoints.
+	"serviceaccounts": {core("serviceaccounts"), "ServiceAccount", true},
+	"replicasets":     {group("apps", "v1", "replicasets"), "ReplicaSet", true},
+	"endpointslices":  {group("discovery.k8s.io", "v1", "endpointslices"), "EndpointSlice", true},
 }
 
 // resourceForKind finds the URL name for a kind, so owners like

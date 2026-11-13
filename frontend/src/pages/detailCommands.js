@@ -58,7 +58,7 @@ export function detailCommands({ d, page, clusterId, tab, tabs, openTab, search 
     to: `/c/${clusterId}/topology?${map}`,
   });
 
-  if (namespace) {
+  if (namespace && !page.noList) {
     commands.push({
       id: "detail.namespace-list",
       title: `${page.label} in ${namespace}`,

@@ -494,10 +494,15 @@ The values of `{resource}`:
 | `persistentvolumeclaims` | PersistentVolumeClaim | namespace | core                        | yes         |
 | `persistentvolumes`      | PersistentVolume      | cluster   | core                        | yes         |
 | `storageclasses`         | StorageClass          | cluster   | `storage.k8s.io`            | yes         |
+| `serviceaccounts`        | ServiceAccount        | namespace | core                        | yes         |
+| `replicasets`            | ReplicaSet            | namespace | `apps`                      | yes         |
+| `endpointslices`         | EndpointSlice         | namespace | `discovery.k8s.io`          | detail only |
 
 The list is defined in `backend/internal/resources/resources.go` (`Listers`) and, for detail
-pages, `detail.go`. The graph also reads ReplicaSets (`apps`), EndpointSlices (`discovery.k8s.io`)
-and ServiceAccounts (core), which have no endpoints of their own (`graphOnly`).
+pages, `detail.go`. EndpointSlices have a detail view and no list: a Service's detail lists the
+endpoints of all its slices, in an `Endpoints` table. A Deployment's detail lists the ReplicaSets
+it owns, newest revision first, in a `Revisions` table; there's no ReplicaSet page in the
+sidebar, but the list exists, and ReplicaSets are in `/names`. EndpointSlices aren't.
 
 ## Examples
 

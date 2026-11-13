@@ -45,9 +45,11 @@ export default function App() {
         <Route path="clusters/add" element={<AddCluster />} />
         <Route path="c/:clusterId">
           <Route index element={<Navigate to="overview" replace />} />
-          {allPages.map((page) => (
-            <Route key={page.path} path={page.path} element={pageElement(page)} />
-          ))}
+          {allPages
+            .filter((page) => !page.noList)
+            .map((page) => (
+              <Route key={page.path} path={page.path} element={pageElement(page)} />
+            ))}
           {allPages
             .filter((page) => page.resource)
             .map((page) => (

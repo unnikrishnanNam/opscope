@@ -75,12 +75,16 @@ export default function ResourceDetail({ page }) {
             {namespace && (
               <>
                 Namespace{" "}
-                <Link
-                  className="detail-namespace"
-                  to={`/c/${cluster.id}/${page.path}?ns=${encodeURIComponent(namespace)}`}
-                >
-                  {namespace}
-                </Link>
+                {page.noList ? (
+                  <span className="detail-namespace">{namespace}</span>
+                ) : (
+                  <Link
+                    className="detail-namespace"
+                    to={`/c/${cluster.id}/${page.path}?ns=${encodeURIComponent(namespace)}`}
+                  >
+                    {namespace}
+                  </Link>
+                )}
                 {" · "}
               </>
             )}

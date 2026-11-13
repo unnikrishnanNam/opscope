@@ -3,11 +3,13 @@ import { allPages } from "../../sections.js";
 // "Go to" every page of the current cluster, straight from sections.js, so
 // a new page there is in the palette too. Links keep the selected
 // namespace, as the sidebar's do. `aliases` ("po", "svc") find them as well.
+// Pages the sidebar doesn't show (ReplicaSets, EndpointSlices) aren't here
+// either; their objects are still found by name.
 export const pages = {
   id: "pages",
   commands: (ctx) =>
     ctx.cluster
-      ? allPages.map((page) => ({
+      ? allPages.filter((page) => !page.hidden).map((page) => ({
           id: `go.${page.path}`,
           title: page.label,
           detail: page.group,

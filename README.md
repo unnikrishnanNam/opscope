@@ -45,7 +45,8 @@ machine or inside the cluster it shows.
   exist (a missing Secret, a Service with no pods) is shown as missing. The map updates live and
   also comes as a list, for the keyboard and screen readers.
 - **Detail pages:** a summary, containers, conditions, events and YAML for every object, links to
-  owners and nodes, what uses a ConfigMap or Secret, and pod logs with the previous run and live
+  owners and nodes, what uses a ConfigMap, Secret or ServiceAccount, a Deployment's revisions, the
+  endpoints behind a Service and whether each is ready, and pod logs with the previous run and live
   follow. Links to objects that don't exist say so.
 - **Live usage:** CPU and memory per node and pod from metrics-server, with the last 15 minutes as
   a trend.

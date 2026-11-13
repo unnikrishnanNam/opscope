@@ -25,7 +25,7 @@ build phases 0–8 or the D, G, L, P, R, S and T phases. All work happens on the
 one commit per phase, as in v1.4 and v1.5. Each phase is reviewed before it is committed, and the
 next phase starts only after that.
 
-**Status (2026-11-13):** in progress: I0 done, I1 next.
+**Status (2026-11-13):** in progress: I0 and I1 done, I2 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -379,19 +379,21 @@ Goal: this record is reviewed before the work starts.
 
 Goal: every kind in the cache has a page, and the signals to come have somewhere to link.
 
-- [ ] The three kinds move from `graphOnly` to `kinds`; ServiceAccounts also to `Listers`, with a
-      row (name, namespace, secrets, age) and a column set in `columns.jsx`
-- [ ] ServiceAccount detail: "Used by" from the graph, automount, `imagePullSecrets` and
+- [~] The three kinds move from `graphOnly` to `kinds`; ServiceAccounts also to `Listers`, with a
+      row (name, namespace, secrets, age) and a column set in `columns.jsx` (ReplicaSets too; see
+      notes)
+- [x] ServiceAccount detail: "Used by" from the graph, automount, `imagePullSecrets` and
       `secrets` linked
-- [ ] Deployment detail: a Revisions section from the graph's `owns` edges and each ReplicaSet's
-      revision annotation; ReplicaSet detail: owner, selector, replicas, conditions, events, pods
-- [ ] Service detail: an Endpoints section from its EndpointSlices; EndpointSlice detail
-- [ ] `sections.js`: a ServiceAccounts entry in Config; hidden page entries for ReplicaSets and
+- [~] Deployment detail: a Revisions section ~~from the graph's `owns` edges and~~ from the cache's
+      ReplicaSets and each one's revision annotation; ReplicaSet detail: owner, selector, replicas,
+      conditions, events, pods (see notes)
+- [x] Service detail: an Endpoints section from its EndpointSlices; EndpointSlice detail
+- [x] `sections.js`: a ServiceAccounts entry in Config; hidden page entries for ReplicaSets and
       EndpointSlices; `detailPath` and the Topology panel link to all three
-- [ ] `/names` and the palette: ServiceAccounts and ReplicaSets, with kubectl's short names
-- [ ] Go tests on fakes for every new section; `test/scenarios/` gets a rollout with two live
-      ReplicaSets and a Service with one ready and one unready endpoint
-- [ ] Browser: light and dark, keyboard, 375 px and wide
+- [x] `/names` and the palette: ServiceAccounts and ReplicaSets, with kubectl's short names
+- [x] Go tests on fakes for every new section; `test/scenarios/` gets a rollout with two live
+      ReplicaSets and a Service with one ready and one unready endpoint (`rollouts.yaml`)
+- [x] Browser: light and dark, keyboard, 375 px and wide
 
 ## Phase I2: Signal engine
 
@@ -512,3 +514,40 @@ Goal: v1.6.0 is ready to tag.
   Decisions (the log-read limits, on by default with `OPSCOPE_LOG_SIGNALS=false` to turn it off;
   the 28-type vocabulary; no notifications in core; grouping by owner on the Issues page; a
   60-second resolve delay for every type, with `oom_killed`'s one-hour window in its condition).
+
+### I1: Pages for ServiceAccounts, ReplicaSets and EndpointSlices (2026-11-13)
+
+- `graphOnly` is gone. The three kinds are in `kinds` (detail views), and `Kinds()` now collects
+  every kind in `Listers` or `kinds`, so a kind with a detail view and no list (EndpointSlices) is
+  still cached. ServiceAccounts and **ReplicaSets** are in `Listers`. Changed from the plan:
+  ReplicaSets needed a lister to be in `/names`, which builds the index from `Listers`. Their list
+  page exists, with no sidebar entry, and is where a ReplicaSet page's breadcrumb leads.
+- **Revisions come from the cache, not the graph's edges.** The revision number is an annotation,
+  which the graph doesn't hold, so `deploymentRevisions` lists the cached ReplicaSets whose
+  controller is the Deployment (by UID), newest revision first. Each is `current` (its revision is
+  the Deployment's), `old, still running` (it still has pods: a rollout under way or stuck) or
+  `old`. A ReplicaSet's own page reads its pods from the graph's `owns` edges, and its containers
+  from the object itself, which is read from the cluster with its template.
+- **A Service's endpoints come from the cache too**, because the graph's `endpoints` edges keep only
+  ready or not, and the page shows serving, terminating, node, zone and ports. An unset `ready` or
+  `serving` counts as ready, and an unset `terminating` as not, as the EndpointSlice API says.
+- **The `default` ServiceAccount's "Used by" is a sentence, not a table.** The graph leaves out
+  edges to `default` (a lesson kept from G0–G7), so a table would be empty or misleading. Its page
+  says "every pod in <namespace> that names no other account".
+- `sections.js` has `hiddenPages`: ReplicaSets (`workloads/replicasets`) and EndpointSlices
+  (`network/endpointslices`, `noList`). They're in `allPages`, so routes, `detailPath`, `pageFor`,
+  the Topology panel and the palette's object search find them. They aren't in the sidebar or the
+  palette's "Go to". For EndpointSlices there's no list route, and the breadcrumb, the namespace
+  link and the "EndpointSlices in <namespace>" command are left out.
+- The v1.4 links comparison (`TestDetailLinksMatchV14`) lists two intended changes: a pod's
+  ReplicaSet owner now links to its page, and Deployment `web` has a Revisions table.
+- Checked on a throwaway kind cluster (`opscope-rollouts`) with `rollouts.yaml` and the stuck
+  rollout: revision 2 current at 0/1 and revision 1 "old, still running" at 2/2; `split` with one
+  Ready and one Not ready endpoint; `shop`'s pull Secret and its Deployment with 3 pods in "Used by";
+  47 ServiceAccounts in `/names` (most of them `kube-system`'s). In the browser: the ServiceAccounts
+  list, the Deployment's Revisions linking to the ReplicaSet page, the Service's Endpoints and the
+  EndpointSlice page (breadcrumb without a link), dark and light, and 375 px (the tables scroll
+  inside their box; the page doesn't). The only console errors were `metrics/nodes` 404s, since kind
+  has no metrics-server.
+- Docs: the resource table and the note under it in `docs/api.md`, the memory note and permission
+  reasons in `docs/deployment.md`, the ClusterRole's comments, the README's detail pages line.

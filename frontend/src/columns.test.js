@@ -5,7 +5,7 @@ import { allPages } from "./sections.js";
 
 describe("tables", () => {
   test("every page with a table has columns", () => {
-    for (const page of allPages.filter((p) => p.resource)) {
+    for (const page of allPages.filter((p) => p.resource && !p.noList)) {
       expect(columns[page.resource], page.resource).toBeDefined();
     }
   });

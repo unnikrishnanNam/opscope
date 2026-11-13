@@ -54,6 +54,20 @@ export const columns = {
     created,
   ],
 
+  serviceaccounts: [
+    name,
+    namespace,
+    { key: "secrets", label: "Secrets", className: "num" },
+    { key: "pullSecrets", label: "Pull secrets", className: "num" },
+    {
+      key: "automount",
+      label: "Token in pods",
+      render: (row) => (row.automount === false ? "Only if asked" : "Yes"),
+      sortValue: (row) => (row.automount === false ? 1 : 0),
+    },
+    created,
+  ],
+
   secrets: [
     name,
     namespace,
@@ -347,6 +361,26 @@ export const columns = {
       render: (row) => (row.usage ? bytes(row.usage.memory) : <span className="muted">–</span>),
       sortValue: (row) => row.usage?.memory,
     },
+    created,
+  ],
+
+  replicasets: [
+    name,
+    namespace,
+    {
+      key: "ready",
+      label: "Ready",
+      className: "num",
+      render: (row) => <Fraction have={row.ready} want={row.desired} />,
+    },
+    { key: "current", label: "Current", className: "num" },
+    {
+      key: "revision",
+      label: "Revision",
+      className: "num",
+      render: (row) => row.revision || <span className="muted">–</span>,
+    },
+    { key: "owner", label: "Owner", render: (row) => row.owner || <span className="muted">–</span> },
     created,
   ],
 

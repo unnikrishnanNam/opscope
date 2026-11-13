@@ -234,3 +234,35 @@ since it can't list across namespaces.
 ```bash
 kind delete cluster --name opscope-graph
 ```
+
+## Revisions, endpoints and ServiceAccounts
+
+`rollouts.yaml` is for the pages v1.6 added: a Deployment's revisions, the endpoints behind a
+Service, and a ServiceAccount's page. The second step sets an image that can't be pulled, so the
+rollout stops halfway with two ReplicaSets running:
+
+```bash
+kind create cluster --name opscope-rollouts --kubeconfig /tmp/opscope-rollouts.kubeconfig
+export KUBECONFIG=/tmp/opscope-rollouts.kubeconfig
+until kubectl apply -f test/scenarios/rollouts.yaml; do sleep 2; done
+kubectl -n rollouts-test rollout status deploy/shop
+kubectl -n rollouts-test set image deploy/shop app=registry.invalid/shop:2
+```
+
+Run Opscope with `OPSCOPE_KUBECONFIG=/tmp/opscope-rollouts.kubeconfig` and look at
+`rollouts-test`:
+
+| Page                     | What it should show                                                                                     |
+| ------------------------ | ------------------------------------------------------------------------------------------------------- |
+| Deployment `shop`        | Revisions: 2 current, 0/1; 1 "old, still running", 2/2. Each links to its ReplicaSet                    |
+| ReplicaSet of revision 2 | Revision 2, the `registry.invalid/shop:2` container, its one pod in ErrImagePull or ImagePullBackOff, owned by `shop` |
+| Service `split`          | Endpoints: `split-0` Ready, `split-1` Not ready, both on port `http 8080/TCP`                           |
+| Its EndpointSlice        | The same two endpoints, Service `split`, address type IPv4; no list to go back to in the breadcrumb    |
+| ServiceAccount `shop`    | Token mounted in pods: no, unless a pod asks; Secrets: `regcred` for pulling images; Used by: Deployment `shop`, 3 pods |
+| ServiceAccount `default` | "Used by: every pod in rollouts-test that names no other account", and no table                         |
+
+### Clean up
+
+```bash
+kind delete cluster --name opscope-rollouts
+```

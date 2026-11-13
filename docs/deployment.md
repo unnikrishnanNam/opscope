@@ -114,8 +114,8 @@ in memory:
 | ServiceAccounts                       | about 1.5 MiB                            |
 | Events, Namespaces                    | about 1.3 MiB                            |
 
-ReplicaSets, EndpointSlices and ServiceAccounts are kept for the topology: they have no pages of
-their own. The topology's graph of how objects connect adds about 2.7 MiB per 1,000 objects of
+ReplicaSets, EndpointSlices and ServiceAccounts were added for the topology, and have pages since
+v1.6. The topology's graph of how objects connect adds about 2.7 MiB per 1,000 objects of
 every kind but Events and Namespaces; it shares the objects with the copy above.
 
 On top of that copy and the graph, the process needs about 25 MiB. Go's garbage collector also lets memory grow
@@ -165,9 +165,9 @@ cluster each time you open them.
 | core (`""`)                 | persistentvolumeclaims, persistentvolumes             | Storage                |
 | `storage.k8s.io`            | storageclasses                                        | Storage                |
 | `gateway.networking.k8s.io` | gateways, httproutes, gatewayclasses                  | Gateway API (optional) |
-| `apps`                      | replicasets                                           | Topology               |
-| `discovery.k8s.io`          | endpointslices                                        | Topology               |
-| core (`""`)                 | serviceaccounts                                       | Topology               |
+| `apps`                      | replicasets                                           | Topology, revisions    |
+| `discovery.k8s.io`          | endpointslices                                        | Topology, endpoints    |
+| core (`""`)                 | serviceaccounts                                       | Topology, Config       |
 | `metrics.k8s.io`            | nodes, pods                                           | CPU and memory usage   |
 | core (`""`)                 | secrets (`secrets-access.yaml` only)                  | Secrets pages, Reveal  |
 | core (`""`)                 | nodes/proxy (`get`, `volume-usage.yaml` only)         | Volume usage (opt-in)  |
