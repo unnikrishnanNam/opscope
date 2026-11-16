@@ -77,6 +77,26 @@ func main() {
 	// The Signal engine follows them too, and the graph reads each node's
 	// health from it.
 	issues := signals.NewEngine(collectors, signals.Default, logger)
+	if cfg.VolumeUsage {
+		// volume_nearly_full, from the same kubelet numbers the pages show.
+		volumes := metrics.NewVolumes()
+		issues.SetVolumeUsage(func(ctx context.Context, id string) (map[string]signals.Fill, error) {
+			cluster, ok := manager.Get(id)
+			if !ok {
+				return nil, nil
+			}
+			report, err := volumes.Read(ctx, id, cluster.Client, collectors.Source(cluster), "")
+			if err != nil {
+				return nil, err
+			}
+			fills := map[string]signals.Fill{}
+			for _, v := range report.Volumes {
+				fills[v.Namespace+"/"+v.Name] = signals.Fill{Used: v.Used, Capacity: v.Capacity,
+					InodesUsed: v.InodesUsed, Inodes: v.Inodes, Seen: time.Now()}
+			}
+			return fills, nil
+		})
+	}
 	go issues.Run(ctx)
 	graphs.SetHealth(func(cluster, resource, uid string) *graph.Health {
 		h := issues.HealthOf(cluster, resource, uid)
@@ -122,7 +142,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           server.New(cfg, manager, collectors, graphs, history, logger),
+		Handler:           server.New(cfg, manager, collectors, graphs, issues, history, logger),
 		ReadHeaderTimeout: 10 * time.Second, // don't let a slow client hold a connection open forever
 	}
 

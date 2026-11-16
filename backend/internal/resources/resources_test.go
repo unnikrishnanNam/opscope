@@ -380,7 +380,10 @@ func TestOverview(t *testing.T) {
 			Status: appsv1.DeploymentStatus{ReadyReplicas: 1}},
 	)
 
-	o, err := GetOverview(context.Background(), Direct(Clients{Kube: client, Dynamic: fakeDynamic()}), Query{})
+	// What needs attention comes from the Signal engine: here, a fixed answer.
+	att := fixedAttention{"deployments:replicas_unavailable": 1, "deployments:rollout_stuck": 1, "pods": 2,
+		"jobs:replicas_unavailable": 5}
+	o, err := GetOverview(context.Background(), Direct(Clients{Kube: client, Dynamic: fakeDynamic()}), Query{}, att)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -390,9 +393,47 @@ func TestOverview(t *testing.T) {
 	if o.Pods.Total != 3 || o.Pods.ByStatus["Running"] != 2 || o.Pods.ByStatus["Pending"] != 1 {
 		t.Errorf("unexpected pods: %+v", o.Pods)
 	}
-	if d := o.Workloads[0]; d.Resource != "deployments" || d.Total != 2 || d.Unhealthy != 1 {
+	// Deployments count both their types; Jobs only job_failed.
+	if d := o.Workloads[0]; d.Resource != "deployments" || d.Total != 2 || d.Unhealthy != 2 {
 		t.Errorf("unexpected deployments count: %+v", d)
 	}
+	if j := o.Workloads[3]; j.Resource != "jobs" || j.Unhealthy != 0 {
+		t.Errorf("unexpected jobs count: %+v", j)
+	}
+	if o.Pods.Unhealthy != 2 || o.Signals["rollout_stuck"] != 1 {
+		t.Errorf("pods %+v, signals %v", o.Pods, o.Signals)
+	}
+
+	// Without a Signal engine, nothing needs attention.
+	o, err = GetOverview(context.Background(), Direct(Clients{Kube: client, Dynamic: fakeDynamic()}), Query{}, nil)
+	if err != nil || o.Workloads[0].Unhealthy != 0 || o.Pods.Unhealthy != 0 || o.Signals == nil {
+		t.Errorf("without attention: %+v, %v", o, err)
+	}
+}
+
+// fixedAttention answers Objects from "resource" (any type) and
+// "resource:type" keys.
+type fixedAttention map[string]int
+
+func (a fixedAttention) Objects(resource string, types ...string) int {
+	if len(types) == 0 {
+		return a[resource]
+	}
+	n := 0
+	for _, t := range types {
+		n += a[resource+":"+t]
+	}
+	return n
+}
+
+func (a fixedAttention) Types() map[string]int {
+	out := map[string]int{}
+	for k, v := range a {
+		if _, typ, ok := strings.Cut(k, ":"); ok {
+			out[typ] += v
+		}
+	}
+	return out
 }
 
 func TestSecretListNeverContainsValues(t *testing.T) {

@@ -263,7 +263,8 @@ func TestOverviewStorage(t *testing.T) {
 	)
 	clients := Clients{Kube: client, Dynamic: fakeDynamic()}
 
-	o, err := GetOverview(context.Background(), Direct(clients), Query{})
+	att := fixedAttention{"persistentvolumeclaims:pvc_unbound": 3, "persistentvolumes:volume_released": 2}
+	o, err := GetOverview(context.Background(), Direct(clients), Query{}, att)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -276,7 +277,8 @@ func TestOverviewStorage(t *testing.T) {
 	}
 
 	// Claims follow the namespace; volumes are cluster-wide, like nodes.
-	o, err = GetOverview(context.Background(), Direct(clients), Query{Namespace: "web"})
+	att["persistentvolumeclaims:pvc_unbound"] = 1 // the engine is read for the namespace too
+	o, err = GetOverview(context.Background(), Direct(clients), Query{Namespace: "web"}, att)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -287,7 +289,7 @@ func TestOverviewStorage(t *testing.T) {
 }
 
 func TestOverviewWithoutStorage(t *testing.T) {
-	o, err := GetOverview(context.Background(), Direct(Clients{Kube: fake.NewClientset(), Dynamic: fakeDynamic()}), Query{})
+	o, err := GetOverview(context.Background(), Direct(Clients{Kube: fake.NewClientset(), Dynamic: fakeDynamic()}), Query{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -300,7 +302,7 @@ func TestOverviewWithoutStorage(t *testing.T) {
 	client.PrependReactor("list", "persistentvolumes", func(clienttesting.Action) (bool, runtime.Object, error) {
 		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "persistentvolumes"}, "", errors.New("RBAC"))
 	})
-	o, err = GetOverview(context.Background(), Direct(Clients{Kube: client, Dynamic: fakeDynamic()}), Query{})
+	o, err = GetOverview(context.Background(), Direct(Clients{Kube: client, Dynamic: fakeDynamic()}), Query{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

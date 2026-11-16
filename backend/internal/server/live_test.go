@@ -19,6 +19,7 @@ import (
 	"opscope/internal/clusters"
 	"opscope/internal/collector"
 	"opscope/internal/graph"
+	"opscope/internal/signals"
 )
 
 // fakeFeed stands in for the collectors: a real bus, and a status the test
@@ -239,7 +240,7 @@ func TestStreamAnswers(t *testing.T) {
 		{"collector not started yet", on, "/api/clusters/lab/live/stream", http.StatusServiceUnavailable},
 	}
 	for _, tt := range tests {
-		handler := New(Config{}, manager, tt.live, graph.NewEngine(tt.live, logger), nil, logger)
+		handler := New(Config{}, manager, tt.live, graph.NewEngine(tt.live, logger), signals.NewEngine(tt.live, signals.Default, logger), nil, logger)
 		if rec := get(handler, tt.path); rec.Code != tt.want {
 			t.Errorf("%s: %d %s, want %d", tt.name, rec.Code, rec.Body.String(), tt.want)
 		}

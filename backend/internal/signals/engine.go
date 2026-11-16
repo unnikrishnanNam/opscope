@@ -47,7 +47,7 @@ type Info struct {
 	Partial []PartialKind `json:"partial"`
 	// HistorySince is how far back signals and health go: when the engine
 	// first read the cluster. Zero for an answer built on request.
-	HistorySince time.Time `json:"historySince"`
+	HistorySince time.Time `json:"historySince,omitzero"`
 }
 
 // PartialKind is a kind the engine couldn't read, with the name index's
@@ -75,6 +75,21 @@ type Engine struct {
 	// health is cluster → *clusterHealth, for readers that mustn't wait on
 	// a world's lock (the graph, from inside its own).
 	health sync.Map
+
+	// fills reads how full each claim's volume is; nil while volume usage
+	// is off (see SetVolumeUsage).
+	fills func(ctx context.Context, cluster string) (map[string]Fill, error)
+}
+
+// fillsEvery is how often volume usage is read: the kubelet measures
+// volumes about once a minute.
+const fillsEvery = time.Minute
+
+// SetVolumeUsage gives the engine where volume usage comes from, keyed
+// "namespace/claim". Call it before Run, and only when volume usage is on
+// (OPSCOPE_VOLUME_USAGE): reading it calls every node's kubelet.
+func (e *Engine) SetVolumeUsage(fn func(ctx context.Context, cluster string) (map[string]Fill, error)) {
+	e.fills = fn
 }
 
 // clusterHealth is a live world's health as other engines read it: the
@@ -117,6 +132,9 @@ func (e *Engine) Run(ctx context.Context) {
 	defer e.sub.Close()
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
+	if e.fills != nil {
+		go e.readFills(ctx)
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -128,6 +146,38 @@ func (e *Engine) Run(ctx context.Context) {
 			e.handle(ev)
 		case <-ticker.C:
 			e.tickAll()
+		}
+	}
+}
+
+// readFills reads volume usage for every live cluster once a minute, away
+// from the engine's loop: it calls every node. A cluster whose usage can't
+// be read keeps its claims' signals as they are.
+func (e *Engine) readFills(ctx context.Context) {
+	ticker := time.NewTicker(fillsEvery)
+	defer ticker.Stop()
+	for {
+		e.mu.Lock()
+		clusters := maps.Clone(e.clusters)
+		e.mu.Unlock()
+		for id, l := range clusters {
+			readCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			fills, err := e.fills(readCtx, id)
+			cancel()
+			if err != nil {
+				e.logger.Debug("signals: can't read volume usage", "cluster", id, "error", err)
+				continue
+			}
+			l.mu.Lock()
+			l.w.setFills(fills, e.now())
+			out := l.w.drain()
+			l.mu.Unlock()
+			e.publish(out)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
 		}
 	}
 }

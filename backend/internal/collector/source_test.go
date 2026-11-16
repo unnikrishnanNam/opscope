@@ -165,9 +165,9 @@ func TestCacheAndClusterGiveTheSameAnswers(t *testing.T) {
 		}
 	}
 	for _, q := range queries[:3] {
-		want := asJSON(resources.GetOverview(ctx, direct, q))
+		want := asJSON(resources.GetOverview(ctx, direct, q, nil))
 		mustAnswer(t, "overview", want)
-		if got := asJSON(resources.GetOverview(ctx, cached, q)); got != want {
+		if got := asJSON(resources.GetOverview(ctx, cached, q, nil)); got != want {
 			t.Errorf("overview %+v:\ncache   %s\ncluster %s", q, got, want)
 		}
 	}

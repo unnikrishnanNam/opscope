@@ -14,7 +14,7 @@ import Tooltip from "../components/Tooltip.jsx";
 import { Sparkline, UsageBar } from "../components/Usage.jsx";
 import { CpuIcon, MemoryIcon, NodesIcon, PodsIcon, RefreshIcon, SuccessIcon, WarningIcon } from "../components/icons.jsx";
 import { allPages, detailPath, nsQuery, overviewKinds } from "../sections.js";
-import { USAGE_OFF, isNearlyFull } from "../volumeUsage.js";
+import { USAGE_OFF } from "../volumeUsage.js";
 import "./Overview.css";
 
 // Without live updates (see live.js), or for kinds that can't be watched.
@@ -70,7 +70,10 @@ export default function Overview({ page }) {
     stopOn: USAGE_OFF,
   });
 
-  const o = overview.data && { ...overview.data, storage: withMeasuredClaims(overview.data.storage, volumes.data) };
+  const o = overview.data && {
+    ...overview.data,
+    storage: withMeasuredClaims(overview.data.storage, volumes.data, overview.data.signals),
+  };
   const error = overview.error ?? nodes.error ?? warnings.error;
   // Links to list pages keep the selected namespace.
   const to = (path) => `/c/${cluster.id}/${path}${search}`;
@@ -199,10 +202,11 @@ export default function Overview({ page }) {
 }
 
 // withMeasuredClaims adds a row to the Storage group when volume usage is
-// on: how many claims have numbers, and how many of those are nearly full.
-// Left out when none do (for example, every claim is a local-path folder
-// the kubelet doesn't measure), rather than claim "none nearly full".
-function withMeasuredClaims(storage, report) {
+// on: how many claims have numbers, and how many of those are nearly full
+// (volume_nearly_full signals, as the Issues feed counts them). Left out
+// when none do (for example, every claim is a local-path folder the kubelet
+// doesn't measure), rather than claim "none nearly full".
+function withMeasuredClaims(storage, report, signals) {
   if (!storage || !report?.volumes.length) return storage;
   return [
     ...storage,
@@ -211,7 +215,7 @@ function withMeasuredClaims(storage, report) {
       kind: "measuredClaims",
       label: "Measured claims",
       total: report.volumes.length,
-      unhealthy: report.volumes.filter(isNearlyFull).length,
+      unhealthy: signals?.volume_nearly_full ?? 0,
     },
   ];
 }
@@ -223,7 +227,7 @@ function issuesOf(o) {
     if (count > 0) issues.push({ count, text: `${count} ${count === 1 ? singular(label) : label} ${problem}` });
   };
   add(o.nodes.total - o.nodes.ready, "Nodes", "not ready");
-  add(unhealthyPods(o.pods.byStatus), "Pods", "unhealthy");
+  add(o.pods.unhealthy, "Pods", "unhealthy");
   for (const w of [...o.workloads, ...(o.gatewayAPI ?? []), ...(o.storage ?? [])]) {
     const problem = KINDS[w.kind ?? w.resource]?.problem;
     if (problem) add(w.unhealthy, pageFor(w.resource).label, problem);
@@ -257,7 +261,7 @@ function HealthChip({ issues }) {
 // One card, four cells: nodes, pods, CPU and memory. On narrow screens it
 // becomes two by two.
 function SummaryStrip({ o, nodes, usage, to }) {
-  const badPods = unhealthyPods(o.pods.byStatus);
+  const badPods = o.pods.unhealthy;
   const notReady = o.nodes.total - o.nodes.ready;
   return (
     <div className="summary-strip">
@@ -426,13 +430,6 @@ function ResourceGroup({ title, items, to }) {
       </ul>
     </div>
   );
-}
-
-// Pods whose status is not plainly fine (running or completed).
-function unhealthyPods(byStatus) {
-  return Object.entries(byStatus)
-    .filter(([status]) => !["Running", "Completed", "Succeeded"].includes(status))
-    .reduce((sum, [, count]) => sum + count, 0);
 }
 
 // Each node: name, roles and status, and its usage when metrics-server is there.

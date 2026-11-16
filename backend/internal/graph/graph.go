@@ -261,6 +261,13 @@ func (g *Graph) Readable(resource string) bool {
 // ---- Resolving references ----
 
 // refsOf runs every builder for a kind over one object.
+// RefsOf returns the references an object makes, as the graph's builders
+// read them: for engines that check them against what exists (the Signal
+// engine's missing references), so they and the graph agree.
+func RefsOf(resource string, obj runtime.Object) []Ref {
+	return refsOf(resource, obj)
+}
+
 func refsOf(resource string, obj runtime.Object) []Ref {
 	var out []Ref
 	for _, b := range buildersFor(resource) {

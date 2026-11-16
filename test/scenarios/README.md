@@ -266,3 +266,62 @@ Run Opscope with `OPSCOPE_KUBECONFIG=/tmp/opscope-rollouts.kubeconfig` and look 
 ```bash
 kind delete cluster --name opscope-rollouts
 ```
+
+## Issues
+
+`issues.yaml` has a case for every signal type a plain kind cluster can show, in the namespace
+`issues-test`, for the Issues feed. The types it can't show (`evicted`, the `node_*` types, Gateway
+API status, `volume_nearly_full`, `volume_released`) are tested with fakes in
+`backend/internal/signals`. The certificate is made fresh, so it always expires in 20 days:
+
+```bash
+kind create cluster --name opscope-issues --kubeconfig /tmp/opscope-issues.kubeconfig
+export KUBECONFIG=/tmp/opscope-issues.kubeconfig
+until kubectl apply -f test/scenarios/issues.yaml; do sleep 2; done
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 20 \
+  -subj /CN=shop.example -keyout /tmp/issues.key -out /tmp/issues.crt
+kubectl -n issues-test create secret tls expiring-cert --cert=/tmp/issues.crt --key=/tmp/issues.key
+```
+
+Give it two minutes: `replicas_unavailable`, `pvc_unbound` and `mount_failed` wait that long from
+when the object started failing. Then run Opscope with `OPSCOPE_KUBECONFIG=/tmp/opscope-issues.kubeconfig`,
+or check the engine without the UI:
+
+```bash
+cd backend
+OPSCOPE_TEST_KUBECONFIG=/tmp/opscope-issues.kubeconfig OPSCOPE_TEST_EXPECT=issues \
+  go test ./internal/signals -run TestLiveCluster -v
+```
+
+It starts a collector and the Signal engine as Opscope does, waits up to 30 seconds for every signal
+below, and fails on any it didn't expect:
+
+| Object                         | Signals                                                              |
+| ------------------------------ | -------------------------------------------------------------------- |
+| Pod `crash`                    | `crash_loop`                                                         |
+| Pod `oom`                      | `oom_killed`; `crash_loop` too, between kills                        |
+| Pod `once`                     | `container_error`                                                    |
+| Pod `bad-image`                | `image_pull_failed`                                                  |
+| Pod `no-secret`                | `config_missing`, `reference_missing`                                |
+| Pod `bad-init`                 | `init_failing`                                                       |
+| Pod `nowhere`                  | `unschedulable`                                                      |
+| Pod `no-volume`                | `mount_failed`, `reference_missing`                                  |
+| Pod and Service `unready`      | `probe_failing` on the pod, `no_ready_endpoints` on the Service      |
+| Service `typo`                 | `selector_matches_nothing`                                           |
+| Deployment `stuck`             | `replicas_unavailable`, `rollout_stuck`; its pod `image_pull_failed` |
+| Deployment `no-account`        | `replicas_unavailable`; its ReplicaSet `create_failed`               |
+| Deployment `no-config`         | `reference_missing` and `replicas_unavailable` (once, on the Deployment); its pod `config_missing` |
+| Job `report`                   | `job_failed` (its failed pod is the Job's to judge: no signal)       |
+| Ingress `old`                  | `backend_missing`                                                    |
+| PersistentVolumeClaim `orphan` | `pvc_unbound`                                                        |
+| Secret `expiring-cert`         | `cert_expiring` (info: 20 days left)                                 |
+| Pod `fine`                     | nothing                                                              |
+
+The overview of `issues-test` then says 11 pods unhealthy, 3 Deployments not ready, 1 Job failed
+and 1 claim not bound.
+
+### Clean up
+
+```bash
+kind delete cluster --name opscope-issues
+```

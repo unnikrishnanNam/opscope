@@ -210,7 +210,7 @@ func TestGatewayAPINotInstalled(t *testing.T) {
 	}
 
 	// The overview still works, just without Gateway API counts.
-	o, err := GetOverview(context.Background(), Direct(Clients{Kube: fake.NewClientset(), Dynamic: notInstalled()}), Query{})
+	o, err := GetOverview(context.Background(), Direct(Clients{Kube: fake.NewClientset(), Dynamic: notInstalled()}), Query{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

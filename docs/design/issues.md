@@ -25,7 +25,7 @@ build phases 0–8 or the D, G, L, P, R, S and T phases. All work happens on the
 one commit per phase, as in v1.4 and v1.5. Each phase is reviewed before it is committed, and the
 next phase starts only after that.
 
-**Status (2026-11-16):** in progress: I0–I2 done, I3 next.
+**Status (2026-11-16):** in progress: I0–I3 done, I4 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -416,15 +416,15 @@ them yet.
 
 Goal: every type in the vocabulary is raised, and the overview's counts come from the engine.
 
-- [ ] The detectors for every type in the table, each with a test that raises it and one that
+- [x] The detectors for every type in the table, each with a test that raises it and one that
       doesn't (the plan's v1.9 rule, started here)
-- [ ] The cache transform keeps a TLS Secret's expiry date and nothing else of its data
-- [ ] `/health/counts`; the overview reads its "needs attention" counts from it, and the backend
-      and browser code that counted before is removed
-- [ ] `test/scenarios/`: `issues.yaml` with a case for every type a kind cluster can show (all but
+- [x] The cache transform keeps a TLS Secret's expiry date and nothing else of its data
+- [~] `/health/counts`; the overview reads its "needs attention" counts ~~from it~~ from the same
+      engine, and the backend and browser code that counted before is removed (see notes)
+- [x] `test/scenarios/`: `issues.yaml` with a case for every type a kind cluster can show (all but
       `node_*` and `volume_nearly_full`, which are tested on fakes), and a table in the README of
       the signal each should raise
-- [ ] On the scenario cluster: every case raises its signal within 30 seconds and no other; on
+- [x] On the scenario cluster: every case raises its signal within 30 seconds and no other; on
       multipass (read-only) the signals match what `kubectl` shows, with no duplicates
 
 ## Phase I4: Log signals
@@ -598,3 +598,82 @@ Goal: v1.6.0 is ready to tag.
   degraded 2 minutes after the engine started, and the rest are healthy. The pod in
   ImagePullBackOff is healthy until I3 has `image_pull_failed`. After a restart, `crash`'s signal
   had the same ID. All Go tests pass with `-race`.
+
+### I3: Detectors (2026-11-16)
+
+- Every type in the vocabulary is raised, by 13 detectors in five files: `detect_pods.go`
+  (containers, OOM kills, status, events), `detect_workloads.go` (replicas, conditions, events),
+  `detect_network.go` (Services' endpoints, routes' backends, Gateway API conditions),
+  `detect_infra.go` (claims, volumes, nodes) and `detect_config.go` (certificates, missing
+  references). `TestEveryTypeIsDetected` fails if a type has no detector. `detectors_test.go` has,
+  for every type, objects that raise it and objects that look close and don't.
+- **Missing references and backends use the graph's own references** (`graph.RefsOf`, a new
+  export), so a ConfigMap the Topology page shows as missing is the one `reference_missing` names.
+  A reference is only judged when its kind can be read: without the Secret role, a Secret a pod
+  names may well exist, and isn't reported. Ephemeral volumes' claims and a StatefulSet's claim
+  templates are left out, since they're made after the pod. A Deployment's pods don't repeat
+  their Deployment's `reference_missing`; a pod no workload owns has its own.
+- **Events count while they're recent**: within 10 minutes. Kubernetes keeps events for an hour,
+  long after most problems are over. The detectors that read events (probes, mounts, the
+  scheduler, `FailedCreate`) are timed, so their signals resolve as the events grow old, with
+  nothing else changing. `oom_killed` is timed too, and lasts an hour after the kill.
+- Choices made while writing them, each with a test:
+  - `container_error` leaves a Job's pods to the Job (`job_failed`): a Job retries, and keeps the
+    pods that failed before it succeeded.
+  - `replicas_unavailable` leaves a Deployment's ReplicaSets to the Deployment: they come and go
+    in every rollout.
+  - `pvc_unbound` leaves alone a claim whose class binds on first use (`WaitForFirstConsumer`)
+    while no pod uses it; a pod that does makes the wait a problem. Its 2-minute wait counts from
+    when the claim was made.
+  - `unschedulable` comes from the pod's condition, with the scheduler's recent
+    `FailedScheduling` events as more evidence. An event alone counts only while the pod has no
+    node.
+  - `probe_failing` needs recent `Unhealthy` probe events and a running container that isn't
+    ready. `mount_failed` needs recent mount events on a pod that's still pending.
+  - `no_ready_endpoints` counts an endpoint with no `ready` as ready, as the API says, and says
+    nothing until the endpoints controller has made a slice.
+- **Detectors can name kinds they only look up** (`Detector.Reads`): the engine holds only the
+  kinds detectors read, and `pvc_unbound` needs StorageClasses. A Trigger's `Targets` now gets the
+  Context, so a changed pod re-checks only the Services whose selector matches it, before or after
+  the change, rather than every Service in its namespace.
+- **The cache keeps a TLS Secret's expiry date** as the annotation `opscope/cert-not-after`, read
+  from `tls.crt` before the values are dropped (`collector.CertNotAfter`). An answer built on
+  request reads it from the Secret's data the same way and keeps nothing.
+- **Volume usage for `volume_nearly_full`**: with `OPSCOPE_VOLUME_USAGE` on, the engine reads the
+  kubelets' numbers once a minute (`SetVolumeUsage`, with the same `metrics.Volumes` code the pages
+  use), away from its own loop. A cluster whose usage can't be read keeps its claims' signals as
+  they are.
+- **The overview's counts come from the engine.** `GetOverview` takes a `resources.Attention`
+  (an interface, since `signals` imports `resources`). The server reads the engine for the same
+  namespace and passes it in, so the overview and the Issues feed see the same moment. Changed
+  from the plan: the overview doesn't call `/health/counts`. The endpoint exists, and both read
+  the same engine. Each kind's count is made of the types its row names ("not ready" is
+  `replicas_unavailable`, plus `rollout_stuck` for Deployments), and `pods.unhealthy` is pods with
+  any open signal. The overview also gets `signals`, objects per type, and its "Measured claims"
+  row counts `volume_nearly_full`. Removed: `countWorkloads` and the status checks behind it in
+  `overview.go`, and `unhealthyPods` and the nearly-full count in `Overview.jsx`.
+- `historySince` is left out of answers built on request.
+- **Checked on the kind cluster** (`opscope-rollouts`) with `issues.yaml` and a TLS Secret
+  expiring in 20 days, with the new `TestLiveCluster` (`OPSCOPE_TEST_EXPECT=issues`). Every signal
+  in the README's table was there within 25 seconds of the engine starting, and nothing else.
+  `fine` had none, the Job's failed pod had none, and `no-config`'s missing ConfigMap was one
+  signal on the Deployment. The first run, a minute after applying, was missing the four types
+  that wait 2 minutes, as it should. `oom`'s `crash_loop` comes and goes between kills, so the
+  test treats it as optional. Two messages were tidied on the way: the scheduler's, cut to 200
+  characters, and an exec probe's "failed: " with nothing after it. `/health/counts` and the
+  overview of `issues-test` agree: 11 of 13 pods unhealthy, 3 Deployments not ready, 1 Job failed,
+  1 claim not bound.
+- **On multipass (read-only), a bug found and fixed.** The first run raised 11 `reference_missing`
+  signals for Secrets that exist (calico's `typha-certs`, `ecommerce`'s `order-db-credentials`, …)
+  and a `backend_missing` for HTTPRoute `shop`'s Service `frontend`, which exists too. All were
+  already resolving. Reading a kind in full (`replace`) added its objects one at a time, and checked
+  what each bore on as it arrived: a Deployment naming two Secrets was checked when only the first
+  was in place. `replace` now puts every object in place, then checks everything they bear on
+  once, in a fixed order (`store`, `forget`, `bearsOn`, `check`).
+  `TestReplaceChecksOnceEverythingIsThere` covers it.
+- After the fix, multipass gives six signals, all in `ecommerce`, matching `kubectl`: `crash_loop`
+  on `order-service`'s three pods (CrashLoopBackOff, 641–652 restarts), `replicas_unavailable`
+  (0/2) and `rollout_stuck` on its Deployment, and `no_ready_endpoints` on its Service. Nothing
+  else: the calico pods' `Unhealthy` probe events are from the VMs' reboot, and those pods are
+  ready again; no claim is unbound; every node is Ready and schedulable. One signal per object and
+  type, no duplicates.

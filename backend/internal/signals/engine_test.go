@@ -11,6 +11,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
 
 	"opscope/internal/bus"
@@ -92,6 +94,15 @@ func (f *fakeFeed) change(cluster, resource string, kind bus.ChangeType, obj run
 		ev.New = obj
 	}
 	f.bus.Publish(ev)
+}
+
+// fakeDynamic is a dynamic client that lists every kind, empty.
+func fakeDynamic() *dynamicfake.FakeDynamicClient {
+	listKinds := map[schema.GroupVersionResource]string{}
+	for _, k := range resources.Kinds() {
+		listKinds[k.GVR] = k.KindName + "List"
+	}
+	return dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), listKinds)
 }
 
 func startEngine(t *testing.T, f *fakeFeed) *Engine {
@@ -205,7 +216,7 @@ func TestEngineWorksItOutOnRequest(t *testing.T) {
 	f := newFakeFeed()
 	e := startEngine(t, f)
 	kube := fake.NewClientset(crashing("api-1", 4), running("ok"), deployment("web", 2, 1))
-	src := resources.Direct(resources.Clients{Kube: kube})
+	src := resources.Direct(resources.Clients{Kube: kube, Dynamic: fakeDynamic()})
 
 	got, info := readSignals(t, e, "lab", src)
 	if info.Built != BuiltOnRequest || !info.HistorySince.IsZero() {
@@ -216,8 +227,7 @@ func TestEngineWorksItOutOnRequest(t *testing.T) {
 	if want := []string{"api-1:crash_loop:open", "web:replicas_unavailable:open"}; !slices.Equal(types_(got), want) {
 		t.Errorf("signals = %v, want %v", types_(got), want)
 	}
-	// Gateway API isn't in the fakes: no detector reads it yet, so nothing
-	// is partial.
+	// The fakes have Gateway API, with nothing in it: nothing is partial.
 	if len(info.Partial) != 0 {
 		t.Errorf("partial = %+v", info.Partial)
 	}
@@ -232,7 +242,7 @@ func TestEngineWaitsForACompleteCluster(t *testing.T) {
 	f := newFakeFeed()
 	f.cluster("lab", map[string][]runtime.Object{}, map[string]string{"pods": collector.ModePending})
 	e := startEngine(t, f)
-	src := resources.Direct(resources.Clients{Kube: fake.NewClientset(crashing("api-1", 1))})
+	src := resources.Direct(resources.Clients{Kube: fake.NewClientset(crashing("api-1", 1)), Dynamic: fakeDynamic()})
 	got, info := readSignals(t, e, "lab", src)
 	if info.Built != BuiltOnRequest || len(got) != 1 {
 		t.Errorf("signals %v, info %+v", got, info)

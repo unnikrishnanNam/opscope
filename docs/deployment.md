@@ -215,7 +215,9 @@ key, is sent with `Cache-Control: no-store`, and never appears in the YAML view.
 
 With `watch`, the API server sends Opscope each Secret that changes, values included, just as it
 does when the Secrets list is loaded. Opscope drops the values as each Secret arrives and keeps
-only its type and key names, so values are never stored, cached or logged.
+only its type and key names, so values are never stored, cached or logged. For a TLS Secret it also
+keeps when the certificate in `tls.crt` expires, read before the values go, so the Issues feed can
+warn about certificates expiring within 30 days.
 
 **Granting Secret access is a deliberate choice.** With `secrets-access.yaml` applied, the Opscope
 pod can read every Secret in the cluster, and so can anyone who can reach Opscope. To grant it:

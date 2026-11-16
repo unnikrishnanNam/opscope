@@ -24,6 +24,7 @@ import (
 	"opscope/internal/graph"
 	"opscope/internal/metrics"
 	"opscope/internal/resources"
+	"opscope/internal/signals"
 )
 
 // fakeGraphs answers every Read with one graph and info, and records the
@@ -84,7 +85,7 @@ func graphServer(t *testing.T, graphs graphReader) http.Handler {
 	t.Helper()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	live := collector.NewSet(t.Context(), false, bus.New(), logger)
-	return New(Config{}, managerWithCluster(t), live, graphs, metrics.NewHistory(), logger)
+	return New(Config{}, managerWithCluster(t), live, graphs, signals.NewEngine(live, signals.Default, logger), metrics.NewHistory(), logger)
 }
 
 type answer struct {

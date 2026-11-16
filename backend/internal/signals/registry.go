@@ -20,6 +20,10 @@ type Detector struct {
 	// change without the object changing: a certificate nearing expiry,
 	// a volume filling up.
 	Timed bool
+	// Reads are the other kinds it looks up through its Context, so the
+	// engine holds them: a claim's StorageClass. A kind it also has a
+	// Trigger for needn't be listed.
+	Reads []string
 	// Triggers re-run the detector on other objects when an object of
 	// another kind changes: an EndpointSlice's change re-runs its
 	// Service's detectors. Events don't need one: an event always re-runs
@@ -29,10 +33,10 @@ type Detector struct {
 }
 
 // Trigger says which objects to check again when an object of Resource
-// changes.
+// changes. Targets sees the world as it is after the change.
 type Trigger struct {
 	Resource string
-	Targets  func(obj runtime.Object) []Key
+	Targets  func(obj runtime.Object, c Context) []Key
 }
 
 // Key names an object by kind, namespace and name, for triggers.
@@ -65,6 +69,19 @@ type Context interface {
 	// List the objects of a kind in a namespace ("" for all, and for
 	// cluster-wide kinds), sorted by namespace and name.
 	List(resource, namespace string) []runtime.Object
+	// Readable says whether the world is given a kind's objects and is up
+	// to date with them: when it isn't, a missing object may exist.
+	Readable(resource string) bool
+	// VolumeFill is how full a claim's volume is, when volume usage is on
+	// and the kubelet measured it.
+	VolumeFill(namespace, claim string) (Fill, bool)
+}
+
+// Fill is how full a volume is, as the kubelet measures it.
+type Fill struct {
+	Used, Capacity     int64 // bytes
+	InodesUsed, Inodes int64
+	Seen               time.Time
 }
 
 // Registry holds the detectors the engine runs (contract 7).
@@ -109,6 +126,7 @@ func (r *Registry) Kinds() []string {
 	kinds := []string{"events"}
 	for _, d := range r.detectors {
 		kinds = append(kinds, d.Kinds...)
+		kinds = append(kinds, d.Reads...)
 		for _, t := range d.Triggers {
 			kinds = append(kinds, t.Resource)
 		}

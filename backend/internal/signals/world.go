@@ -60,6 +60,7 @@ type world struct {
 
 	canRead   map[string]bool // kinds the world is given objects of
 	stale     map[string]bool // kinds behind a collector gap: their signals aren't checked
+	fills     map[string]Fill // "namespace/claim" → volume usage, when it's on (setFills)
 	lastTimed time.Time
 	started   time.Time // when this world was first given objects: how far back history goes
 
@@ -93,68 +94,25 @@ func objectKey(resource, namespace, name string) string {
 
 // upsert adds or changes an object, and checks again everything it bears on.
 func (w *world) upsert(resource string, obj runtime.Object, now time.Time) {
-	if !w.holds[resource] {
+	old, ok := w.store(resource, obj)
+	if !ok {
 		return
 	}
-	m, err := meta.Accessor(obj)
-	if err != nil {
-		return
-	}
-	uid := string(m.GetUID())
-	if w.objects[resource] == nil {
-		w.objects[resource] = map[string]runtime.Object{}
-	}
-	old := w.objects[resource][uid]
-	w.objects[resource][uid] = obj
-	w.keys[objectKey(resource, m.GetNamespace(), m.GetName())] = uid
-	w.resourceOf[uid] = resource
-
-	if e, ok := obj.(*corev1.Event); ok {
-		w.indexEvent(e)
-		w.evaluate(string(e.InvolvedObject.UID), now)
-		return
-	}
-	w.evaluate(uid, now)
-	w.trigger(resource, old, obj, now)
+	w.check(w.bearsOn(resource, old, obj), now)
 }
 
 // remove deletes an object. Its signals resolve at once: the object is
 // gone, so the condition can't come back on it.
 func (w *world) remove(resource, uid string, now time.Time) {
-	obj, ok := w.objects[resource][uid]
-	if !ok {
-		return
+	if obj := w.forget(resource, uid, now); obj != nil {
+		w.check(w.bearsOn(resource, obj, nil), now)
 	}
-	delete(w.objects[resource], uid)
-	delete(w.resourceOf, uid)
-	if m, err := meta.Accessor(obj); err == nil {
-		delete(w.keys, objectKey(resource, m.GetNamespace(), m.GetName()))
-	}
-
-	if _, ok := obj.(*corev1.Event); ok {
-		about := w.eventAbout[uid]
-		delete(w.eventAbout, uid)
-		delete(w.events[about], uid)
-		if len(w.events[about]) == 0 {
-			delete(w.events, about)
-		}
-		w.evaluate(about, now)
-		return
-	}
-	for id := range w.byUID[uid] {
-		w.resolve(id, now)
-	}
-	for id, p := range w.pending {
-		if p.uid == uid {
-			delete(w.pending, id)
-		}
-	}
-	delete(w.health, uid)
-	w.published.Delete(uid)
-	w.trigger(resource, obj, nil, now)
 }
 
-// replace sets every object of a kind, after a first list or a gap.
+// replace sets every object of a kind, after a first list or a gap. Every
+// object is in place before anything is checked: a Deployment naming two
+// Secrets checked when only the first had arrived would find the second
+// missing.
 func (w *world) replace(resource string, objects []runtime.Object, now time.Time) {
 	if !w.holds[resource] {
 		return
@@ -166,13 +124,123 @@ func (w *world) replace(resource string, objects []runtime.Object, now time.Time
 			keep[string(m.GetUID())] = true
 		}
 	}
-	for uid := range w.objects[resource] {
+	type change struct{ old, new runtime.Object }
+	var changes []change
+	for _, uid := range sortedKeys(w.objects[resource]) {
 		if !keep[uid] {
-			w.remove(resource, uid, now)
+			if obj := w.forget(resource, uid, now); obj != nil {
+				changes = append(changes, change{obj, nil})
+			}
 		}
 	}
 	for _, obj := range objects {
-		w.upsert(resource, obj, now)
+		if old, ok := w.store(resource, obj); ok {
+			changes = append(changes, change{old, obj})
+		}
+	}
+	due := map[string]bool{}
+	for _, c := range changes {
+		for uid := range w.bearsOn(resource, c.old, c.new) {
+			due[uid] = true
+		}
+	}
+	w.check(due, now)
+}
+
+// store puts an object in place without checking anything; ok is false
+// for a kind the world doesn't hold. old is what it replaced, or nil.
+func (w *world) store(resource string, obj runtime.Object) (old runtime.Object, ok bool) {
+	if !w.holds[resource] {
+		return nil, false
+	}
+	m, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, false
+	}
+	uid := string(m.GetUID())
+	if w.objects[resource] == nil {
+		w.objects[resource] = map[string]runtime.Object{}
+	}
+	old = w.objects[resource][uid]
+	w.objects[resource][uid] = obj
+	w.keys[objectKey(resource, m.GetNamespace(), m.GetName())] = uid
+	w.resourceOf[uid] = resource
+	if e, isEvent := obj.(*corev1.Event); isEvent {
+		w.indexEvent(e)
+	}
+	return old, true
+}
+
+// forget takes an object out, and resolves its signals; nil if it wasn't
+// there. What it bears on isn't checked.
+func (w *world) forget(resource, uid string, now time.Time) runtime.Object {
+	obj, ok := w.objects[resource][uid]
+	if !ok {
+		return nil
+	}
+	delete(w.objects[resource], uid)
+	delete(w.resourceOf, uid)
+	if m, err := meta.Accessor(obj); err == nil {
+		delete(w.keys, objectKey(resource, m.GetNamespace(), m.GetName()))
+	}
+	if _, isEvent := obj.(*corev1.Event); isEvent {
+		about := w.eventAbout[uid]
+		delete(w.eventAbout, uid)
+		delete(w.events[about], uid)
+		if len(w.events[about]) == 0 {
+			delete(w.events, about)
+		}
+		return obj
+	}
+	for id := range w.byUID[uid] {
+		w.resolve(id, now)
+	}
+	for id, p := range w.pending {
+		if p.uid == uid {
+			delete(w.pending, id)
+		}
+	}
+	delete(w.health, uid)
+	w.published.Delete(uid)
+	return obj
+}
+
+// bearsOn is the UIDs to check after an object changed from old to new
+// (either nil): the object itself, the object an event is about, and what
+// the detectors' triggers name.
+func (w *world) bearsOn(resource string, old, new runtime.Object) map[string]bool {
+	due := map[string]bool{}
+	for _, obj := range []runtime.Object{old, new} {
+		if obj == nil {
+			continue
+		}
+		if e, isEvent := obj.(*corev1.Event); isEvent {
+			due[string(e.InvolvedObject.UID)] = true
+			continue
+		}
+		if m, err := meta.Accessor(obj); err == nil {
+			due[string(m.GetUID())] = true
+		}
+		for _, d := range w.reg.detectors {
+			for _, t := range d.Triggers {
+				if t.Resource != resource {
+					continue
+				}
+				for _, k := range t.Targets(obj, worldView{w: w}) {
+					if uid, ok := w.keys[objectKey(k.Resource, k.Namespace, k.Name)]; ok {
+						due[uid] = true
+					}
+				}
+			}
+		}
+	}
+	return due
+}
+
+// check evaluates objects in a fixed order. One that's gone is skipped.
+func (w *world) check(due map[string]bool, now time.Time) {
+	for _, uid := range sortedKeys(due) {
+		w.evaluate(uid, now)
 	}
 }
 
@@ -215,28 +283,6 @@ func (w *world) indexEvent(e *corev1.Event) {
 		w.events[about] = map[string]*corev1.Event{}
 	}
 	w.events[about][uid] = e
-}
-
-// trigger checks again the objects a changed object bears on, by the
-// detectors' triggers. old is nil for an add, now for a delete.
-func (w *world) trigger(resource string, old, now runtime.Object, at time.Time) {
-	for _, d := range w.reg.detectors {
-		for _, t := range d.Triggers {
-			if t.Resource != resource {
-				continue
-			}
-			for _, obj := range []runtime.Object{old, now} {
-				if obj == nil {
-					continue
-				}
-				for _, k := range t.Targets(obj) {
-					if uid, ok := w.keys[objectKey(k.Resource, k.Namespace, k.Name)]; ok {
-						w.evaluate(uid, at)
-					}
-				}
-			}
-		}
-	}
 }
 
 // evaluate runs an object's detectors and brings its signals in line with
@@ -457,6 +503,20 @@ func (w *world) record(t Transition) {
 	}
 }
 
+// setFills replaces the volume usage the detectors read, and checks the
+// claims again. nil means volume usage is off or couldn't be read: claims
+// keep the signals they have, since a signal never resolves for want of
+// data, and their fill isn't checked until it can be read again.
+func (w *world) setFills(fills map[string]Fill, now time.Time) {
+	if fills == nil {
+		return
+	}
+	w.fills = fills
+	for _, uid := range sortedKeys(w.objects["persistentvolumeclaims"]) {
+		w.evaluate(uid, now)
+	}
+}
+
 // drain hands over the bus events made since the last drain.
 func (w *world) drain() []bus.Event {
 	out := w.out
@@ -487,6 +547,15 @@ func (v worldView) Events(uid string) []*corev1.Event {
 		return out[i].Name < out[j].Name
 	})
 	return out
+}
+
+func (v worldView) Readable(resource string) bool {
+	return v.w.readable(resource) && !v.w.stale[resource]
+}
+
+func (v worldView) VolumeFill(namespace, claim string) (Fill, bool) {
+	f, ok := v.w.fills[namespace+"/"+claim]
+	return f, ok
 }
 
 func (v worldView) Get(resource, namespace, name string) runtime.Object {

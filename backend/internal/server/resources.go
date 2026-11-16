@@ -7,6 +7,7 @@ import (
 	"opscope/internal/clusters"
 	"opscope/internal/collector"
 	"opscope/internal/resources"
+	"opscope/internal/signals"
 )
 
 // GET /api/clusters/{id}/{resource}?namespace=...&type=...
@@ -46,14 +47,24 @@ func listResource(manager *clusters.Manager, live *collector.Set) http.HandlerFu
 // GET /api/clusters/{id}/overview?namespace=...
 //
 // Counts and health for the cluster's front page.
-func getOverview(manager *clusters.Manager, live *collector.Set) http.HandlerFunc {
+//
+// What needs attention comes from the Signal engine, read for the same
+// namespace, so the overview and the Issues feed agree.
+func getOverview(manager *clusters.Manager, live *collector.Set, issues signalReader) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cluster, ok := findCluster(w, r, manager)
 		if !ok {
 			return
 		}
 
-		overview, err := resources.GetOverview(r.Context(), live.Source(cluster), queryFrom(r))
+		q := queryFrom(r)
+		src := live.Source(cluster)
+		var overview *resources.Overview
+		err := issues.Read(r.Context(), cluster.ID, src, q.Namespace, func(v signals.View, _ signals.Info) error {
+			var err error
+			overview, err = resources.GetOverview(r.Context(), src, q, attention{v, q.Namespace})
+			return err
+		})
 		if err != nil {
 			writeClusterError(w, err, cluster)
 			return

@@ -109,3 +109,41 @@ func (v View) Counts(namespace string) map[string]int {
 	}
 	return counts
 }
+
+// Objects counts the objects of a kind in a namespace ("" for all) with an
+// open signal of one of these types, or of any type when none are given.
+func (v View) Objects(namespace, resource string, types ...string) int {
+	n := 0
+	for uid, ids := range v.w.byUID {
+		if v.w.resourceOf[uid] != resource {
+			continue
+		}
+		ref := refOf(resource, v.w.objects[resource][uid])
+		if namespace != "" && ref.Namespace != namespace {
+			continue
+		}
+		for id := range ids {
+			if len(types) == 0 || slices.Contains(types, v.w.signals[id].Type) {
+				n++
+				break
+			}
+		}
+	}
+	return n
+}
+
+// TypeCounts counts the objects in a namespace ("" for all) with an open
+// signal, by signal type.
+func (v View) TypeCounts(namespace string) map[string]int {
+	counts := map[string]int{}
+	for uid, ids := range v.w.byUID {
+		resource := v.w.resourceOf[uid]
+		if ref := refOf(resource, v.w.objects[resource][uid]); namespace != "" && ref.Namespace != namespace {
+			continue
+		}
+		for id := range ids {
+			counts[v.w.signals[id].Type]++
+		}
+	}
+	return counts
+}

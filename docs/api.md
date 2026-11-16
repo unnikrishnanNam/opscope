@@ -132,19 +132,44 @@ Counts for the overview page. `namespace` limits the namespaced counts.
 {
   "namespaces": 12,
   "nodes": { "total": 3, "ready": 3 },
-  "pods": { "total": 54, "byStatus": { "Running": 52, "CrashLoopBackOff": 2 } },
+  "pods": { "total": 54, "byStatus": { "Running": 52, "CrashLoopBackOff": 2 }, "unhealthy": 2 },
   "workloads": [{ "resource": "deployments", "total": 20, "unhealthy": 1 }],
   "storage": [{ "resource": "persistentvolumeclaims", "total": 8, "unhealthy": 1 }],
-  "gatewayAPI": [{ "resource": "gateways", "total": 2, "unhealthy": 0 }]
+  "gatewayAPI": [{ "resource": "gateways", "total": 2, "unhealthy": 0 }],
+  "signals": { "crash_loop": 2, "replicas_unavailable": 1, "pvc_unbound": 1 }
 }
 ```
 
-`unhealthy` counts what needs a look: workloads with fewer replicas ready than wanted, failed Jobs,
-claims that are `Pending` or `Lost`, volumes that are `Released` or `Failed`, Gateways that aren't
-`Programmed` and HTTPRoutes that aren't `Accepted`. CronJobs are never counted as unhealthy.
+What needs a look comes from the Signal engine, so it's what the Issues feed lists. `signals` counts
+the objects with an open signal of each type. `unhealthy` counts the objects of a kind with an open
+signal of the types its row names: Deployments `replicas_unavailable` or `rollout_stuck`;
+StatefulSets and DaemonSets `replicas_unavailable`; Jobs `job_failed`; claims `pvc_unbound`;
+volumes `volume_released`; Gateways `gateway_not_programmed`; HTTPRoutes `route_not_accepted`.
+`pods.unhealthy` counts pods with any open signal. CronJobs are never counted as unhealthy.
 PersistentVolumes, like nodes, are counted across the whole cluster whatever the `namespace`.
 `storage` is `null` when the cluster has no claims and no volumes, or Opscope isn't allowed to list
 them. `gatewayAPI` is `null` when the cluster has no Gateway API.
+
+### `GET /api/clusters/{id}/health/counts`
+
+How many objects have an open signal, by kind and by signal type, in `namespace` or the whole
+cluster: what the overview's counts are made of.
+
+```json
+{
+  "built": "live",
+  "partial": [{ "resource": "gateways", "code": "not_installed", "reason": "not installed" }],
+  "historySince": "2026-11-16T14:53:38Z",
+  "kinds": { "pods": 11, "deployments": 3, "services": 2 },
+  "types": { "crash_loop": 2, "replicas_unavailable": 3, "selector_matches_nothing": 1 }
+}
+```
+
+`built` is `live` when the Signal engine keeps the cluster up to date from its watch cache, and
+`on_request` when the answer was worked out for this request (live data off, or the cache still on
+its first list): then there's no history, and `historySince` is left out. `partial` lists the kinds
+the detectors couldn't read, as the graph's answers do. Without the Secret role there are no
+certificate checks; without Gateway API, no route or Gateway signals.
 
 ### `GET /api/clusters/{id}/names`
 

@@ -397,3 +397,58 @@ func TestSignalIDs(t *testing.T) {
 		}
 	}
 }
+
+// What the overview counts: objects of a kind with a signal of some types,
+// and objects per type, in a namespace or all of them.
+func TestObjectAndTypeCounts(t *testing.T) {
+	w := testWorld()
+	w.upsert("pods", crashing("a", 1), t0)
+	w.upsert("pods", crashing("b", 1), t0)
+	other := crashing("c", 1)
+	other.Namespace = "other"
+	w.upsert("pods", other, t0)
+	w.upsert("deployments", deployment("web", 1, 0), t0)
+	w.tick(t0.Add(3 * time.Minute))
+	v := View{w, t0}
+	if n := v.Objects("", "pods"); n != 3 {
+		t.Errorf("pods everywhere = %d", n)
+	}
+	if n := v.Objects("shop", "pods", "crash_loop"); n != 2 {
+		t.Errorf("crash-looping pods in shop = %d", n)
+	}
+	if n := v.Objects("shop", "pods", "oom_killed"); n != 0 {
+		t.Errorf("OOM-killed pods = %d", n)
+	}
+	if got := v.TypeCounts("shop"); !reflect.DeepEqual(got, map[string]int{"crash_loop": 2, "replicas_unavailable": 1}) {
+		t.Errorf("types in shop = %v", got)
+	}
+}
+
+// Reading a kind in full puts every object in place before anything is
+// checked: a Deployment naming two Secrets mustn't find the second missing
+// while only the first has arrived (found on multipass at start-up).
+func TestReplaceChecksOnceEverythingIsThere(t *testing.T) {
+	w := newWorld("lab", Default, t0)
+	w.setReadable("deployments", true)
+	d := deployment("web", 1, 1)
+	for _, name := range []string{"a", "b"} {
+		d.Spec.Template.Spec.Volumes = append(d.Spec.Template.Spec.Volumes, corev1.Volume{Name: name, VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{SecretName: name}}})
+	}
+	w.replace("deployments", []runtime.Object{d}, t0) // Secrets can't be read yet: nothing is judged
+	w.setReadable("secrets", true)
+	w.replace("secrets", []runtime.Object{
+		&corev1.Secret{ObjectMeta: objMeta("shop", "a")},
+		&corev1.Secret{ObjectMeta: objMeta("shop", "b")},
+	}, t0.Add(time.Second))
+	for _, e := range w.drain() {
+		if r, ok := e.(bus.SignalRaised); ok {
+			t.Errorf("raised %s", r.Type)
+		}
+	}
+	// And a Secret really missing is still found.
+	w.replace("secrets", []runtime.Object{&corev1.Secret{ObjectMeta: objMeta("shop", "a")}}, t0.Add(2*time.Second))
+	if got := types_(open(w)); !slices.Equal(got, []string{"web:reference_missing:open"}) {
+		t.Errorf("signals = %v", got)
+	}
+}

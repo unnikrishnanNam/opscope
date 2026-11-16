@@ -5,6 +5,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -20,6 +21,78 @@ func init() {
 		Types:  []string{"replicas_unavailable"},
 		Detect: workloadReplicas,
 	})
+	Default.Register(Detector{
+		Name:   "workloads.conditions",
+		Kinds:  []string{"deployments", "jobs"},
+		Types:  []string{"rollout_stuck", "job_failed"},
+		Detect: workloadConditions,
+	})
+	Default.Register(Detector{
+		Name:   "workloads.events",
+		Kinds:  []string{"replicasets", "statefulsets", "daemonsets", "jobs"},
+		Types:  []string{"create_failed"},
+		Timed:  true, // events grow old
+		Detect: workloadEvents,
+	})
+}
+
+// workloadConditions reads a Deployment's progress and a Job's failure
+// from their conditions.
+func workloadConditions(obj runtime.Object, c Context) []Found {
+	switch o := obj.(type) {
+	case *appsv1.Deployment:
+		if o.DeletionTimestamp != nil || o.Spec.Paused {
+			return nil
+		}
+		for i, cond := range o.Status.Conditions {
+			if cond.Type == appsv1.DeploymentProgressing && cond.Status == corev1.ConditionFalse && cond.Reason == "ProgressDeadlineExceeded" {
+				return []Found{{
+					Type: "rollout_stuck", Since: cond.LastTransitionTime.Time,
+					Message: "The rollout stopped: " + orElse(cond.Message, "it passed its progress deadline"),
+					Evidence: []Evidence{{Source: FromField, Field: fmt.Sprintf("status.conditions[%d]", i),
+						Value: "Progressing=False (ProgressDeadlineExceeded)", ResourceVersion: o.ResourceVersion}},
+				}}
+			}
+		}
+	case *batchv1.Job:
+		if o.DeletionTimestamp != nil {
+			return nil
+		}
+		for i, cond := range o.Status.Conditions {
+			if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
+				return []Found{{
+					Type: "job_failed", Since: cond.LastTransitionTime.Time,
+					Message: "Failed: " + orElse(cond.Message, cond.Reason),
+					Evidence: []Evidence{{Source: FromField, Field: fmt.Sprintf("status.conditions[%d]", i),
+						Value: "Failed=True (" + cond.Reason + ")", ResourceVersion: o.ResourceVersion}},
+				}}
+			}
+		}
+	}
+	return nil
+}
+
+// workloadEvents finds controllers that can't create their pods: a
+// quota, an admission webhook, a ServiceAccount that doesn't exist.
+func workloadEvents(obj runtime.Object, c Context) []Found {
+	m, ok := obj.(metav1.Object)
+	if !ok || m.GetDeletionTimestamp() != nil {
+		return nil
+	}
+	var f Found
+	for _, e := range c.Events(string(m.GetUID())) {
+		if e.Type == corev1.EventTypeWarning && e.Reason == "FailedCreate" && c.Now().Sub(eventTime(e)) <= eventWindow {
+			addEvent(&f, e)
+			if f.Message == "" {
+				f.Message = "Can't create its pods: " + firstLine(e.Message)
+			}
+		}
+	}
+	if f.Evidence == nil {
+		return nil
+	}
+	f.Type = "create_failed"
+	return []Found{f}
 }
 
 // workloadReplicas finds workloads with fewer replicas ready than wanted.
