@@ -2,6 +2,8 @@ package signals
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"os"
 	"slices"
 	"strings"
@@ -12,12 +14,14 @@ import (
 	"opscope/internal/clusters"
 	"opscope/internal/collector"
 	"opscope/internal/resources"
+	"opscope/internal/signals/logs"
 )
 
 // issuesScenario is what test/scenarios/issues.yaml raises: "name:type",
 // where a name ending in "-" is a prefix (a Deployment's pods and
 // ReplicaSets), and a "?" at the end marks one that comes and goes with the
-// moment (the OOM-killed pod is crash-looping only between kills). See
+// moment (the OOM-killed pod is crash-looping only between kills; two
+// Deployments pass the default 10-minute progress deadline). See
 // test/scenarios/README.md.
 var issuesScenario = []string{
 	"crash:crash_loop",
@@ -31,8 +35,8 @@ var issuesScenario = []string{
 	"unready:probe_failing", "unready:no_ready_endpoints",
 	"typo:selector_matches_nothing",
 	"stuck:replicas_unavailable", "stuck:rollout_stuck", "stuck-:image_pull_failed",
-	"no-account:replicas_unavailable", "no-account-:create_failed",
-	"no-config:reference_missing", "no-config:replicas_unavailable", "no-config-:config_missing",
+	"no-account:replicas_unavailable", "no-account-:create_failed", "no-account:rollout_stuck?",
+	"no-config:reference_missing", "no-config:replicas_unavailable", "no-config-:config_missing", "no-config:rollout_stuck?",
 	"report:job_failed",
 	"old:backend_missing",
 	"orphan:pvc_unbound",
@@ -42,10 +46,11 @@ var issuesScenario = []string{
 // TestLiveCluster runs the engine on a real cluster, as Opscope does: a
 // collector, the bus and the live world. It only reads. Set
 // OPSCOPE_TEST_KUBECONFIG to run it, and OPSCOPE_TEST_NAMESPACE to look at
-// one namespace. It logs every open signal. With OPSCOPE_TEST_EXPECT=issues
-// it checks issues.yaml's namespace: every signal the README promises,
-// within OPSCOPE_TEST_WAIT (30s by default) of the engine starting, and no
-// others.
+// one namespace. It logs every open signal, with what logs said. With
+// OPSCOPE_TEST_EXPECT=issues it checks issues.yaml's namespace: every signal
+// the README promises, and crash's log finding, within OPSCOPE_TEST_WAIT
+// (30s by default) of the engine starting, and no others. OPSCOPE_TEST_MIN
+// keeps it reading for at least that long, for logs to be read.
 func TestLiveCluster(t *testing.T) {
 	path := os.Getenv("OPSCOPE_TEST_KUBECONFIG")
 	if path == "" {
@@ -60,6 +65,10 @@ func TestLiveCluster(t *testing.T) {
 	}
 	set := collector.NewSet(ctx, true, bus.New(), quiet)
 	engine := NewEngine(set, Default, quiet)
+	engine.SetLogReader(func(ctx context.Context, _, namespace, pod, container string, previous bool) (io.ReadCloser, error) {
+		return resources.PodLogs(ctx, cluster.Stream, namespace, pod, resources.LogOptions{
+			Container: container, Tail: logs.MaxLines, Previous: previous, LimitBytes: logs.MaxBytes})
+	})
 	go engine.Run(ctx)
 	set.Follow(manager)
 	src := resources.Direct(resources.Clients{Kube: cluster.Client, Dynamic: cluster.Dynamic})
@@ -73,6 +82,9 @@ func TestLiveCluster(t *testing.T) {
 	if d, err := time.ParseDuration(os.Getenv("OPSCOPE_TEST_WAIT")); err == nil {
 		wait = d
 	}
+	// OPSCOPE_TEST_MIN keeps it reading at least that long: logs are read
+	// every 10 seconds.
+	least, _ := time.ParseDuration(os.Getenv("OPSCOPE_TEST_MIN"))
 
 	start := time.Now()
 	var got []Signal
@@ -85,7 +97,8 @@ func TestLiveCluster(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if info.Built == BuiltLive && (want == nil || len(missingFrom(got, want)) == 0) || time.Since(start) > wait {
+		done := info.Built == BuiltLive && (want == nil || len(missingFrom(got, want)) == 0 && saidInLog(got))
+		if done && time.Since(start) >= least || time.Since(start) > wait {
 			break
 		}
 		time.Sleep(time.Second)
@@ -94,6 +107,11 @@ func TestLiveCluster(t *testing.T) {
 	for _, s := range got {
 		t.Logf("%-10s %-9s %-28s %s/%s: %s (since %s)", s.Severity, s.State, s.Type, s.Resource.Kind, s.Resource.Name, s.Message,
 			s.FirstSeen.Format(time.TimeOnly))
+		for _, e := range s.Evidence {
+			if e.Source == FromLog {
+				t.Logf("           log: %s: %s%s", e.Field, e.Pattern, map[bool]string{true: fmt.Sprintf(" ×%d", e.Matches), false: " " + e.Value}[e.Matches > 0])
+			}
+		}
 	}
 	if info.Built != BuiltLive {
 		t.Errorf("the world wasn't live after %s", wait)
@@ -104,11 +122,25 @@ func TestLiveCluster(t *testing.T) {
 	for _, m := range missingFrom(got, want) {
 		t.Errorf("missing: %s", m)
 	}
+	if !saidInLog(got) {
+		t.Error("crash's crash_loop has no connection_refused from its log")
+	}
 	for _, s := range got {
 		if !slices.ContainsFunc(want, func(w string) bool { return matches(s, w) }) {
 			t.Errorf("not expected: %s:%s", s.Resource.Name, s.Type)
 		}
 	}
+}
+
+// saidInLog: the scenario's crash pod's log says connection refused, and
+// its crash_loop has that as evidence (log signals, read every 10 seconds).
+func saidInLog(got []Signal) bool {
+	for _, s := range got {
+		if s.Resource.Name == "crash" && s.Type == "crash_loop" {
+			return slices.ContainsFunc(s.Evidence, func(e Evidence) bool { return e.Pattern == "connection_refused" })
+		}
+	}
+	return false
 }
 
 func matches(s Signal, want string) bool {

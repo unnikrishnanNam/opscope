@@ -161,7 +161,7 @@ cluster each time you open them.
 | API group                   | Resources                                             | Used for               |
 | --------------------------- | ----------------------------------------------------- | ---------------------- |
 | core (`""`)                 | namespaces, nodes, pods, services, configmaps, events | Lists and detail pages |
-| core (`""`)                 | pods/log (`get`)                                      | The Logs tab           |
+| core (`""`)                 | pods/log (`get`)                                      | The Logs tab, log signals |
 | `apps`                      | deployments, statefulsets, daemonsets                 | Workloads              |
 | `batch`                     | jobs, cronjobs                                        | Workloads              |
 | `networking.k8s.io`         | ingresses                                             | Networking             |
@@ -233,6 +233,25 @@ kubectl delete -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.5
 ```
 
 The Secrets pages then say that this user isn't allowed to read them.
+
+### Log signals
+
+The Issues feed reads a little of the logs of containers that are already failing, so a crash loop
+can say what the container said before it exited ("its log shows connection refused"). Only these
+are read:
+
+- the previous run's log of a container in CrashLoopBackOff, and the current log of a running
+  container whose readiness or liveness probe fails;
+- the last 200 lines or 64 KiB, whichever is less;
+- the same container at most once every 5 minutes, and at most 5 at once per cluster.
+
+Each line (its first 16 KiB) is matched in memory against a short list of known patterns
+(connection refused, refused credentials, a missing file, permission denied, out of memory, an
+address in use, TLS and DNS failures, timeouts, panics and uncaught exceptions) and dropped. What's kept is the pattern's name and how many lines
+matched, and how many other kinds of line there were: never a line, nor anything made from one, in
+memory, in the answers or in Opscope's own log. It uses `get` on `pods/log`, which the role already
+has for the Logs tab; without it, the signals stay and say their logs couldn't be read.
+`OPSCOPE_LOG_SIGNALS=false` turns it off, and no log is read except when you open the Logs tab.
 
 ### Volume usage
 
@@ -358,6 +377,7 @@ Opscope is configured with environment variables:
 | `OPSCOPE_CLUSTER_NAME` | context name       | Display name for the environment or in-cluster cluster            |
 | `OPSCOPE_VOLUME_USAGE` | (off)              | `true`: show how full volumes are (see [Volume usage](#volume-usage)) |
 | `OPSCOPE_LIVE`         | (on)               | `false`: keep no live copy; pages ask the cluster each time (see [Turning live data off](#turning-live-data-off)) |
+| `OPSCOPE_LOG_SIGNALS`  | (on)               | `false`: never read failing containers' logs for the Issues feed (see [Log signals](#log-signals)) |
 | `DATA_DIR`             | `../data`          | Where clusters added in the UI are saved (`/data` in the image)   |
 | `STATIC_DIR`           | `../frontend/dist` | Folder with the built web UI (`/app/web` in the image)            |
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"maps"
 	"slices"
@@ -18,6 +19,7 @@ import (
 	"opscope/internal/bus"
 	"opscope/internal/collector"
 	"opscope/internal/resources"
+	"opscope/internal/signals/logs"
 )
 
 // Feed is where the engine reads clusters from and publishes to: the
@@ -79,6 +81,31 @@ type Engine struct {
 	// fills reads how full each claim's volume is; nil while volume usage
 	// is off (see SetVolumeUsage).
 	fills func(ctx context.Context, cluster string) (map[string]Fill, error)
+
+	// readLog opens a container's log; nil while log signals are off (see
+	// SetLogReader). logRead is when each container's log was last read.
+	readLog LogReader
+	logRead map[string]time.Time
+}
+
+// LogReader opens the last logs.MaxLines lines of a container's log, its
+// previous run's when previous is set. The engine closes it.
+type LogReader func(ctx context.Context, cluster, namespace, pod, container string, previous bool) (io.ReadCloser, error)
+
+// Limits on reading logs (docs/design/issues.md, "Logs").
+const (
+	logScanEvery = 10 * time.Second // how often the engine looks for logs to read
+	logEvery     = 5 * time.Minute  // the same container's log at most this often
+	logParallel  = 5                // reads at once, per cluster
+	logTimeout   = 10 * time.Second
+)
+
+// SetLogReader turns on log signals: the logs of containers whose pods
+// crash-loop or fail their probes are read, a few lines at a time, matched
+// against known patterns, and dropped (contract 11). Call it before Run.
+// Off (OPSCOPE_LOG_SIGNALS=false), no log is ever read.
+func (e *Engine) SetLogReader(fn LogReader) {
+	e.readLog = fn
 }
 
 // fillsEvery is how often volume usage is read: the kubelet measures
@@ -135,6 +162,9 @@ func (e *Engine) Run(ctx context.Context) {
 	if e.fills != nil {
 		go e.readFills(ctx)
 	}
+	if e.readLog != nil {
+		go e.readLogs(ctx)
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -148,6 +178,99 @@ func (e *Engine) Run(ctx context.Context) {
 			e.tickAll()
 		}
 	}
+}
+
+// readLogs reads the logs live worlds ask for (world.logWants), within
+// the limits, away from the engine's loop. What each read found goes back
+// into its world as counts; the lines never leave logs.Match.
+func (e *Engine) readLogs(ctx context.Context) {
+	ticker := time.NewTicker(logScanEvery)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+		e.mu.Lock()
+		clusters := maps.Clone(e.clusters)
+		e.mu.Unlock()
+		for id, l := range clusters {
+			e.readClusterLogs(ctx, id, l)
+		}
+	}
+}
+
+func (e *Engine) readClusterLogs(ctx context.Context, cluster string, l *liveWorld) {
+	l.mu.Lock()
+	wants := l.w.logWants()
+	l.mu.Unlock()
+
+	now := e.now()
+	var due []LogWant
+	e.mu.Lock()
+	if e.logRead == nil {
+		e.logRead = map[string]time.Time{}
+	}
+	for key, at := range e.logRead {
+		if now.Sub(at) > 2*logEvery {
+			delete(e.logRead, key) // a container that stopped failing
+		}
+	}
+	for _, w := range wants {
+		key := fmt.Sprintf("%s/%s/%s/%v", cluster, w.PodUID, w.Container, w.Previous)
+		if at, ok := e.logRead[key]; ok && now.Sub(at) < logEvery {
+			continue
+		}
+		e.logRead[key] = now
+		due = append(due, w)
+	}
+	e.mu.Unlock()
+
+	sem := make(chan struct{}, logParallel)
+	var wg sync.WaitGroup
+	for _, w := range due {
+		sem <- struct{}{}
+		wg.Go(func() {
+			defer func() { <-sem }()
+			f := e.readOne(ctx, cluster, w)
+			l.mu.Lock()
+			l.w.setLog(w.PodUID, w.Container, f, e.now())
+			out := l.w.drain()
+			l.mu.Unlock()
+			e.publish(out)
+		})
+	}
+	wg.Wait()
+}
+
+// readOne reads one container's log and keeps only what logs.Match counts.
+// An error is put in words that carry nothing from the log or the API's
+// message.
+func (e *Engine) readOne(ctx context.Context, cluster string, w LogWant) LogFinding {
+	f := LogFinding{Previous: w.Previous, Read: e.now(), Patterns: map[string]int{}}
+	ctx, cancel := context.WithTimeout(ctx, logTimeout)
+	defer cancel()
+	rc, err := e.readLog(ctx, cluster, w.Namespace, w.Pod, w.Container, w.Previous)
+	if err == nil {
+		defer rc.Close()
+		var res logs.Result
+		if res, err = logs.Match(rc, logs.Patterns); err == nil {
+			f.Lines, f.Patterns, f.Other = res.Lines, res.Patterns, res.Other
+			return f
+		}
+	}
+	switch {
+	case apierrors.IsForbidden(err):
+		f.Error = "not allowed (needs get on pods/log)"
+	case apierrors.IsNotFound(err), apierrors.IsBadRequest(err):
+		f.Error = "not available" // no previous run yet, or the container is gone
+	default:
+		f.Error = "the read failed"
+	}
+	e.logger.Debug("signals: can't read a log", "cluster", cluster, "pod", w.Namespace+"/"+w.Pod, "container", w.Container, "reason", f.Error)
+	f.Patterns = nil
+	return f
 }
 
 // readFills reads volume usage for every live cluster once a minute, away

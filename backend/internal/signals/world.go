@@ -58,9 +58,10 @@ type world struct {
 	published *sync.Map         // UID → *Health, for readers that can't take the engine's lock (the graph)
 	history   []Transition
 
-	canRead   map[string]bool // kinds the world is given objects of
-	stale     map[string]bool // kinds behind a collector gap: their signals aren't checked
-	fills     map[string]Fill // "namespace/claim" → volume usage, when it's on (setFills)
+	canRead   map[string]bool                  // kinds the world is given objects of
+	stale     map[string]bool                  // kinds behind a collector gap: their signals aren't checked
+	fills     map[string]Fill                  // "namespace/claim" → volume usage, when it's on (setFills)
+	logs      map[string]map[string]LogFinding // pod UID → container → what its log said (setLog)
 	lastTimed time.Time
 	started   time.Time // when this world was first given objects: how far back history goes
 
@@ -84,7 +85,7 @@ func newWorld(cluster string, reg *Registry, now time.Time) *world {
 		signals: map[string]*Signal{}, byUID: map[string]map[string]bool{},
 		resolving: map[string]time.Time{}, pending: map[string]pendingSignal{},
 		health: map[string]Health{}, published: &sync.Map{},
-		canRead: map[string]bool{}, stale: map[string]bool{}, lastTimed: now, started: now,
+		logs: map[string]map[string]LogFinding{}, canRead: map[string]bool{}, stale: map[string]bool{}, lastTimed: now, started: now,
 	}
 }
 
@@ -201,6 +202,7 @@ func (w *world) forget(resource, uid string, now time.Time) runtime.Object {
 		}
 	}
 	delete(w.health, uid)
+	delete(w.logs, uid)
 	w.published.Delete(uid)
 	return obj
 }
@@ -517,6 +519,58 @@ func (w *world) setFills(fills map[string]Fill, now time.Time) {
 	}
 }
 
+// setLog records what a container's log said and checks its pod again.
+// A pod that's gone is ignored.
+func (w *world) setLog(podUID, container string, f LogFinding, now time.Time) {
+	if _, ok := w.objects["pods"][podUID]; !ok {
+		return
+	}
+	if w.logs[podUID] == nil {
+		w.logs[podUID] = map[string]LogFinding{}
+	}
+	w.logs[podUID][container] = f
+	w.evaluate(podUID, now)
+}
+
+// LogWant is a container whose log is worth reading: its pod has an open
+// crash_loop (the previous run's log) or probe_failing (the current one).
+type LogWant struct {
+	PodUID, Namespace, Pod, Container string
+	Previous                          bool
+}
+
+// logWants lists the containers whose logs are worth reading now, in a
+// fixed order. Which are read, and how often, is the engine's to decide.
+func (w *world) logWants() []LogWant {
+	var out []LogWant
+	for _, uid := range sortedKeys(w.byUID) {
+		pod, ok := w.objects["pods"][uid].(*corev1.Pod)
+		if !ok {
+			continue
+		}
+		// A crash loop resolves for a moment each time its container runs
+		// again, so resolving counts; its signal comes back with the next
+		// exit, and the finding with it.
+		var crash, probe bool
+		for id := range w.byUID[uid] {
+			s := w.signals[id]
+			crash = crash || s.Type == "crash_loop"
+			probe = probe || s.Type == "probe_failing" && s.State == Open
+		}
+		for _, cs := range pod.Status.ContainerStatuses {
+			looping := cs.State.Waiting != nil && cs.State.Waiting.Reason == "CrashLoopBackOff" ||
+				cs.LastTerminationState.Terminated != nil && cs.RestartCount > 0
+			switch {
+			case crash && looping:
+				out = append(out, LogWant{uid, pod.Namespace, pod.Name, cs.Name, true})
+			case probe && cs.State.Running != nil && !cs.Ready:
+				out = append(out, LogWant{uid, pod.Namespace, pod.Name, cs.Name, false})
+			}
+		}
+	}
+	return out
+}
+
 // drain hands over the bus events made since the last drain.
 func (w *world) drain() []bus.Event {
 	out := w.out
@@ -551,6 +605,10 @@ func (v worldView) Events(uid string) []*corev1.Event {
 
 func (v worldView) Readable(resource string) bool {
 	return v.w.readable(resource) && !v.w.stale[resource]
+}
+
+func (v worldView) Logs(podUID string) map[string]LogFinding {
+	return v.w.logs[podUID]
 }
 
 func (v worldView) VolumeFill(namespace, claim string) (Fill, bool) {

@@ -9,6 +9,8 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -23,8 +25,10 @@ import (
 	"opscope/internal/collector"
 	"opscope/internal/graph"
 	"opscope/internal/metrics"
+	"opscope/internal/resources"
 	"opscope/internal/server"
 	"opscope/internal/signals"
+	"opscope/internal/signals/logs"
 )
 
 // version is overwritten at build time with:
@@ -56,9 +60,12 @@ func main() {
 	// Collectors keep a watch cache per cluster; OPSCOPE_LIVE=false turns
 	// them off, and every page then calls the cluster as in v1.3.
 	live := os.Getenv("OPSCOPE_LIVE") != "false"
+	// The Signal engine reads a few lines of failing containers' logs;
+	// OPSCOPE_LOG_SIGNALS=false turns that off.
+	logSignals := os.Getenv("OPSCOPE_LOG_SIGNALS") != "false"
 
 	logger.Info("starting opscope", "addr", addr, "version", version, "static_dir", cfg.StaticDir, "data_dir", dataDir,
-		"volume_usage", cfg.VolumeUsage, "live", live)
+		"volume_usage", cfg.VolumeUsage, "live", live, "log_signals", logSignals)
 
 	// ctx is cancelled when the process gets SIGTERM (what Kubernetes and
 	// `docker stop` send) or SIGINT (Ctrl+C in a terminal).
@@ -95,6 +102,19 @@ func main() {
 					InodesUsed: v.InodesUsed, Inodes: v.Inodes, Seen: time.Now()}
 			}
 			return fills, nil
+		})
+	}
+	if logSignals {
+		// A few lines of failing containers' logs, matched and dropped:
+		// docs/deployment.md, "Log signals".
+		issues.SetLogReader(func(ctx context.Context, id, namespace, pod, container string, previous bool) (io.ReadCloser, error) {
+			cluster, ok := manager.Get(id)
+			if !ok {
+				return nil, fmt.Errorf("no cluster %q", id)
+			}
+			return resources.PodLogs(ctx, cluster.Stream, namespace, pod, resources.LogOptions{
+				Container: container, Tail: logs.MaxLines, Previous: previous, LimitBytes: logs.MaxBytes,
+			})
 		})
 	}
 	go issues.Run(ctx)

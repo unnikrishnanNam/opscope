@@ -298,7 +298,7 @@ below, and fails on any it didn't expect:
 
 | Object                         | Signals                                                              |
 | ------------------------------ | -------------------------------------------------------------------- |
-| Pod `crash`                    | `crash_loop`                                                         |
+| Pod `crash`                    | `crash_loop`, whose log shows connection refused (log signals)        |
 | Pod `oom`                      | `oom_killed`; `crash_loop` too, between kills                        |
 | Pod `once`                     | `container_error`                                                    |
 | Pod `bad-image`                | `image_pull_failed`                                                  |
@@ -309,8 +309,8 @@ below, and fails on any it didn't expect:
 | Pod and Service `unready`      | `probe_failing` on the pod, `no_ready_endpoints` on the Service      |
 | Service `typo`                 | `selector_matches_nothing`                                           |
 | Deployment `stuck`             | `replicas_unavailable`, `rollout_stuck`; its pod `image_pull_failed` |
-| Deployment `no-account`        | `replicas_unavailable`; its ReplicaSet `create_failed`               |
-| Deployment `no-config`         | `reference_missing` and `replicas_unavailable` (once, on the Deployment); its pod `config_missing` |
+| Deployment `no-account`        | `replicas_unavailable`; its ReplicaSet `create_failed`; after 10 minutes, `rollout_stuck` |
+| Deployment `no-config`         | `reference_missing` and `replicas_unavailable` (once, on the Deployment); its pod `config_missing`; after 10 minutes, `rollout_stuck` |
 | Job `report`                   | `job_failed` (its failed pod is the Job's to judge: no signal)       |
 | Ingress `old`                  | `backend_missing`                                                    |
 | PersistentVolumeClaim `orphan` | `pvc_unbound`                                                        |

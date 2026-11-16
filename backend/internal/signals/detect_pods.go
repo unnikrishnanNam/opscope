@@ -8,6 +8,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	"opscope/internal/signals/logs"
 )
 
 // Detectors on pods: their containers' states, their conditions, and the
@@ -162,6 +164,7 @@ func podContainers(obj runtime.Object, c Context) []Found {
 	if crash.names != nil {
 		crash.Type = "crash_loop"
 		crash.Message = crashMessage(pod, crash.names, crash.Count)
+		addLogs(&crash.Found, c.Logs(string(pod.UID)), crash.names, true)
 		out = append(out, crash.Found)
 	}
 	if pull.names != nil {
@@ -296,6 +299,13 @@ func podEvents(obj runtime.Object, c Context) []Found {
 	var out []Found
 	if probe.Evidence != nil {
 		probe.Type = "probe_failing"
+		var unready []string
+		for _, s := range pod.Status.ContainerStatuses {
+			if s.State.Running != nil && !s.Ready {
+				unready = append(unready, s.Name)
+			}
+		}
+		addLogs(&probe, c.Logs(string(pod.UID)), unready, false)
 		out = append(out, probe)
 	}
 	if mount.Evidence != nil {
@@ -309,6 +319,45 @@ func podEvents(obj runtime.Object, c Context) []Found {
 		out = append(out, sched)
 	}
 	return out
+}
+
+// addLogs adds what the containers' logs said to a signal: a piece of
+// evidence per pattern that matched, with how many lines, one for the
+// other kinds of line, or why the log couldn't be read. Only a finding from
+// the run the signal is about counts (the previous run for a crash loop).
+// The message gets the first pattern, in words: "…; its log shows
+// connection refused".
+func addLogs(f *Found, findings map[string]LogFinding, containers []string, previous bool) {
+	said := ""
+	for _, name := range containers {
+		lf, ok := findings[name]
+		if !ok || lf.Previous != previous {
+			continue
+		}
+		where := "log of container " + name
+		if previous {
+			where += ", previous run"
+		}
+		if lf.Error != "" {
+			f.Evidence = append(f.Evidence, Evidence{Source: FromLog, Field: where, Value: "couldn't be read: " + lf.Error, Seen: lf.Read})
+			continue
+		}
+		for _, p := range logs.Patterns {
+			if n := lf.Patterns[p.Name]; n > 0 {
+				f.Evidence = append(f.Evidence, Evidence{Source: FromLog, Field: where, Pattern: p.Name, Matches: n, Seen: lf.Read})
+				if said == "" {
+					said = p.About
+				}
+			}
+		}
+		if lf.Other > 0 {
+			f.Evidence = append(f.Evidence, Evidence{Source: FromLog, Field: where,
+				Value: fmt.Sprintf("%d other %s of line, not kept", lf.Other, plural(int64(lf.Other), "kind", "kinds")), Seen: lf.Read})
+		}
+	}
+	if said != "" {
+		f.Message += "; its log shows " + said
+	}
 }
 
 // addEvent records an event as evidence, counts it, and moves Since to the

@@ -75,6 +75,20 @@ type Context interface {
 	// VolumeFill is how full a claim's volume is, when volume usage is on
 	// and the kubelet measured it.
 	VolumeFill(namespace, claim string) (Fill, bool)
+	// Logs is what reading a failing pod's containers' logs found, by
+	// container name: counts only, never a line (see LogFinding).
+	Logs(podUID string) map[string]LogFinding
+}
+
+// LogFinding is what one read of one container's log found. It holds no
+// text from the log (contract 11).
+type LogFinding struct {
+	Previous bool           // the previous run's log, as for a crash loop
+	Read     time.Time      // when it was read
+	Lines    int            // lines read
+	Patterns map[string]int // pattern name → lines that matched
+	Other    int            // kinds of line that matched no pattern
+	Error    string         // why it couldn't be read ("not allowed"); the rest is empty
 }
 
 // Fill is how full a volume is, as the kubelet measures it.

@@ -25,7 +25,7 @@ build phases 0–8 or the D, G, L, P, R, S and T phases. All work happens on the
 one commit per phase, as in v1.4 and v1.5. Each phase is reviewed before it is committed, and the
 next phase starts only after that.
 
-**Status (2026-11-16):** in progress: I0–I3 done, I4 next.
+**Status (2026-11-16):** in progress: I0–I4 done, I5 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -431,12 +431,12 @@ Goal: every type in the vocabulary is raised, and the overview's counts come fro
 
 Goal: failing pods' logs add evidence, and no log text is kept anywhere.
 
-- [ ] `internal/signals/logs`: the read limits, the pattern table, template counting
-- [ ] Reads only for pods with `crash_loop` or `probe_failing`; previous run's logs for crash
+- [x] `internal/signals/logs`: the read limits, the pattern table, template counting
+- [x] Reads only for pods with `crash_loop` or `probe_failing`; previous run's logs for crash
       loops; the per-container and per-cluster limits
-- [ ] Matches become evidence on the pod's signal; the count of unknown templates is kept
-- [ ] The test that no log line is kept, in memory, in an answer or in Opscope's own log
-- [ ] Without `pods/log`, the signals stay and say their logs couldn't be read
+- [x] Matches become evidence on the pod's signal; the count of unknown templates is kept
+- [x] The test that no log line is kept, in memory, in an answer or in Opscope's own log
+- [x] Without `pods/log`, the signals stay and say their logs couldn't be read
 
 ## Phase I5: Issues page
 
@@ -677,3 +677,49 @@ Goal: v1.6.0 is ready to tag.
   else: the calico pods' `Unhealthy` probe events are from the VMs' reboot, and those pods are
   ready again; no claim is unbound; every node is Ready and schedulable. One signal per object and
   type, no duplicates.
+
+### I4: Log signals (2026-11-16)
+
+- `internal/signals/logs` reads at most 64 KiB (and asks the API for 200 lines and 64 KiB,
+  `LimitBytes` being new in `resources.LogOptions`), looks at the first 16 KiB of each line, and
+  returns counts only: lines read, lines per pattern, and how many other kinds of line there were.
+  Other lines are reduced to templates (quoted text, UUIDs, addresses, long hex and numbers taken
+  out), counted, and dropped with the read. Ten patterns, as data (`logs.Patterns`), each with an
+  example in the tests and near misses that mustn't match.
+- **The engine reads; the world decides what's worth reading.** `world.logWants` lists the
+  containers of pods with a `crash_loop` (the previous run's log) or an open `probe_failing` (the
+  current one). Every 10 seconds the engine reads those it hasn't read for 5 minutes, 5 at once per
+  cluster, outside the world's lock, and hands back a `LogFinding` per container (`setLog`), which
+  checks the pod again. The pod detectors add the finding to the signal as evidence: one piece per
+  pattern with its count, one for the other kinds of line, or why the log couldn't be read. Only a
+  finding from the run the signal is about counts: a crash loop's evidence is its previous run.
+  The message gets the first pattern in words: "…; its log shows connection refused".
+- **A crash loop's resolving signal still wants its log.** On kind, the scenario's `crash` pod
+  spent most of its time running between restarts, early in its loop, so its signal was resolving
+  whenever the engine looked, and its log was never read. A container crash-looping, or with a
+  last termination and restarts, is read while its pod's `crash_loop` is open or resolving.
+- **Errors carry nothing from the API.** A forbidden read is "not allowed (needs get on pods/log)",
+  a missing previous run "not available", anything else "the read failed". The API's message
+  could quote anything, so it's neither kept nor logged; a test puts the secret line in a
+  forbidden error's message and checks Opscope's log.
+- **The no-log-text test** (`TestNoLogTextIsKept`) runs the engine on three crash-looping pods
+  whose log carries a line with a password, then looks for every line of it in the world's
+  memory (log findings, signals, history, health), in the answer's JSON, on the bus and in
+  Opscope's own log at debug level. `TestLogReadsAreLimited` checks five at once, and once per
+  five minutes.
+- `OPSCOPE_LOG_SIGNALS=false` sets no reader, and no log is read. It's on by default, as decided
+  in I0; `docs/deployment.md` has a "Log signals" section and the setting.
+- **Checked on kind:** the scenario's `crash` pod now writes "dial tcp …: connect: connection
+  refused" before exiting, and its `crash_loop` says "its log shows connection refused", with
+  `connection_refused ×1` and "1 other kind of line, not kept" as evidence. The live test waits for
+  it. Two Deployments in the scenario had by then passed Kubernetes' default 10-minute progress
+  deadline and had `rollout_stuck`: right, and now in the README's table and the test as coming
+  with time.
+- **Checked on multipass (read-only: reading logs).** The first run said `order-service`'s log
+  showed "permission denied" and "out of memory". Both were wrong: `EACCES`, matched in any case,
+  is inside `DirectMethodHandleAccessor`, and `-XX:+ExitOnOutOfMemoryError` is a JVM flag in its
+  start-up line. The real cause was `password authentication failed` (Postgres), inside a 9 KiB
+  JSON line past the 4 KiB first looked at, and with no pattern for it. Fixed: error codes match
+  only as whole words in capitals; out of memory needs the error itself; a new `auth_failed`
+  pattern; 16 KiB of each line. Now all three pods say "its log shows refused credentials"
+  (`auth_failed ×1`, 3 other kinds of line). The log copy used to check this was deleted.
