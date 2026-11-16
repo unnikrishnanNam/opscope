@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -381,6 +382,51 @@ func TestEveryNodeKindIsCollected(t *testing.T) {
 	for _, k := range NodeKinds {
 		if !collected[k] {
 			t.Errorf("%s isn't collected, so the graph can never be live", k)
+		}
+	}
+}
+
+// Nodes' health comes from the lookup the engine is given, for the
+// objects that exist; placeholders have none.
+func TestEngineFillsHealth(t *testing.T) {
+	f := newFakeFeed()
+	f.cluster("c1", shop(), nil)
+	e := startEngine(t, f)
+	var asked []string
+	var mu sync.Mutex
+	e.SetHealth(func(cluster, resource, uid string) *Health {
+		mu.Lock()
+		asked = append(asked, cluster+"/"+resource)
+		mu.Unlock()
+		if resource == "pods" {
+			return &Health{State: "failing", Signals: []string{"s1"}}
+		}
+		return nil
+	})
+
+	s, _ := read(t, e, "c1", nil)
+	pods, others := 0, 0
+	for _, n := range s.Nodes {
+		switch {
+		case n.Resource == "pods" && n.Presence == Present:
+			pods++
+			if n.Health == nil || n.Health.State != "failing" {
+				t.Errorf("%s: health %+v", n.Name, n.Health)
+			}
+		case n.Health != nil:
+			t.Errorf("%s %s (%s) has health %+v", n.Kind, n.Name, n.Presence, n.Health)
+		default:
+			others++
+		}
+	}
+	if pods == 0 || others == 0 {
+		t.Fatalf("pods %d, others %d", pods, others)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	for _, a := range asked {
+		if !strings.HasPrefix(a, "c1/") {
+			t.Errorf("asked about %s", a)
 		}
 	}
 }

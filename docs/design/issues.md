@@ -25,7 +25,7 @@ build phases 0–8 or the D, G, L, P, R, S and T phases. All work happens on the
 one commit per phase, as in v1.4 and v1.5. Each phase is reviewed before it is committed, and the
 next phase starts only after that.
 
-**Status (2026-11-13):** in progress: I0 and I1 done, I2 next.
+**Status (2026-11-16):** in progress: I0–I2 done, I3 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -233,7 +233,7 @@ next phase starts only after that.
 
 ```
 backend/internal/signals/       the model, the vocabulary, the engine, health and its history
-backend/internal/signals/detect/  detectors, one file per area (pods, workloads, network, storage, nodes)
+backend/internal/signals/detect_*.go  detectors, one file per area (pods, workloads, network, storage, nodes)
 backend/internal/signals/logs/  reading, pattern matching and template counting; nothing kept
 backend/internal/server/        issues.go: the /issues endpoints
 frontend/src/pages/             Issues.jsx
@@ -400,17 +400,17 @@ Goal: every kind in the cache has a page, and the signals to come have somewhere
 Goal: signals open, update and resolve from the bus, with health and its history; nothing shows
 them yet.
 
-- [ ] `internal/signals`: `Signal`, `Evidence`, `Health`, `Transition`, IDs; the vocabulary as a
+- [x] `internal/signals`: `Signal`, `Evidence`, `Health`, `Transition`, IDs; the vocabulary as a
       table with each type's default severity; the detector registry
-- [ ] The engine follows the bus: initial adds, changes, the event index by involved UID, the
+- [x] The engine follows the bus: initial adds, changes, the event index by involved UID, the
       60-second resolve, timed detectors, gaps (stale signals, re-runs, a stopped collector)
-- [ ] Health from signals; transitions recorded and capped; `SignalRaised`, `SignalResolved` and
+- [x] Health from signals; transitions recorded and capped; `SignalRaised`, `SignalResolved` and
       `HealthChanged` on the bus; the graph's health slot filled
-- [ ] Built on request from a `Source` when live data is off, kept for 10 seconds
-- [ ] Two detectors to prove the shape: `crash_loop` and `replicas_unavailable`
-- [ ] Tests: the same objects in any order give the same signals; a flapping condition is one
+- [x] Built on request from a `Source` when live data is off, kept for 10 seconds
+- [x] Two detectors to prove the shape: `crash_loop` and `replicas_unavailable`
+- [x] Tests: the same objects in any order give the same signals; a flapping condition is one
       signal; a gap never resolves a signal; IDs are stable across restarts
-- [ ] Memory per 1,000 pods with a tenth failing; the "Memory" section follows the numbers
+- [x] Memory per 1,000 pods with a tenth failing; the "Memory" section follows the numbers
 
 ## Phase I3: Detectors
 
@@ -551,3 +551,50 @@ Goal: v1.6.0 is ready to tag.
   has no metrics-server.
 - Docs: the resource table and the note under it in `docs/api.md`, the memory note and permission
   reasons in `docs/deployment.md`, the ClusterRole's comments, the README's detail pages line.
+
+### I2: Signal engine (2026-11-13)
+
+- `internal/signals` has the model (`model.go`), the vocabulary (`vocabulary.go`, 28 types and
+  `dependency_unreachable` reserved, each with its default severity and wait), the registry
+  (`registry.go`), one cluster's state (`world.go`), the engine around it (`engine.go`) and the
+  read side (`view.go`). Changed from the plan: the detectors are files in the same package
+  (`detect_pods.go`, `detect_workloads.go`), registered from `init` into `signals.Default`. A
+  `detect` package would have to import `signals` for its types while the engine needs the
+  detectors, which only works with registration from `main`; one package is simpler and keeps
+  "adding a detector is one more entry".
+- **The world is pure and takes the time from its caller**, so the tests decide what time it is:
+  open at once, the 2-minute wait, the 60-second resolve and the one-hour memory of resolved
+  signals are all tested without sleeping. The engine wraps it with the bus, the cache and a
+  lock, as the graph engine does, and runs `tick` every second.
+- **A signal opens with the earliest start the object gives**, so a Deployment unavailable for an
+  hour when Opscope starts is a signal at once, with that hour in its first-seen time. A type
+  whose start the object doesn't say waits from when Opscope first saw it; an answer built on
+  request has no history, so it takes the wait as over.
+- **Deleting an object resolves its signals at once**, without the 60 seconds: the condition can't
+  come back on that UID. **A kind that can no longer be read keeps its signals, marked stale**,
+  as a gap does: a signal never resolves because data is missing.
+- **Owners are worked out when signals are read**, not stored, so a pod's owner (its ReplicaSet's
+  Deployment) never depends on which arrived first. The order test builds the same objects in 20
+  random orders and compares every field.
+- **Health for the graph**, without locks between the two engines: the Signal engine shares, per
+  cluster, a `sync.Map` of the objects whose health changed and whether its world is complete. The
+  graph engine gets a lookup (`SetHealth`) that it calls while reading nodes, with the node's kind:
+  an object of a kind a detector reads, with no entry, in a complete world, is healthy; anything
+  else is `null`. Healthy objects aren't stored one by one. `Since` is left out of the JSON when
+  the health hasn't changed since Opscope started.
+- `bus` has `SignalRaised`, `SignalResolved` and `HealthChanged`; `collector.Set` has `Publish`.
+  The engine publishes after letting go of its lock. Nothing subscribes to them yet.
+- The severity "info" is the constant `Notice` in Go, since `Info` is the answer's type; the JSON
+  says `info`, as the record does.
+- `View.Signals` puts open signals before resolved ones, then the worst, then the newest, then by
+  ID. `View.Counts` (per kind, how many objects have an open signal) is ready for the overview in
+  I3.
+- **Memory:** about 786 KiB per 1,000 pods on top of the cache (`BenchmarkEngineMemory`: 10,000
+  pods in Deployments of five, a tenth crash-looping with two events each, with their Deployments
+  and ReplicaSets), most of it the per-object maps. The "Memory" section says "under 1 MiB per
+  1,000 pods".
+- Checked on the `opscope-rollouts` kind cluster with a crash-looping pod added (`kubectl run
+  crash`): through the graph API, `crash` is failing with its signal, `split` (1 of 2 ready) turned
+  degraded 2 minutes after the engine started, and the rest are healthy. The pod in
+  ImagePullBackOff is healthy until I3 has `image_pull_failed`. After a restart, `crash`'s signal
+  had the same ID. All Go tests pass with `-race`.

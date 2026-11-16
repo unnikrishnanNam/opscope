@@ -116,7 +116,10 @@ in memory:
 
 ReplicaSets, EndpointSlices and ServiceAccounts were added for the topology, and have pages since
 v1.6. The topology's graph of how objects connect adds about 2.7 MiB per 1,000 objects of
-every kind but Events and Namespaces; it shares the objects with the copy above.
+every kind but Events and Namespaces; it shares the objects with the copy above. The signals
+behind the health of each object add under 1 MiB per 1,000 pods (measured with a tenth of them
+crash-looping), also sharing the objects; they're kept in memory, so they start again when
+Opscope restarts.
 
 On top of that copy and the graph, the process needs about 25 MiB. Go's garbage collector also lets memory grow
 to about twice what Opscope holds before it cleans up, unless `GOMEMLIMIT` tells it to work harder

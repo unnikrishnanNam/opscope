@@ -316,7 +316,7 @@ Every answer has the same shape:
       "name": "web-7d9f-x1",
       "presence": "present",
       "status": "Running",
-      "health": null,
+      "health": { "state": "healthy" },
       "resourceVersion": "48211"
     },
     {
@@ -360,7 +360,11 @@ Every answer has the same shape:
   `missing` node, `missing:<resource>/<namespace>/<name>`; one whose kind can't be read is
   `unknown`. A Service whose selector matches nothing has a `dangling` entry
   (`{"kind":"selects","field":"spec.selector","reason":"matches no pods"}`).
-- `status` is what the node's list page shows, for display. `health` is always `null` for now.
+- `status` is what the node's list page shows, for display. `health` is the object's health from
+  its open signals: `{"state": "healthy" | "degraded" | "failing", "since": …, "signals": [IDs]}`.
+  `since` is left out when the health hasn't changed since Opscope started. `health` is `null` for
+  kinds no detector reads (ConfigMaps, Services, … until v1.6's later phases), for missing and
+  unknown nodes, and while the cluster isn't read live.
 - An edge points from the object that needs to the one it needs: Pod → Secret, Service → Pod,
   HTTPRoute → Service. Its `id` is derived from its two ends and kind, so it's the same in every
   answer. Each piece of `evidence` is one field that makes it; `optional` is set when every

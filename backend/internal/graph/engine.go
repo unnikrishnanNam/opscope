@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -92,6 +93,8 @@ type Engine struct {
 	mu        sync.Mutex
 	clusters  map[string]*liveGraph
 	requested map[string]*requestedGraph // by cluster and namespace
+
+	health atomic.Pointer[HealthFunc] // fills nodes' Health; see SetHealth
 }
 
 type liveGraph struct {
@@ -122,6 +125,22 @@ func NewEngine(feed Feed, logger *slog.Logger) *Engine {
 		now:       time.Now,
 		clusters:  map[string]*liveGraph{},
 		requested: map[string]*requestedGraph{},
+	}
+}
+
+// SetHealth gives the engine where nodes' health comes from: the Signal
+// engine. Until it's set, every node's Health is nil.
+func (e *Engine) SetHealth(fn HealthFunc) {
+	e.health.Store(&fn)
+}
+
+// healthFor is the lookup a cluster's graphs use.
+func (e *Engine) healthFor(cluster string) func(resource, uid string) *Health {
+	return func(resource, uid string) *Health {
+		if fn := e.health.Load(); fn != nil {
+			return (*fn)(cluster, resource, uid)
+		}
+		return nil
 	}
 }
 
@@ -202,6 +221,7 @@ func (e *Engine) live(cluster string) *liveGraph {
 			return nil
 		}
 		l = &liveGraph{g: New([]string{}), stale: map[string]bool{}}
+		l.g.healthOf = e.healthFor(cluster)
 		e.clusters[cluster] = l
 		l.mu.Lock() // before e.mu is let go, so nobody reads it unsynced
 		e.mu.Unlock()
@@ -347,6 +367,7 @@ func (e *Engine) onRequest(ctx context.Context, cluster string, src resources.So
 		if err != nil {
 			return err
 		}
+		g.healthOf = e.healthFor(cluster)
 		r.g, r.info, r.built = g, info, e.now()
 	}
 	return fn(r.g, Info{Built: r.info.Built, Partial: slices.Clone(r.info.Partial)})

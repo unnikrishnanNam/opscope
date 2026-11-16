@@ -50,6 +50,10 @@ type Graph struct {
 
 	wanting  map[string]map[string]bool // target key → readers that name it
 	watching map[string]map[string]bool // "resource/namespace" → readers whose matches look there
+
+	// healthOf fills a present node's Health as it's read; nil leaves it
+	// empty. The engine sets it (SetHealth).
+	healthOf func(resource, uid string) *Health
 }
 
 // entry is a present object and what it contributes to the graph.
@@ -503,6 +507,9 @@ func (g *Graph) Snapshot() Snapshot {
 func (g *Graph) node(id string) Node {
 	n := *g.nodes[id]
 	n.Dangling = slices.Clone(n.Dangling)
+	if g.healthOf != nil && n.Presence == Present {
+		n.Health = g.healthOf(n.Resource, id)
+	}
 	return n
 }
 

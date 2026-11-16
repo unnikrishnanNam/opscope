@@ -24,6 +24,7 @@ import (
 	"opscope/internal/graph"
 	"opscope/internal/metrics"
 	"opscope/internal/server"
+	"opscope/internal/signals"
 )
 
 // version is overwritten at build time with:
@@ -73,6 +74,17 @@ func main() {
 	// before the first collector starts.
 	graphs := graph.NewEngine(collectors, logger)
 	go graphs.Run(ctx)
+	// The Signal engine follows them too, and the graph reads each node's
+	// health from it.
+	issues := signals.NewEngine(collectors, signals.Default, logger)
+	go issues.Run(ctx)
+	graphs.SetHealth(func(cluster, resource, uid string) *graph.Health {
+		h := issues.HealthOf(cluster, resource, uid)
+		if h == nil {
+			return nil
+		}
+		return &graph.Health{State: h.State, Since: h.Since, Signals: h.Signals}
+	})
 	collectors.Follow(manager)
 
 	// 1. Clusters from the environment. A broken setting here is a mistake
