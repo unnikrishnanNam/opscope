@@ -14,6 +14,8 @@ import LogViewer from "../components/LogViewer.jsx";
 import { PageHeader } from "../components/PageHeader.jsx";
 import SecretKeys from "../components/SecretKeys.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
+import HealthBadge from "../components/HealthBadge.jsx";
+import IssueList, { asGroups } from "../components/IssueList.jsx";
 import { Tag } from "../components/Tag.jsx";
 import { UsageBar, VolumeUsageNote } from "../components/Usage.jsx";
 import Tabs from "../components/Tabs.jsx";
@@ -38,6 +40,14 @@ export default function ResourceDetail({ page }) {
   const parts = page.clusterScoped ? [name] : [namespace, name];
   const path = reachable ? `/clusters/${cluster.id}/${page.resource}/${parts.map(encodeURIComponent).join("/")}` : null;
   const { data: d, error } = useApi(path, { refreshMs: REFRESH_MS });
+  // Its health and signals, from the Signal engine: live, as the Issues page is.
+  const healthQuery = new URLSearchParams({ resource: page.resource, name });
+  if (!page.clusterScoped) healthQuery.set("namespace", namespace);
+  const health = useApi(reachable ? `/clusters/${cluster.id}/health?${healthQuery}` : null, {
+    refreshMs: REFRESH_MS,
+    live: "issues",
+  });
+  const openSignals = (health.data?.signals ?? []).filter((s) => s.state !== "resolved");
 
   function openTab(next) {
     const params = new URLSearchParams(searchParams);
@@ -69,7 +79,14 @@ export default function ResourceDetail({ page }) {
       <PageHeader
         before={<Tag>{d?.kind ?? page.label}</Tag>}
         title={name}
-        after={status && <StatusBadge status={status} />}
+        after={
+          (status || health.data?.health) && (
+            <span className="detail-badges">
+              {status && <StatusBadge status={status} />}
+              <HealthBadge health={health.data?.health} title={healthTitle(health.data?.health)} />
+            </span>
+          )
+        }
         description={
           <>
             {namespace && (
@@ -103,7 +120,7 @@ export default function ResourceDetail({ page }) {
 
       {d && (
         <Tabs label={`${d.kind} details`} value={tab} onChange={openTab} tabs={tabs}>
-          {tab === "summary" && <Summary d={d} cluster={cluster} resource={page.resource} />}
+          {tab === "summary" && <Summary d={d} cluster={cluster} resource={page.resource} signals={openSignals} />}
           {tab === "yaml" && (
             <CodeBlock
               code={d.yaml}
@@ -126,6 +143,13 @@ export default function ResourceDetail({ page }) {
       )}
     </section>
   );
+}
+
+// healthTitle says since when, on hover: "Failing since 14:02:11".
+function healthTitle(h) {
+  if (!h?.since) return undefined;
+  const word = { healthy: "Healthy", degraded: "Degraded", failing: "Failing" }[h.state] ?? h.state;
+  return `${word} since ${new Date(h.since).toLocaleString()}`;
 }
 
 // usageClaim is the claim whose volume usage this page shows: the claim
@@ -205,13 +229,19 @@ function ObjectLink({ cluster, link, text, search }) {
   return path ? <Link to={path + search}>{text}</Link> : text;
 }
 
-function Summary({ d, cluster, resource }) {
+function Summary({ d, cluster, resource, signals }) {
   const search = nsQuery(useLocation().search);
   const facts = d.fields.filter((f) => f.label !== "Status"); // already in the header
   const claim = usageClaim(d, resource);
 
   return (
     <div className="detail-sections">
+      {/* First: what's wrong with it, if anything, as the Issues page says. */}
+      {signals.length > 0 && (
+        <Section title="Issues" aside={signals.length}>
+          <IssueList groups={asGroups(signals)} clusterId={cluster.id} search={search} hideObject />
+        </Section>
+      )}
       {(facts.length > 0 || d.owners.length > 0) && (
         <Card>
           <FactGrid>

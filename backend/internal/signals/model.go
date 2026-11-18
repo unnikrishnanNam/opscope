@@ -55,6 +55,7 @@ type Ref struct {
 type Signal struct {
 	ID        string     `json:"id"`       // SignalID(cluster, uid, type)
 	Type      string     `json:"type"`     // from the vocabulary: "crash_loop"
+	Title     string     `json:"title"`    // the type in a few words: "Crash loop"
 	Severity  string     `json:"severity"` // critical, warning, info
 	Cluster   string     `json:"cluster"`
 	Resource  Ref        `json:"resource"`

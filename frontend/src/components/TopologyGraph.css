@@ -299,6 +299,33 @@
   text-overflow: ellipsis;
 }
 
+/* Health from the Signal engine, on cards that are degraded or failing:
+   the edge's colour, and an icon and a word at the start of the status. */
+.topo-health-failing {
+  border-color: var(--bad-mark);
+}
+
+.topo-health-degraded {
+  border-color: var(--warn-mark);
+}
+
+.topo-health {
+  font-weight: var(--weight-strong);
+}
+
+.topo-health svg {
+  margin-right: 3px;
+  vertical-align: -2px;
+}
+
+.topo-health.status-bad svg {
+  color: var(--bad-mark);
+}
+
+.topo-health.status-warn svg {
+  color: var(--warn-mark);
+}
+
 .topo-missing .topo-status,
 .topo-unknown .topo-status {
   color: var(--text-subtle);

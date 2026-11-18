@@ -386,7 +386,7 @@ func (w *world) apply(uid, resource string, obj runtime.Object, f Found, now tim
 	}
 
 	s := &Signal{
-		ID: id, Type: f.Type, Severity: severity, Cluster: w.cluster,
+		ID: id, Type: f.Type, Title: t.Title, Severity: severity, Cluster: w.cluster,
 		Resource: refOf(resource, obj), Message: f.Message,
 		FirstSeen: since, LastSeen: now, Count: count, State: Open, Evidence: evidence,
 	}

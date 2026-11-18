@@ -201,6 +201,7 @@ one or more signal types, comma-separated; `kind`, the objects' kind by URL name
         {
           "id": "9d1719b5c0ca552a651d9de2470d50a9",
           "type": "crash_loop",
+          "title": "Crash loop",
           "severity": "critical",
           "cluster": "lab",
           "resource": { "uid": "…", "resource": "pods", "kind": "Pod", "namespace": "shop", "name": "order-service-fb47c5848-9hpsf" },

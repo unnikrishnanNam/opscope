@@ -25,7 +25,7 @@ build phases 0–8 or the D, G, L, P, R, S and T phases. All work happens on the
 one commit per phase, as in v1.4 and v1.5. Each phase is reviewed before it is committed, and the
 next phase starts only after that.
 
-**Status (2026-11-18):** in progress: I0–I5 done, I6 next.
+**Status (2026-11-18):** in progress: I0–I6 done, I7 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -455,13 +455,13 @@ Goal: the Issues page works on real clusters, live.
 
 Goal: detail pages and Topology show health from the same engine.
 
-- [ ] Detail pages: the health badge and an Issues section with evidence
-- [ ] Topology: cards and the list view show health in colour and in words; the panel lists open
+- [x] Detail pages: the health badge and an Issues section with evidence
+- [x] Topology: cards and the list view show health in colour and in words; the panel lists open
       signals
-- [ ] A test that the overview, the feed, a detail page and Topology give the same health for the
+- [x] A test that the overview, the feed, a detail page and Topology give the same health for the
       same object
-- [ ] Browser: light and dark, keyboard only, the accessibility tree, 375 px and wide, with and
-      without Gateway API and metrics, two clusters connected
+- [~] Browser: light and dark, keyboard only, the accessibility tree, 375 px and wide, ~~with and
+      without Gateway API and metrics,~~ two clusters connected (see notes)
 
 ## Phase I7: Release
 
@@ -768,3 +768,38 @@ Goal: v1.6.0 is ready to tag.
   dark and light, 375 px with no sideways scroll, and the production build's console (only
   `metrics/nodes` 404s, as kind has no metrics-server). An `addPageSource` error seen in the dev
   server's console came from hot reloads and doesn't happen in the build.
+
+### I6: Health across Opscope (2026-11-18)
+
+- **Detail pages** read `GET /health` for their object, live on `issues` like the Issues page,
+  and show its health beside its status in the header ("Failing", with since when on hover), and
+  an "Issues" section first in the summary, with the same rows as the Issues page (`IssueList`
+  with `hideObject`, and `asGroups` to make each signal a row). A kind no detector reads, or a
+  healthy object, shows neither.
+- **Signals carry their title** (`"title": "Crash loop"`), so a page reading `/health` names them
+  as `/issues` does.
+- **Topology:** a card that's degraded or failing gets that colour on its edge and an icon and a
+  word before its status ("Failing · CrashLoopBackOff"), and its accessible name says it; a
+  healthy card stays as it was, so a healthy map stays quiet. A group of pods takes its worst
+  member's health (`worstHealth`). The list view adds the health badge to such objects. The panel
+  shows health beside the status, "the worst of its pods" for a group with each pod's badge, and
+  for one object its open issues, each linking to its row on the Issues page. The map now follows
+  `issues` on the stream too, since health changes with no object changing.
+- **One engine, one answer:** `TestEveryViewAgreesOnHealth` runs the graph engine and the Signal
+  engine on one fake cluster (a crash-looping pod, a healthy one, Deployments short, down and full,
+  and a ConfigMap no detector reads) and checks, for each object, that its own health
+  (`/health`), the graph's node (Topology), whether the Issues feed lists it, and the overview's
+  counts all say the same.
+- **Checked in the browser** on the kind cluster: the Deployment `stuck`'s page ("Failing", its
+  rollout and replicas issues), the `crash` pod's at 375 px in light mode (no sideways scroll), the
+  map of `issues-test` with failing and degraded cards, the `crash` card's panel with its crash
+  loop and log finding, the list view's badges, and in `rollouts-test` "2 pods of StatefulSet
+  split, degraded" while `shop`'s healthy pods say nothing. Keyboard: Enter opens an issue's row
+  with focus kept on its button, and Tab moves on to the next row; card labels read "Pod
+  issues-test/crash, failing, CrashLoopBackOff".
+- **Two clusters:** the second kind cluster, `opscope-graph`, was added to the same Opscope: its
+  Issues page shows its own 11 issues (from `workloads.yaml` and `topology.yaml`) and the first
+  cluster's page its own 31.
+- **Not checked with Gateway API or metrics-server in the browser:** multipass, which has both,
+  wasn't reachable (its VMs were stopped), and neither kind cluster has them. The Gateway API
+  detectors are tested on fakes (I3), and nothing in this phase depends on either.

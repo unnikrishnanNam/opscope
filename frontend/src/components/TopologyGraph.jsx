@@ -3,6 +3,7 @@ import { LINE_STYLE, kindIcon } from "../graph/kinds.js";
 import { HEADER_H, NODE_H, NODE_W, layout } from "../graph/layout.js";
 import { cardKind } from "../graph/view.js";
 import Button from "./Button.jsx";
+import { HEALTH } from "./HealthBadge.jsx";
 import { CrosshairIcon, EyeOffIcon, FitIcon, MinusIcon, MissingIcon, PlusIcon, UnlinkIcon } from "./icons.jsx";
 import "./TopologyGraph.css";
 
@@ -471,6 +472,7 @@ const Card = memo(function Card({ n, box, isFocus, isSelected, isNear, tabIndex,
   const Icon = kindIcon(n.resource);
   const tag = gapTag(n);
   const status = statusText(n);
+  const trouble = troubleOf(n);
   return (
     <button
       ref={(el) => cardRef(n.id, el)}
@@ -480,6 +482,7 @@ const Card = memo(function Card({ n, box, isFocus, isSelected, isNear, tabIndex,
         "topo-node",
         `topo-${n.presence ?? "present"}`,
         n.pods && "topo-group",
+        trouble && `topo-health-${n.health.state}`,
         isFocus && "topo-focus",
         isSelected && "topo-selected",
         isNear && "topo-near",
@@ -507,10 +510,27 @@ const Card = memo(function Card({ n, box, isFocus, isSelected, isNear, tabIndex,
         )}
       </span>
       <span className="topo-name">{n.name}</span>
-      <span className="topo-status">{status || " "}</span>
+      <span className="topo-status">
+        {trouble && (
+          <span className={`topo-health status-${trouble.tone}`}>
+            <trouble.icon size={12} />
+            {trouble.label}
+            {status && " · "}
+          </span>
+        )}
+        {status || (trouble ? "" : " ")}
+      </span>
     </button>
   );
 });
+
+// troubleOf is how a card shows its health from the Signal engine: only
+// when it's degraded or failing, so a healthy map stays quiet. An icon and
+// a word, never colour alone.
+export function troubleOf(n) {
+  const h = n.presence === "present" && n.health && HEALTH[n.health.state];
+  return h?.icon ? h : null;
+}
 
 // gapTag is the tag a card carries for a gap in the graph, if any.
 export function gapTag(n) {
@@ -544,6 +564,8 @@ export function cardLabel(n, isFocus) {
   const words = [fullName(n)];
   const tag = gapTag(n);
   if (tag) words.push(tag.label.toLowerCase());
+  const trouble = troubleOf(n);
+  if (trouble) words.push(trouble.label.toLowerCase());
   const status = statusText(n);
   if (status && n.presence === "present") words.push(status);
   if (isFocus) words.push("this object");

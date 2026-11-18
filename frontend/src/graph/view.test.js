@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardKind, shape, statusSummary, unreadable } from "./view.js";
+import { cardKind, shape, statusSummary, unreadable, worstHealth } from "./view.js";
 
 // Answers shaped like GET /graph/…: node(id) for "resource/namespace/name".
 const KINDS = {
@@ -157,5 +157,15 @@ describe("unreadable", () => {
     ];
     expect(unreadable(partial).map((p) => p.resource)).toEqual(["secrets"]);
     expect(unreadable(undefined)).toEqual([]);
+  });
+});
+
+describe("worstHealth", () => {
+  it("is a group's worst member's health", () => {
+    const h = (state) => ({ health: state && { state } });
+    expect(worstHealth([h("healthy"), h("failing"), h("degraded")])).toEqual({ state: "failing" });
+    expect(worstHealth([h("healthy"), h("degraded")])).toEqual({ state: "degraded" });
+    expect(worstHealth([h("healthy"), h(null)])).toEqual({ state: "healthy" });
+    expect(worstHealth([h(null), h(null)])).toBe(null);
   });
 });

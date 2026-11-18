@@ -99,7 +99,7 @@ export function shape(answer, { expanded = new Set() } = {}) {
       name: ownerNode.name,
       presence: "present",
       status: statusSummary(list),
-      health: null,
+      health: worstHealth(list),
       pods: { owner, ownerKind: ownerNode.kind, members: list },
     });
   }
@@ -163,4 +163,16 @@ export function cardKind(n) {
 
 export function compare(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
+}
+
+// worstHealth is a group's health: its worst member's, failing before
+// degraded before healthy; null when no member has health.
+const HEALTH_RANK = { healthy: 1, degraded: 2, failing: 3 };
+export function worstHealth(nodes) {
+  let worst = null;
+  for (const n of nodes) {
+    const state = n.health?.state;
+    if (HEALTH_RANK[state] && (!worst || HEALTH_RANK[state] > HEALTH_RANK[worst])) worst = state;
+  }
+  return worst ? { state: worst } : null;
 }

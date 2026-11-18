@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { layout } from "../graph/layout.js";
-import { cardLabel, firstView, fitAll, gapTag, gridStep, neighbour, statusText } from "./TopologyGraph.jsx";
+import { cardLabel, firstView, fitAll, gapTag, gridStep, neighbour, statusText, troubleOf } from "./TopologyGraph.jsx";
 
 const node = (id, resource, extra = {}) => ({ id, resource, kind: resource, name: id, namespace: "shop", presence: "present", status: "", ...extra });
 const edge = (from, to, kind) => ({ id: `${kind}|${from}|${to}`, from, to, kind });
@@ -114,5 +114,16 @@ describe("what a card says", () => {
     expect(statusText(node("s", "services", { endpoints: { ready: 2, notReady: 1 } }))).toBe("2 ready, 1 not ready");
     const group = node("g", "pods", { kind: "Pod", name: "web", status: "3 Running", pods: { ownerKind: "Deployment", members: [{}, {}, {}] } });
     expect(cardLabel(group, true)).toBe("3 pods of Deployment shop/web, 3 Running, this object");
+  });
+
+  it("says when it's failing or degraded, in words, and nothing when healthy", () => {
+    const failing = node("p", "pods", { kind: "Pod", name: "api-1", status: "CrashLoopBackOff", health: { state: "failing" } });
+    expect(troubleOf(failing).label).toBe("Failing");
+    expect(cardLabel(failing)).toBe("Pod shop/api-1, failing, CrashLoopBackOff");
+    expect(troubleOf({ ...failing, health: { state: "degraded" } }).label).toBe("Degraded");
+    expect(troubleOf({ ...failing, health: { state: "healthy" } })).toBe(null);
+    expect(troubleOf({ ...failing, health: null })).toBe(null);
+    // A missing object has no health of its own to show.
+    expect(troubleOf({ ...failing, presence: "missing" })).toBe(null);
   });
 });

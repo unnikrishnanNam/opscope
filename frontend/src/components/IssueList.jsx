@@ -15,6 +15,7 @@ import "./IssueList.css";
 //   search         the query string links keep (the namespace)
 //   showNamespace  name each object's namespace (across namespaces)
 //   open           the ID of a row to open and scroll to (?signal=)
+//   hideObject     leave out each row's object, on that object's own page
 
 export const SEVERITY = {
   critical: { icon: ErrorIcon, label: "Critical", tone: "bad" },
@@ -22,7 +23,7 @@ export const SEVERITY = {
   info: { icon: InfoIcon, label: "Info", tone: "info" },
 };
 
-export default function IssueList({ groups, clusterId, search = "", showNamespace = false, open }) {
+export default function IssueList({ groups, clusterId, search = "", showNamespace = false, open, hideObject = false }) {
   const [opened, setOpened] = useState(() => new Set(open ? [open] : []));
   useEffect(() => {
     if (!open) return;
@@ -48,6 +49,7 @@ export default function IssueList({ groups, clusterId, search = "", showNamespac
           isOpen={opened.has(g.id)}
           onToggle={() => toggle(g.id)}
           highlighted={g.id === open}
+          hideObject={hideObject}
         />
       ))}
     </ul>
@@ -56,7 +58,25 @@ export default function IssueList({ groups, clusterId, search = "", showNamespac
 
 const rowId = (id) => `issue-${id.replaceAll(":", "-")}`;
 
-function IssueRow({ group: g, clusterId, search, showNamespace, isOpen, onToggle, highlighted }) {
+// asGroups makes each signal a row of its own, for a list of one object's
+// signals (GET /health), worst first.
+export function asGroups(signals) {
+  const rank = { critical: 3, warning: 2, info: 1 };
+  return [...signals]
+    .sort((a, b) => (rank[b.severity] ?? 0) - (rank[a.severity] ?? 0) || (a.firstSeen < b.firstSeen ? 1 : -1))
+    .map((s) => ({
+      id: s.id,
+      type: s.type,
+      title: s.title,
+      severity: s.severity,
+      state: s.state === "resolved" ? "resolved" : "open",
+      firstSeen: s.firstSeen,
+      lastSeen: s.lastSeen,
+      signals: [s],
+    }));
+}
+
+function IssueRow({ group: g, clusterId, search, showNamespace, isOpen, onToggle, highlighted, hideObject }) {
   const panelId = useId();
   const sev = SEVERITY[g.severity] ?? SEVERITY.info;
   const one = g.signals.length === 1 ? g.signals[0] : null;
@@ -75,6 +95,7 @@ function IssueRow({ group: g, clusterId, search, showNamespace, isOpen, onToggle
       <div className="issue-main">
         <div className="issue-head">
           <span className="issue-title">{g.title}</span>
+          {!hideObject && (
           <span className="issue-object">
             {one ? (
               <ObjectLink r={one.resource} clusterId={clusterId} search={search} showNamespace={showNamespace} />
@@ -85,6 +106,7 @@ function IssueRow({ group: g, clusterId, search, showNamespace, isOpen, onToggle
               </>
             )}
           </span>
+          )}
           {resolving && <span className="issue-tag">going away</span>}
           {stale && (
             <span className="issue-tag" title="Opscope missed some changes to it and hasn't read it again yet">
