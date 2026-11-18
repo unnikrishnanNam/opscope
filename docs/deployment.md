@@ -240,8 +240,8 @@ The Issues feed reads a little of the logs of containers that are already failin
 can say what the container said before it exited ("its log shows connection refused"). Only these
 are read:
 
-- the previous run's log of a container in CrashLoopBackOff, and the current log of a running
-  container whose readiness or liveness probe fails;
+- for a crash-looping container, the log of the run that just ended (never one still running),
+  and the current log of a running container whose readiness or liveness probe fails;
 - the last 200 lines or 64 KiB, whichever is less;
 - the same container at most once every 5 minutes, and at most 5 at once per cluster.
 

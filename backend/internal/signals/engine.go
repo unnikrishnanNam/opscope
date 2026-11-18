@@ -218,7 +218,7 @@ func (e *Engine) readClusterLogs(ctx context.Context, cluster string, l *liveWor
 		}
 	}
 	for _, w := range wants {
-		key := fmt.Sprintf("%s/%s/%s/%v", cluster, w.PodUID, w.Container, w.Previous)
+		key := fmt.Sprintf("%s/%s/%s", cluster, w.PodUID, w.Container) // either run counts against the limit
 		if at, ok := e.logRead[key]; ok && now.Sub(at) < logEvery {
 			continue
 		}

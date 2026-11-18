@@ -533,8 +533,9 @@ func (w *world) setLog(podUID, container string, f LogFinding, now time.Time) {
 	w.evaluate(podUID, now)
 }
 
-// LogWant is a container whose log is worth reading: its pod has an open
-// crash_loop (the previous run's log) or probe_failing (the current one).
+// LogWant is a container whose log is worth reading: its pod has a
+// crash_loop (the run that just ended) or an open probe_failing (the
+// current one). Previous says which run to ask the API for.
 type LogWant struct {
 	PodUID, Namespace, Pod, Container string
 	Previous                          bool
@@ -559,11 +560,16 @@ func (w *world) logWants() []LogWant {
 			probe = probe || s.Type == "probe_failing" && s.State == Open
 		}
 		for _, cs := range pod.Status.ContainerStatuses {
-			looping := cs.State.Waiting != nil && cs.State.Waiting.Reason == "CrashLoopBackOff" ||
-				cs.LastTerminationState.Terminated != nil && cs.RestartCount > 0
+			// A crash loop's log is the run that just ended: while the
+			// container waits out its back-off, that's the previous run;
+			// while the kubelet shows it terminated, the current one. While
+			// it runs again, nothing: the run is still being written, and
+			// the "previous" one may not be the run that ended.
 			switch {
-			case crash && looping:
+			case crash && cs.State.Waiting != nil && cs.State.Waiting.Reason == "CrashLoopBackOff":
 				out = append(out, LogWant{uid, pod.Namespace, pod.Name, cs.Name, true})
+			case crash && cs.State.Terminated != nil && cs.RestartCount > 0:
+				out = append(out, LogWant{uid, pod.Namespace, pod.Name, cs.Name, false})
 			case probe && cs.State.Running != nil && !cs.Ready:
 				out = append(out, LogWant{uid, pod.Namespace, pod.Name, cs.Name, false})
 			}

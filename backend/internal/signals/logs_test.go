@@ -47,11 +47,10 @@ func TestLogFindingsBecomeEvidence(t *testing.T) {
 		t.Fatalf("wants = %+v", got)
 	}
 
-	// The current run's log doesn't speak for a crash loop: it's the run
-	// that just started.
-	w.setLog("uid-api-1", "app", LogFinding{Previous: false, Read: t0, Lines: 3, Patterns: map[string]int{"timeout": 3}}, t0)
-	if s := open(w)[0]; len(s.Evidence) != 2 {
-		t.Errorf("the current run counted: %+v", s.Evidence)
+	// A failing probe's signal doesn't take a finding about a run that ended.
+	w.upsert("pods", probing("web-0"), t0)
+	if got := w.logWants(); len(got) != 1 {
+		t.Fatalf("a running, unready pod without a probe signal wants %+v", got)
 	}
 
 	w.setLog("uid-api-1", "app", LogFinding{Previous: true, Read: t0, Lines: 5,
@@ -67,8 +66,8 @@ func TestLogFindingsBecomeEvidence(t *testing.T) {
 		}
 	}
 	want := []Evidence{
-		{Source: FromLog, Detector: "pods.containers", Field: "log of container app, previous run", Pattern: "connection_refused", Matches: 2, Seen: t0},
-		{Source: FromLog, Detector: "pods.containers", Field: "log of container app, previous run", Value: "3 other kinds of line, not kept", Seen: t0},
+		{Source: FromLog, Detector: "pods.containers", Field: "log of container app, last run", Pattern: "connection_refused", Matches: 2, Seen: t0},
+		{Source: FromLog, Detector: "pods.containers", Field: "log of container app, last run", Value: "3 other kinds of line, not kept", Seen: t0},
 	}
 	if fmt.Sprint(fromLog) != fmt.Sprint(want) {
 		t.Errorf("evidence = %+v", fromLog)
@@ -89,6 +88,23 @@ func TestLogFindingsBecomeEvidence(t *testing.T) {
 		LastTimestamp:  ago(time.Minute), FirstTimestamp: ago(2 * time.Minute)}, t0)
 	if got := w.logWants(); !slices.Contains(got, LogWant{"uid-web-1", "shop", "web-1", "app", false}) {
 		t.Errorf("wants = %+v", got)
+	}
+
+	// Which run a crash loop reads: the one that just ended. Waiting out
+	// its back-off, that's the previous run; shown as terminated, the
+	// current one; running again, none.
+	between := crashing("api-2", 4)
+	between.Status.ContainerStatuses[0].State = corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{
+		Reason: "Error", ExitCode: 1, StartedAt: ago(time.Minute), FinishedAt: ago(time.Minute - 2*time.Second)}}
+	w.upsert("pods", between, t0)
+	if got := w.logWants(); !slices.Contains(got, LogWant{"uid-api-2", "shop", "api-2", "app", false}) {
+		t.Errorf("terminated: wants %+v", got)
+	}
+	again := crashing("api-2", 5)
+	again.Status.ContainerStatuses[0].State = corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}
+	w.upsert("pods", again, t0.Add(time.Second))
+	if got := w.logWants(); slices.ContainsFunc(got, func(l LogWant) bool { return l.Pod == "api-2" }) {
+		t.Errorf("running again: wants %+v", got)
 	}
 
 	// A deleted pod's findings go with it, and a late read is ignored.

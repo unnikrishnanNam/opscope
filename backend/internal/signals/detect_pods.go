@@ -333,19 +333,22 @@ func podEvents(obj runtime.Object, c Context) []Found {
 // addLogs adds what the containers' logs said to a signal: a piece of
 // evidence per pattern that matched, with how many lines, one for the
 // other kinds of line, or why the log couldn't be read. Only a finding from
-// the run the signal is about counts (the previous run for a crash loop).
+// the run the signal is about counts: for a crash loop, the run that ended;
+// for a failing probe, the running one.
 // The message gets the first pattern, in words: "…; its log shows
 // connection refused".
-func addLogs(f *Found, findings map[string]LogFinding, containers []string, previous bool) {
+func addLogs(f *Found, findings map[string]LogFinding, containers []string, crash bool) {
 	said := ""
 	for _, name := range containers {
 		lf, ok := findings[name]
-		if !ok || lf.Previous != previous {
+		// A crash loop's finding is always of a run that ended (see
+		// world.logWants); a failing probe's must be of the running one.
+		if !ok || !crash && lf.Previous {
 			continue
 		}
 		where := "log of container " + name
-		if previous {
-			where += ", previous run"
+		if crash {
+			where += ", last run"
 		}
 		if lf.Error != "" {
 			f.Evidence = append(f.Evidence, Evidence{Source: FromLog, Field: where, Value: "couldn't be read: " + lf.Error, Seen: lf.Read})
