@@ -147,3 +147,10 @@ func (v View) TypeCounts(namespace string) map[string]int {
 	}
 	return counts
 }
+
+// Find is an object's UID by kind, namespace and name; ok is false when
+// the world doesn't hold it.
+func (v View) Find(resource, namespace, name string) (string, bool) {
+	uid, ok := v.w.keys[objectKey(resource, namespace, name)]
+	return uid, ok
+}

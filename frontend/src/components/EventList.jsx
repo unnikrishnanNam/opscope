@@ -9,7 +9,8 @@ import "./EventList.css";
 // when it was last seen and how many times.
 //   showObject     include the object (off on an object's own page)
 //   showNamespace  prefix objects with their namespace (across namespaces)
-export default function EventList({ clusterId, events, showObject = true, showNamespace = false, emptyText }) {
+//   issueOf        optional: the link to the issue an event is evidence for
+export default function EventList({ clusterId, events, showObject = true, showNamespace = false, emptyText, issueOf }) {
   const search = nsQuery(useLocation().search);
   if (events.length === 0) return <p className="event-list-empty">{emptyText}</p>;
 
@@ -18,6 +19,7 @@ export default function EventList({ clusterId, events, showObject = true, showNa
       {events.map((e) => {
         const warning = e.type === "Warning";
         const link = showObject && detailPath(clusterId, e.objectResource, e.namespace, e.objectName);
+        const issue = issueOf?.(e);
         return (
           <li key={e.uid || `${e.namespace}/${e.name}`} className="event">
             <span className="event-mark">
@@ -32,6 +34,11 @@ export default function EventList({ clusterId, events, showObject = true, showNa
                     {showNamespace && <span className="event-namespace">{e.namespace}/</span>}
                     {link ? <Link to={link + search}>{e.object}</Link> : e.object}
                   </span>
+                )}
+                {issue && (
+                  <Link className="event-issue" to={issue}>
+                    In Issues
+                  </Link>
                 )}
               </div>
               <p className="event-message">{e.message}</p>

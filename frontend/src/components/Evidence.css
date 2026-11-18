@@ -1,0 +1,44 @@
+.evidence {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.evidence-item {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.evidence-source {
+  color: var(--text-subtle);
+  font-weight: var(--weight-strong);
+}
+
+.evidence-what {
+  min-width: 0;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.evidence-field {
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+
+.evidence-value {
+  margin-left: var(--space-2);
+  font-family: var(--font-mono);
+}
+
+.evidence-reason {
+  font-weight: var(--weight-strong);
+  color: var(--text);
+}
+
+.evidence-when {
+  color: var(--text-subtle);
+}

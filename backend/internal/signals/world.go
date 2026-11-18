@@ -395,7 +395,7 @@ func (w *world) apply(uid, resource string, obj runtime.Object, f Found, now tim
 		w.byUID[uid] = map[string]bool{}
 	}
 	w.byUID[uid][id] = true
-	w.out = append(w.out, bus.SignalRaised{Cluster: w.cluster, ID: id, UID: uid, Type: s.Type, Severity: severity, At: now})
+	w.out = append(w.out, bus.SignalRaised{Cluster: w.cluster, ID: id, UID: uid, Namespace: s.Resource.Namespace, Type: s.Type, Severity: severity, At: now})
 }
 
 // resolve closes a signal.
@@ -413,7 +413,7 @@ func (w *world) resolve(id string, now time.Time) {
 	if len(w.byUID[uid]) == 0 {
 		delete(w.byUID, uid)
 	}
-	w.out = append(w.out, bus.SignalResolved{Cluster: w.cluster, ID: id, UID: uid, Type: s.Type, At: now})
+	w.out = append(w.out, bus.SignalResolved{Cluster: w.cluster, ID: id, UID: uid, Namespace: s.Resource.Namespace, Type: s.Type, At: now})
 	if _, exists := w.resourceOf[uid]; exists {
 		w.updateHealth(uid, now)
 	}
@@ -491,7 +491,8 @@ func (w *world) updateHealth(uid string, now time.Time) {
 	if prev.State != state {
 		next.Since = now
 		w.record(Transition{UID: uid, From: prev.State, To: state, At: now, Signals: ids})
-		w.out = append(w.out, bus.HealthChanged{Cluster: w.cluster, UID: uid, From: prev.State, To: state, At: now})
+		w.out = append(w.out, bus.HealthChanged{Cluster: w.cluster, UID: uid, Namespace: refOf(resource, w.objects[resource][uid]).Namespace,
+			From: prev.State, To: state, At: now})
 	}
 	w.health[uid] = next
 	h := next

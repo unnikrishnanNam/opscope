@@ -44,6 +44,13 @@ machine or inside the cluster it shows.
   Every connection says which field it was read from, and something referred to that doesn't
   exist (a missing Secret, a Service with no pods) is shown as missing. The map updates live and
   also comes as a list, for the keyboard and screen readers.
+- **Issues:** what's wrong right now, worst first, in plain words: crash loops, images that can't
+  be pulled, pods that can't be scheduled, rollouts that stopped, Services with no ready
+  endpoints, routes to Services that don't exist, claims that won't bind, nodes that aren't
+  ready, certificates about to expire, and more. Each issue says what it was read from: the fields,
+  the events, and for a crashing container, what its log showed (a few lines read and matched,
+  never kept). A workload's pods with the same problem are one row; the overview's counts link
+  here, filtered; issues that clear stay listed for an hour.
 - **Detail pages:** a summary, containers, conditions, events and YAML for every object, links to
   owners and nodes, what uses a ConfigMap, Secret or ServiceAccount, a Deployment's revisions, the
   endpoints behind a Service and whether each is ready, and pod logs with the previous run and live

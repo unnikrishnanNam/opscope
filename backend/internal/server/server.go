@@ -46,6 +46,11 @@ func New(cfg Config, manager *clusters.Manager, live *collector.Set, graphs grap
 	mux.HandleFunc("GET /api/clusters/{id}/overview", getOverview(manager, live, issues))
 	// How many objects need a look, by kind and signal type (beats {resource}/{name}).
 	mux.HandleFunc("GET /api/clusters/{id}/health/counts", getHealthCounts(manager, issues, live.Source))
+	// The Issues feed, one signal, and one object's health (fixed segments
+	// beat {resource}, {resource}/{name}).
+	mux.HandleFunc("GET /api/clusters/{id}/issues", getIssues(manager, issues, live.Source))
+	mux.HandleFunc("GET /api/clusters/{id}/issues/{signal}", getIssue(manager, issues, live.Source))
+	mux.HandleFunc("GET /api/clusters/{id}/health", getHealth(manager, issues, live.Source))
 
 	// Every object's name, for the command palette (also beats {resource}).
 	mux.HandleFunc("GET /api/clusters/{id}/names", listNames(manager, live))

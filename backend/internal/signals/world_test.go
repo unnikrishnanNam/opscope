@@ -452,3 +452,55 @@ func TestReplaceChecksOnceEverythingIsThere(t *testing.T) {
 		t.Errorf("signals = %v", got)
 	}
 }
+
+func TestGroupSignals(t *testing.T) {
+	w := testWorld()
+	w.upsert("replicasets", &appsv1.ReplicaSet{ObjectMeta: controlled(objMeta("shop", "web-1"), "apps/v1", "Deployment", "web")}, t0)
+	for i, name := range []string{"web-1-a", "web-1-b", "web-1-c"} {
+		p := crashing(name, int32(i+1))
+		p.ObjectMeta = controlled(p.ObjectMeta, "apps/v1", "ReplicaSet", "web-1")
+		w.upsert("pods", p, t0.Add(time.Duration(i)*time.Second))
+	}
+	w.upsert("pods", crashing("lonely", 1), t0)
+	w.upsert("deployments", deployment("web", 3, 0), t0)
+	w.tick(t0.Add(3 * time.Minute))
+	groups := GroupSignals(View{w, t0}.Signals(Filter{}))
+
+	// Every one critical, all first seen at t0: the order is by ID.
+	var got []string
+	var g, deploy Group
+	for _, x := range groups {
+		got = append(got, fmt.Sprintf("%s/%d", x.Title, len(x.Signals)))
+		switch {
+		case len(x.Signals) == 3:
+			g = x
+		case x.Type == "replicas_unavailable":
+			deploy = x
+		}
+	}
+	slices.Sort(got)
+	if !slices.Equal(got, []string{"Crash loop/1", "Crash loop/3", "Replicas not ready/1"}) {
+		t.Fatalf("groups = %v", got)
+	}
+	if g.Owner == nil || g.Owner.Name != "web" || g.Owner.Kind != "Deployment" || g.State != Open || !g.FirstSeen.Equal(t0) ||
+		g.ID != "group:uid-web:crash_loop" || g.Signals[0].Resource.Name != "web-1-a" {
+		t.Errorf("group = %+v", g)
+	}
+	if deploy.Owner != nil {
+		t.Errorf("a single signal has a group owner: %+v", deploy.Owner)
+	}
+
+	// Resolved pods are a group of their own, apart from the open ones.
+	w.upsert("pods", running("web-1-a"), t0.Add(4*time.Minute))
+	w.tick(t0.Add(6 * time.Minute))
+	var ids []string
+	for _, g := range GroupSignals(View{w, t0}.Signals(Filter{})) {
+		if g.Type == "crash_loop" {
+			ids = append(ids, fmt.Sprintf("%s/%s/%d", g.ID, g.State, len(g.Signals)))
+		}
+	}
+	slices.Sort(ids)
+	if len(ids) != 3 || !slices.Contains(ids, "group:uid-web:crash_loop/open/2") {
+		t.Errorf("after one recovered: %v", ids)
+	}
+}

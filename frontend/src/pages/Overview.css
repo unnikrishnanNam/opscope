@@ -34,7 +34,7 @@
 .health-chip-warn {
   background: var(--warn-soft);
   color: var(--warn);
-  cursor: default;
+  text-decoration: none;
 }
 
 .health-chip-warn svg {
@@ -223,9 +223,18 @@
   list-style: none;
 }
 
+/* A row: the kind's link to its list, then what needs attention, which
+   links to the Issues page when there's something. */
+.resource-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 128px;
+  align-items: center;
+  gap: var(--space-4);
+}
+
 .resource-row {
   display: grid;
-  grid-template-columns: minmax(130px, 1fr) 48px minmax(80px, 1.3fr) 128px;
+  grid-template-columns: minmax(130px, 1fr) 48px minmax(80px, 1.3fr);
   align-items: center;
   gap: var(--space-4);
   min-height: 38px;
@@ -282,9 +291,28 @@
   white-space: nowrap;
 }
 
+.resource-state-link {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius);
+  text-decoration: none;
+}
+
+.resource-state-link:hover {
+  background: var(--surface-hover);
+  text-decoration: underline;
+}
+
 @media (max-width: 640px) {
+  .resource-item {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-3);
+  }
+
   .resource-row {
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: var(--space-3);
   }
 

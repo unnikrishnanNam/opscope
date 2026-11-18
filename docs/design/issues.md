@@ -25,7 +25,7 @@ build phases 0–8 or the D, G, L, P, R, S and T phases. All work happens on the
 one commit per phase, as in v1.4 and v1.5. Each phase is reviewed before it is committed, and the
 next phase starts only after that.
 
-**Status (2026-11-16):** in progress: I0–I4 done, I5 next.
+**Status (2026-11-18):** in progress: I0–I5 done, I6 next.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -442,14 +442,14 @@ Goal: failing pods' logs add evidence, and no log text is kept anywhere.
 
 Goal: the Issues page works on real clusters, live.
 
-- [ ] `/issues` and `/health` endpoints; `issues` events on the stream; `docs/api.md`
-- [ ] `/kit`: the issue row, grouping, the evidence list, the health badge, in both themes, at
+- [x] `/issues` and `/health` endpoints (and `/issues/{signal}`); `issues` events on the stream; `docs/api.md`
+- [x] `/kit`: the issue row, grouping, the evidence list, the health badge, in both themes, at
       375 px and wide
-- [ ] `pages/Issues.jsx`: open and resolved, filters, grouping, the namespace picker, live updates
-- [ ] Sidebar entry and `g i`; "Issues" and "Issues in <namespace>" in the palette
-- [ ] The overview's counts link to the filtered feed; a warning event that raised a signal links
+- [x] `pages/Issues.jsx`: open and resolved, filters, grouping, the namespace picker, live updates
+- [x] Sidebar entry and `g i`; "Issues" and "Issues in <namespace>" in the palette
+- [x] The overview's counts link to the filtered feed; a warning event that raised a signal links
       to it
-- [ ] The page says what it couldn't see (`partial`), how it was built and how far back history goes
+- [x] The page says what it couldn't see (`partial`), how it was built and how far back history goes
 
 ## Phase I6: Health across Opscope
 
@@ -723,3 +723,48 @@ Goal: v1.6.0 is ready to tag.
   only as whole words in capitals; out of memory needs the error itself; a new `auth_failed`
   pattern; 16 KiB of each line. Now all three pods say "its log shows refused credentials"
   (`auth_failed ×1`, 3 other kinds of line). The log copy used to check this was deleted.
+
+### I5: Issues page (2026-11-17)
+
+- **Endpoints:** `GET /issues` (with `namespace`, `state`, `severity`, `type` as a comma-separated
+  list, `kind`), `GET /issues/{signal}` and `GET /health?resource=&namespace=&name=`, all in
+  `docs/api.md`. Grouping is `signals.GroupSignals`: pods' signals of one type under one owner,
+  open and resolved kept apart; a single signal is its own group, and its ID is the signal's. Each
+  type now has a `Title` in the vocabulary ("Crash loop"), so the page names it the same way the
+  API does. `/issues` also gives `open` and `resolved`, the groups on each tab whatever the other
+  filters, for the tabs' counts.
+- **Live:** the Signal engine's bus events now carry the object's namespace, and the stream sends
+  them as `{"resource":"issues","namespaces":[…]}`, so the Issues page and the overview follow
+  them like a kind. The browser treats `issues` as live while pods are (the engine is live only
+  while pods are cached), and on a timer otherwise. Checked on kind: creating the missing
+  ConfigMap moved a `reference_missing` from Open to Resolved 60 seconds later on the open page,
+  without a reload. (The ConfigMap was deleted again afterwards, so the scenario stays as the
+  README says.)
+- **The page** (`pages/Issues.jsx`, after Topology in the Cluster group, `g i`): Open and "Resolved
+  in the last hour" tabs; severity, type and kind filters in the URL (`issuesRequest.js`, with
+  tests). It loads every issue of the tab and namespace and filters in the browser, so each filter
+  offers what the others let through, with counts. Changed from the plan: the server can filter
+  too, but the page doesn't ask it to. `?signal=` opens a row and scrolls to it. The page says when
+  it was worked out on request (no history, nothing resolved), since when it's been watching, and
+  which kinds it can't read.
+- **Components, built in `/kit` first:** `IssueList` (rows that open to show their evidence, or
+  each pod of a group, with "going away" and "not checked since a gap" tags), `Evidence` (fields,
+  events, log counts and measurements; never a log line) and `HealthBadge` (an icon and a word, in
+  the StatusBadge style, for I6). Checked in both themes in `/kit`, and at 375 px on the page.
+  Found on the way: a resolved row showed its severity's icon in green; it now shows the success
+  mark and says "Resolved, was warning" to screen readers.
+- **The overview links in.** "16 need attention" opens Issues; each row's count ("3 not ready")
+  is now its own link, beside the row's link to the list, to Issues filtered to the kind and the
+  types the count is made of (the overview now returns those `types`). A warning event that's
+  evidence for an issue gets an "In Issues" link to it (`?signal=`). The overview's counts follow
+  the `issues` stream too, so a signal resolving moves them.
+- **Palette:** "Issues" (from the sidebar entry, aliases problems, health, signals, alerts),
+  "Issues in <namespace>" when one is picked, and "Critical issues".
+- **Checks:** Go tests for grouping and the `issues` stream message; vitest for the page's URL and
+  filters, the palette commands, and `issues` following pods' live mode (154 tests in all). The
+  endpoints have no Go tests of their own, since a `signals.View` can only be made inside the
+  engine; they were checked on the kind cluster with every filter, a 404 and a 400. In the
+  browser: the page, filters, the overview's links, `?signal=` from a warning, the Resolved tab,
+  dark and light, 375 px with no sideways scroll, and the production build's console (only
+  `metrics/nodes` 404s, as kind has no metrics-server). An `addPageSource` error seen in the dev
+  server's console came from hot reloads and doesn't happen in the build.

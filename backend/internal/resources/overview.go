@@ -60,6 +60,9 @@ type WorkloadCount struct {
 	Resource  string `json:"resource"` // matches the API name, e.g. "deployments"
 	Total     int    `json:"total"`
 	Unhealthy int    `json:"unhealthy"`
+	// Types are the signal types Unhealthy counts, for a link to the
+	// Issues feed filtered the same way.
+	Types []string `json:"types,omitempty"`
 }
 
 // attentionTypes are the signal types each kind's "needs attention" count
@@ -92,6 +95,7 @@ func GetOverview(ctx context.Context, src Source, q Query, att Attention) (*Over
 		c := WorkloadCount{Resource: resource, Total: total}
 		if types, ok := attentionTypes[resource]; ok {
 			c.Unhealthy = att.Objects(resource, types...)
+			c.Types = types
 		}
 		return c
 	}

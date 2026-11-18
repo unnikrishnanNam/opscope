@@ -27,6 +27,7 @@ export const sections = [
     items: [
       { path: "overview", shortcut: "g o", icon: icons.OverviewIcon, label: "Overview", about: "Counts, node health and recent warnings at a glance." },
       { path: "topology", shortcut: "g t", icon: icons.TopologyIcon, aliases: ["map", "graph", "uses", "using"], label: "Topology", about: "How objects connect: what each one needs, and what needs it." },
+      { path: "issues", shortcut: "g i", icon: icons.IssuesIcon, aliases: ["problems", "health", "signals", "alerts"], label: "Issues", about: "What's wrong right now, worst first: each problem in plain words, with what it was read from." },
       { path: "nodes", shortcut: "g n", icon: icons.NodesIcon, resource: "nodes", aliases: ["no", "node"], clusterScoped: true, metrics: "nodes", label: "Nodes", about: "Machines in the cluster, their status, capacity and usage." },
     ],
   },
@@ -109,6 +110,7 @@ export function kindsOn(page, detail) {
   if (detail) return [];
   if (page?.resource) return [page.resource];
   if (page?.path === "overview") return [...overviewKinds, "events"];
+  if (page?.path === "issues") return undefined; // signals come from every kind
   if (page?.path === "topology") return GRAPH_KINDS;
   return undefined;
 }

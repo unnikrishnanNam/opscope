@@ -3,7 +3,7 @@ package resources
 import (
 	"context"
 	"errors"
-	"slices"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -269,10 +269,10 @@ func TestOverviewStorage(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []WorkloadCount{
-		{Resource: "persistentvolumeclaims", Total: 5, Unhealthy: 3},
-		{Resource: "persistentvolumes", Total: 4, Unhealthy: 2},
+		{Resource: "persistentvolumeclaims", Total: 5, Unhealthy: 3, Types: []string{"pvc_unbound"}},
+		{Resource: "persistentvolumes", Total: 4, Unhealthy: 2, Types: []string{"volume_released"}},
 	}
-	if !slices.Equal(o.Storage, want) {
+	if !reflect.DeepEqual(o.Storage, want) {
 		t.Errorf("all namespaces: got %+v, want %+v", o.Storage, want)
 	}
 
@@ -282,8 +282,8 @@ func TestOverviewStorage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want[0] = WorkloadCount{Resource: "persistentvolumeclaims", Total: 1, Unhealthy: 1}
-	if !slices.Equal(o.Storage, want) {
+	want[0] = WorkloadCount{Resource: "persistentvolumeclaims", Total: 1, Unhealthy: 1, Types: []string{"pvc_unbound"}}
+	if !reflect.DeepEqual(o.Storage, want) {
 		t.Errorf("namespace web: got %+v, want %+v", o.Storage, want)
 	}
 }

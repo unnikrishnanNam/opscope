@@ -66,6 +66,12 @@ group("needsTimer", () => {
   test("a hidden tab needs nothing", () => {
     expect(needsTimer({ ...live, connection: "paused" }, "configmaps")).toBe(false);
   });
+
+  test("issues follow pods: the Signal engine is live while they're cached", () => {
+    expect(needsTimer(live, "issues")).toBe(false);
+    expect(needsTimer(open("live", [{ resource: "pods", mode: "direct" }]), "issues")).toBe(true);
+    expect(needsTimer({ connection: "off", status: { state: "off", kinds: [] } }, "issues")).toBe(true);
+  });
 });
 
 group("describe", () => {

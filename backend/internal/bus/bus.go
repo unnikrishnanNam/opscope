@@ -75,31 +75,34 @@ type CollectorGap struct {
 // object (see internal/signals). It names the signal; read the engine for
 // the rest.
 type SignalRaised struct {
-	Cluster  string
-	ID       string
-	UID      string // the object's
-	Type     string // from the vocabulary, e.g. "crash_loop"
-	Severity string
-	At       time.Time
+	Cluster   string
+	ID        string
+	UID       string // the object's
+	Namespace string // the object's; "" for cluster-wide kinds
+	Type      string // from the vocabulary, e.g. "crash_loop"
+	Severity  string
+	At        time.Time
 }
 
 // SignalResolved says a signal's condition stayed away long enough for it
 // to close, or its object was deleted.
 type SignalResolved struct {
-	Cluster string
-	ID      string
-	UID     string
-	Type    string
-	At      time.Time
+	Cluster   string
+	ID        string
+	UID       string
+	Namespace string
+	Type      string
+	At        time.Time
 }
 
 // HealthChanged says an object's health changed: healthy, degraded or
 // failing.
 type HealthChanged struct {
-	Cluster  string
-	UID      string
-	From, To string
-	At       time.Time
+	Cluster   string
+	UID       string
+	Namespace string
+	From, To  string
+	At        time.Time
 }
 
 func (ObjectChanged) isEvent()  {}

@@ -190,7 +190,10 @@ export function needsTimer(snapshot, live) {
   if (connection === "paused") return false;
   if (connection !== "open" || !status || status.state === "unreachable") return true;
   return listOf(live).some((resource) => {
-    const mode = status.kinds.find((k) => k.resource === resource)?.mode;
+    // "issues" isn't a kind: the Signal engine says when its answer changes,
+    // and it's kept live while pods are (see backend/internal/signals).
+    const kind = resource === "issues" ? "pods" : resource;
+    const mode = status.kinds.find((k) => k.resource === kind)?.mode;
     return !STREAMED.has(mode) && !SETTLED.has(mode);
   });
 }

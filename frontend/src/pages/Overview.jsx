@@ -15,6 +15,7 @@ import { Sparkline, UsageBar } from "../components/Usage.jsx";
 import { CpuIcon, MemoryIcon, NodesIcon, PodsIcon, RefreshIcon, SuccessIcon, WarningIcon } from "../components/icons.jsx";
 import { allPages, detailPath, nsQuery, overviewKinds } from "../sections.js";
 import { USAGE_OFF } from "../volumeUsage.js";
+import { issuesLink } from "./issuesRequest.js";
 import "./Overview.css";
 
 // Without live updates (see live.js), or for kinds that can't be watched.
@@ -54,7 +55,8 @@ export default function Overview({ page }) {
 
   const query = namespace ? `?namespace=${encodeURIComponent(namespace)}` : "";
   const base = reachable ? `/clusters/${cluster.id}` : null;
-  const overview = useApi(base && `${base}/overview${query}`, { refreshMs: REFRESH_MS, live: overviewKinds });
+  // Its counts come from the Signal engine, so a signal resolving moves them too.
+  const overview = useApi(base && `${base}/overview${query}`, { refreshMs: REFRESH_MS, live: [...overviewKinds, "issues"] });
   const nodes = useApi(base && `${base}/nodes`, { refreshMs: REFRESH_MS, live: "nodes" });
   // Usage is cluster-wide (it comes from the nodes), whatever namespace is picked.
   const usage = useApi(base && `${base}/metrics/nodes`, { refreshMs: METRICS_REFRESH_MS });
@@ -63,6 +65,14 @@ export default function Overview({ page }) {
     refreshMs: REFRESH_MS,
     live: "events",
   });
+  // The issues, for linking the warnings that raised one.
+  const issues = useApi(base && `${base}/issues${query}`, { refreshMs: REFRESH_MS, live: "issues" });
+  const issueOfEvent = new Map();
+  for (const g of issues.data?.groups ?? []) {
+    for (const s of g.signals) {
+      for (const e of s.evidence) if (e.event?.uid) issueOfEvent.set(e.event.uid, g.id);
+    }
+  }
   // How full the claims are, when volume usage is on. Only asked for when there are claims.
   const hasClaims = overview.data?.storage?.find((s) => s.resource === "persistentvolumeclaims")?.total > 0;
   const volumes = useApi(base && hasClaims && `${base}/metrics/volumes${query}`, {
@@ -75,8 +85,10 @@ export default function Overview({ page }) {
     storage: withMeasuredClaims(overview.data.storage, volumes.data, overview.data.signals),
   };
   const error = overview.error ?? nodes.error ?? warnings.error;
-  // Links to list pages keep the selected namespace.
+  // Links to list pages keep the selected namespace; so do links to the
+  // Issues page, filtered as a count is made: { kind, types }.
   const to = (path) => `/c/${cluster.id}/${path}${search}`;
+  const issuesTo = (filter) => issuesLink(cluster.id, filter, search);
 
   useCommands(
     "overview",
@@ -106,7 +118,7 @@ export default function Overview({ page }) {
     <section className="overview">
       <PageHeader
         title={cluster.name}
-        after={o && <HealthChip issues={issuesOf(o)} />}
+        after={o && <HealthChip issues={issuesOf(o)} to={issuesTo()} />}
         description={
           <>
             {status?.version && `Kubernetes ${status.version} · `}
@@ -147,11 +159,11 @@ export default function Overview({ page }) {
         <div className="overview-grid">
           <div className="overview-main">
             <Card title="Resources" aside={namespace ? `in ${namespace}` : "all namespaces"}>
-              <ResourceGroup title="Workloads" items={o.workloads} to={to} />
+              <ResourceGroup title="Workloads" items={o.workloads} to={to} issuesTo={issuesTo} />
               {/* gatewayAPI is null when the cluster doesn't have Gateway API. */}
-              {o.gatewayAPI && <ResourceGroup title="Gateway API" items={o.gatewayAPI} to={to} />}
+              {o.gatewayAPI && <ResourceGroup title="Gateway API" items={o.gatewayAPI} to={to} issuesTo={issuesTo} />}
               {/* storage is null when there are no claims or volumes, or they can't be listed. */}
-              {o.storage && <ResourceGroup title="Storage" items={o.storage} to={to} />}
+              {o.storage && <ResourceGroup title="Storage" items={o.storage} to={to} issuesTo={issuesTo} />}
             </Card>
             <Card
               title="Pods by status"
@@ -194,6 +206,7 @@ export default function Overview({ page }) {
             events={warnings.data.slice(0, WARNINGS_SHOWN)}
             showNamespace={!namespace}
             emptyText="No warnings. Nothing has complained recently."
+            issueOf={(e) => issueOfEvent.has(e.uid) && issuesTo({ signal: issueOfEvent.get(e.uid) })}
           />
         </Card>
       )}
@@ -237,7 +250,8 @@ function issuesOf(o) {
 
 // Next to the cluster's name: "All healthy", or how many things need a look
 // (the list is in its hover text, and read out by screen readers).
-function HealthChip({ issues }) {
+// It links to the Issues page, which lists every one.
+function HealthChip({ issues, to }) {
   const total = issues.reduce((sum, i) => sum + i.count, 0);
   if (total === 0) {
     return (
@@ -250,10 +264,10 @@ function HealthChip({ issues }) {
   const list = issues.map((i) => i.text).join(" · ");
   return (
     <Tooltip label={list}>
-      <span className="health-chip health-chip-warn" tabIndex={0} aria-label={`${total} need attention: ${list}`}>
+      <Link className="health-chip health-chip-warn" to={to} aria-label={`${total} need attention: ${list}. Open Issues`}>
         <WarningIcon size={14} />
         {total} need attention
-      </span>
+      </Link>
     </Tooltip>
   );
 }
@@ -384,7 +398,9 @@ function UsageCell({ usage, field, what, format }) {
 
 // One group of resource kinds ("Workloads", "Gateway API", "Storage"), a row each:
 // name, count, a bar of healthy against not, and what needs attention.
-function ResourceGroup({ title, items, to }) {
+// A row's count of what needs attention links to the Issues page, filtered
+// to the kind and the signal types the count is made of.
+function ResourceGroup({ title, items, to, issuesTo }) {
   return (
     <div className="resource-group">
       <div className="resource-group-title">{title}</div>
@@ -395,7 +411,7 @@ function ResourceGroup({ title, items, to }) {
           const bad = kind.problem ? w.unhealthy : 0;
           const tone = kind.tone ?? "warn";
           return (
-            <li key={w.kind ?? w.resource}>
+            <li key={w.kind ?? w.resource} className="resource-item">
               <Link className="resource-row" to={to(p.path)}>
                 <span className="resource-name">
                   <p.icon size={16} />
@@ -412,18 +428,20 @@ function ResourceGroup({ title, items, to }) {
                     </>
                   )}
                 </span>
-                <span className="resource-state">
-                  {bad > 0 ? (
-                    <span className={`status status-${tone}`}>
-                      {bad} {kind.problem}
-                    </span>
-                  ) : w.total > 0 ? (
-                    kind.ok
-                  ) : (
-                    "None"
-                  )}
-                </span>
               </Link>
+              {bad > 0 ? (
+                <Link
+                  className="resource-state resource-state-link"
+                  to={issuesTo(w.kind === "measuredClaims" ? { kind: w.resource, types: ["volume_nearly_full"] } : { kind: w.resource, types: w.types })}
+                  title="See them in Issues"
+                >
+                  <span className={`status status-${tone}`}>
+                    {bad} {kind.problem}
+                  </span>
+                </Link>
+              ) : (
+                <span className="resource-state">{w.total > 0 ? kind.ok : "None"}</span>
+              )}
             </li>
           );
         })}

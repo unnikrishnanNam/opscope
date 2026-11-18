@@ -272,3 +272,16 @@ func TestChangesAreSentAtMostOnceASecond(t *testing.T) {
 		t.Fatalf("nothing changed: %v", got)
 	}
 }
+
+// The Signal engine's events reach the stream as the resource "issues", by
+// namespace, so the Issues page and the overview follow them.
+func TestIssueEventsAreSentAsIssues(t *testing.T) {
+	g := newChangeGatherer("lab", time.Second)
+	g.add(bus.SignalRaised{Cluster: "lab", Namespace: "shop", Type: "crash_loop"})
+	g.add(bus.HealthChanged{Cluster: "lab", Namespace: "web"})
+	g.add(bus.SignalResolved{Cluster: "other", Namespace: "x"}) // another cluster's
+	b, _ := json.Marshal(g.due(time.Now()))
+	if got := string(b); got != `[{"resource":"issues","namespaces":["shop","web"]}]` {
+		t.Errorf("sent %s", got)
+	}
+}
