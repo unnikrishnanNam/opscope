@@ -137,6 +137,25 @@ func TestPodDetectors(t *testing.T) {
 			})},
 			{"pods", pod("restarted-once", func(p *corev1.Pod) { p.Status.ContainerStatuses[0].RestartCount = 1 })},
 		}},
+		// Between a crash and its back-off the kubelet shows it as
+		// terminated, for over a minute when the back-off is long: still a
+		// crash loop. One that ran for hours and exited once isn't.
+		{name: "crash_loop between restarts", want: []string{"just-exited:crash_loop"}, objects: []obj{
+			{"pods", pod("just-exited", func(p *corev1.Pod) {
+				p.Status.ContainerStatuses[0].RestartCount = 5
+				p.Status.ContainerStatuses[0].State = corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{
+					Reason: "Error", ExitCode: 1, StartedAt: ago(3 * time.Minute), FinishedAt: ago(3*time.Minute - 2*time.Second)}}
+			})},
+			{"pods", pod("long-run", func(p *corev1.Pod) {
+				p.Status.ContainerStatuses[0].RestartCount = 1
+				p.Status.ContainerStatuses[0].State = corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{
+					Reason: "Error", ExitCode: 1, StartedAt: ago(5 * time.Hour), FinishedAt: ago(time.Second)}}
+			})},
+			{"pods", pod("first-exit", func(p *corev1.Pod) {
+				p.Status.ContainerStatuses[0].State = corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{
+					Reason: "Error", ExitCode: 1, StartedAt: ago(time.Minute), FinishedAt: ago(50 * time.Second)}}
+			})},
+		}},
 		{name: "image_pull_failed", want: []string{"pull:image_pull_failed"}, objects: []obj{
 			{"pods", pod("pull", func(p *corev1.Pod) { p.Status.ContainerStatuses[0].State = waiting("ImagePullBackOff", "") })},
 			{"pods", pod("creating", func(p *corev1.Pod) { p.Status.ContainerStatuses[0].State = waiting("ContainerCreating", "") })},

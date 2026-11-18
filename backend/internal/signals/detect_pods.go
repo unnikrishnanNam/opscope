@@ -147,6 +147,15 @@ func podContainers(obj runtime.Object, c Context) []Found {
 			}
 			continue
 		}
+		if t := s.State.Terminated; t != nil && !cs.init && restartsSoon(pod, s, t) {
+			// Between a crash and its back-off, the kubelet shows the
+			// container as terminated, for more than a minute once the
+			// back-off grows: still a crash loop, or its signal would
+			// resolve and open again with every restart.
+			crash.add(s.Name, field(cs.field+".state.terminated", exitText(t)))
+			crash.Count += int64(s.RestartCount)
+			continue
+		}
 		if t := s.State.Terminated; t != nil && t.ExitCode != 0 {
 			path := cs.field + ".state.terminated"
 			switch {
@@ -424,11 +433,34 @@ func limitText(pod *corev1.Pod, container string) string {
 func crashMessage(pod *corev1.Pod, names []string, restarts int64) string {
 	msg := fmt.Sprintf("%s restarted %d %s", who(names, false), restarts, plural(restarts, "time", "times"))
 	for _, s := range pod.Status.ContainerStatuses {
-		if s.Name == names[0] && s.LastTerminationState.Terminated != nil {
-			msg += "; last exit " + exitText(s.LastTerminationState.Terminated)
+		if s.Name != names[0] {
+			continue
+		}
+		last := s.LastTerminationState.Terminated
+		if s.State.Terminated != nil {
+			last = s.State.Terminated // the exit that just happened
+		}
+		if last != nil {
+			msg += "; last exit " + exitText(last)
 		}
 	}
 	return msg
+}
+
+// backoffReset is how long a container must run for the kubelet to forget
+// its back-off: one that exits sooner is still crash-looping.
+const backoffReset = 10 * time.Minute
+
+// restartsSoon: a container that has restarted before, has just exited
+// after a short run, and will be started again. That's a crash loop the
+// kubelet hasn't put back in CrashLoopBackOff yet. One that ran for longer
+// than backoffReset before exiting isn't: it's one restart.
+func restartsSoon(pod *corev1.Pod, s corev1.ContainerStatus, t *corev1.ContainerStateTerminated) bool {
+	if s.RestartCount < 1 || pod.Spec.RestartPolicy == corev1.RestartPolicyNever ||
+		pod.Spec.RestartPolicy == corev1.RestartPolicyOnFailure && t.ExitCode == 0 {
+		return false
+	}
+	return t.FinishedAt.Sub(t.StartedAt.Time) < backoffReset
 }
 
 // exitText: "Error (exit 1)", "OOMKilled (exit 137)", "exit 2".
