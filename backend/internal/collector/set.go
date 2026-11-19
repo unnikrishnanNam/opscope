@@ -139,6 +139,12 @@ func (s *Set) Subscribe(buffer int) *bus.Subscription {
 	return s.bus.Subscribe(buffer)
 }
 
+// Publish puts an event on the set's bus, for engines that publish what
+// they work out (the Signal engine's signals and health).
+func (s *Set) Publish(e bus.Event) {
+	s.bus.Publish(e)
+}
+
 // Done is closed when the set's context ends: Opscope is shutting down.
 func (s *Set) Done() <-chan struct{} {
 	return s.ctx.Done()

@@ -1,0 +1,113 @@
+# A Deployment, a Service and a ServiceAccount for the pages v1.6 adds:
+# a Deployment's revisions (with a rollout stuck between two ReplicaSets
+# once README.md's second step has run), the endpoints behind a Service,
+# one ready and one not, and a named ServiceAccount with a pull Secret.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rollouts-test
+---
+# Pods that run as this account don't get its token unless they ask, and
+# pull images with regcred. The Secret is a placeholder: nothing here pulls
+# from a private registry.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: regcred
+  namespace: rollouts-test
+type: kubernetes.io/dockerconfigjson
+stringData:
+  .dockerconfigjson: '{"auths":{}}'
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: shop
+  namespace: rollouts-test
+automountServiceAccountToken: false
+imagePullSecrets:
+  - name: regcred
+---
+# Revision 1 is healthy. README.md's second step sets an image that can't
+# be pulled: revision 2's pod never becomes ready, so revision 1's two pods
+# keep running beside it (maxUnavailable 0) and the rollout is stuck.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shop
+  namespace: rollouts-test
+spec:
+  replicas: 2
+  progressDeadlineSeconds: 60
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: shop
+  template:
+    metadata:
+      labels:
+        app: shop
+    spec:
+      serviceAccountName: shop
+      containers:
+        - name: app
+          image: busybox:1.36
+          command: [httpd, -f, -p, "8080", -h, /tmp]
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+          resources:
+            requests: { cpu: 5m, memory: 8Mi }
+            limits: { memory: 16Mi }
+---
+# Two pods behind one Service: split-0 becomes ready, split-1 never does
+# (its readiness check looks for a file only split-0 writes).
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: split
+  namespace: rollouts-test
+spec:
+  replicas: 2
+  serviceName: split
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app: split
+  template:
+    metadata:
+      labels:
+        app: split
+    spec:
+      containers:
+        - name: app
+          image: busybox:1.36
+          command: [sh, -c, 'case "$HOSTNAME" in *-0) touch /tmp/ready ;; esac; exec httpd -f -p 8080 -h /tmp']
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            exec:
+              command: [test, -f, /tmp/ready]
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 5m, memory: 8Mi }
+            limits: { memory: 16Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: split
+  namespace: rollouts-test
+spec:
+  selector:
+    app: split
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

@@ -30,7 +30,9 @@ export default function Topology({ page }) {
   const request = topologyRequest(params);
   const base = reachable ? `/clusters/${cluster.id}` : null;
   const path = base && request.path && `${base}${request.path}`;
-  const { data, error } = useApi(path, { refreshMs: REFRESH_MS, live: GRAPH_KINDS });
+  // Cards carry health from the Signal engine, which changes on its own
+  // (a signal resolving a minute after its cause): "issues" too.
+  const { data, error } = useApi(path, { refreshMs: REFRESH_MS, live: [...GRAPH_KINDS, "issues"] });
   // The namespace list, when no namespace is picked: object counts from the name index.
   const names = useApi(base && request.mode === "pick" ? `${base}/names` : null, { refreshMs: REFRESH_MS, live: GRAPH_KINDS });
   // Whether a namespace with an empty map exists: a link can name one this cluster doesn't have.

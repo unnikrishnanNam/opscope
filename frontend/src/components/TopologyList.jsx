@@ -4,7 +4,8 @@ import { kindIcon, relation } from "../graph/kinds.js";
 import { layout } from "../graph/layout.js";
 import { cardKind } from "../graph/view.js";
 import { detailPath, nsQuery } from "../sections.js";
-import { gapTag, statusText } from "./TopologyGraph.jsx";
+import HealthBadge from "./HealthBadge.jsx";
+import { gapTag, statusText, troubleOf } from "./TopologyGraph.jsx";
 import "./TopologyList.css";
 
 // TopologyList is a map as text: the same columns in the same order, each
@@ -76,6 +77,7 @@ function Item({ n, view, nodes, focus, clusterId, search }) {
           </span>
         )}
         {n.id === focus && <span className="topo-list-tag topo-list-tag-here">This object</span>}
+        {troubleOf(n) && <HealthBadge health={n.health} />}
       </div>
       {status && <p className="topo-list-status">{status}</p>}
       {n.pods && <p className="topo-list-members">{n.pods.members.map((p) => `${p.name} (${p.status || "Unknown"})`).join(", ")}</p>}

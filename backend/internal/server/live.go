@@ -71,7 +71,8 @@ type liveFeed interface {
 //
 //	event: changed     {"resource":"pods","namespaces":["default"]}, at most
 //	                   once a second per resource; no namespaces for
-//	                   cluster-wide kinds
+//	                   cluster-wide kinds. The resource "issues" says
+//	                   the Signal engine's signals or health changed
 //	event: status      {"state":"live","kinds":[{"resource":"pods","mode":"watch"}]},
 //	                   on connecting and whenever the state or a mode changes
 //	event: resync      {}, when changes may have been missed: fetch everything
@@ -216,6 +217,12 @@ func (g *changeGatherer) add(e bus.Event) (resync bool) {
 			g.pending[e.Resource] = map[string]bool{}
 		}
 		g.pending[e.Resource][e.Namespace] = true
+	case bus.SignalRaised:
+		g.addIssue(e.Cluster, e.Namespace)
+	case bus.SignalResolved:
+		g.addIssue(e.Cluster, e.Namespace)
+	case bus.HealthChanged:
+		g.addIssue(e.Cluster, e.Namespace)
 	case bus.CollectorGap:
 		// Only a gap in what this stream received needs a refetch. Relists
 		// publish what changed as ordinary changes, and an unreachable or
@@ -223,6 +230,19 @@ func (g *changeGatherer) add(e bus.Event) (resync bool) {
 		return e.Reason == bus.GapLagged
 	}
 	return false
+}
+
+// addIssue records that the Signal engine's answer changed, as the
+// resource "issues": the Issues page, the overview's counts and health
+// follow it like a kind.
+func (g *changeGatherer) addIssue(cluster, namespace string) {
+	if cluster != g.cluster {
+		return
+	}
+	if g.pending["issues"] == nil {
+		g.pending["issues"] = map[string]bool{}
+	}
+	g.pending["issues"][namespace] = true
 }
 
 // due returns the resources whose changes can be sent at now, in name

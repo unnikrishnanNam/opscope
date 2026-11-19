@@ -14,6 +14,9 @@
 // `kubectl` is the name kubectl knows the resource by, when it isn't
 // `resource`: Gateway API kinds need their group, since other projects have
 // a kind called Gateway too.
+//
+// `hiddenPages` are kinds with detail pages but no sidebar entry (see
+// below); `noList` marks one that has no list either.
 
 import * as icons from "./components/icons.jsx";
 import { GRAPH_KINDS } from "./pages/topologyRequest.js";
@@ -24,6 +27,7 @@ export const sections = [
     items: [
       { path: "overview", shortcut: "g o", icon: icons.OverviewIcon, label: "Overview", about: "Counts, node health and recent warnings at a glance." },
       { path: "topology", shortcut: "g t", icon: icons.TopologyIcon, aliases: ["map", "graph", "uses", "using"], label: "Topology", about: "How objects connect: what each one needs, and what needs it." },
+      { path: "issues", shortcut: "g i", icon: icons.IssuesIcon, aliases: ["problems", "health", "signals", "alerts"], label: "Issues", about: "What's wrong right now, worst first: each problem in plain words, with what it was read from." },
       { path: "nodes", shortcut: "g n", icon: icons.NodesIcon, resource: "nodes", aliases: ["no", "node"], clusterScoped: true, metrics: "nodes", label: "Nodes", about: "Machines in the cluster, their status, capacity and usage." },
     ],
   },
@@ -43,6 +47,7 @@ export const sections = [
     items: [
       { path: "config/configmaps", icon: icons.ConfigMapsIcon, resource: "configmaps", aliases: ["cm", "configmap"], label: "ConfigMaps", about: "Plain configuration values used by pods." },
       { path: "config/secrets", icon: icons.SecretsIcon, resource: "secrets", aliases: ["secret"], label: "Secrets", about: "Sensitive values. Click a name to see its keys; each value stays hidden until you reveal it." },
+      { path: "config/serviceaccounts", icon: icons.ServiceAccountsIcon, resource: "serviceaccounts", aliases: ["sa", "serviceaccount"], label: "ServiceAccounts", about: "Identities pods run as, and what uses each one." },
     ],
   },
   {
@@ -65,10 +70,22 @@ export const sections = [
   },
 ];
 
-// The same pages as a flat list, handy for building routes.
-export const allPages = sections.flatMap((section) =>
-  section.items.map((item) => ({ ...item, group: section.group })),
-);
+// Kinds with detail pages and no sidebar entry. A Deployment shows its
+// ReplicaSets as revisions, so a list of every ReplicaSet in the sidebar
+// would be mostly old ones; their list still exists, for the breadcrumb and
+// anyone who opens it. EndpointSlices have no list at all: a Service shows
+// its endpoints. Both pages are where links from Topology, events and owner
+// fields land. They're left out of "Go to" in the palette.
+export const hiddenPages = [
+  { group: "Workloads", path: "workloads/replicasets", icon: icons.ReplicaSetsIcon, resource: "replicasets", aliases: ["rs", "replicaset"], label: "ReplicaSets", about: "The pods a Deployment runs for one revision; a Deployment's page lists its own." },
+  { group: "Network", path: "network/endpointslices", icon: icons.EndpointSlicesIcon, resource: "endpointslices", noList: true, label: "EndpointSlices", about: "The addresses behind a Service, and whether each is ready; a Service's page lists its own." },
+].map((page) => ({ ...page, hidden: true }));
+
+// Every page as a flat list, hidden ones too, handy for building routes.
+export const allPages = [
+  ...sections.flatMap((section) => section.items.map((item) => ({ ...item, group: section.group }))),
+  ...hiddenPages,
+];
 
 // The kinds GET /overview counts (backend/internal/resources/overview.go).
 export const overviewKinds = [
@@ -93,6 +110,7 @@ export function kindsOn(page, detail) {
   if (detail) return [];
   if (page?.resource) return [page.resource];
   if (page?.path === "overview") return [...overviewKinds, "events"];
+  if (page?.path === "issues") return undefined; // signals come from every kind
   if (page?.path === "topology") return GRAPH_KINDS;
   return undefined;
 }

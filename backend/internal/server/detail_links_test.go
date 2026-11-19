@@ -9,6 +9,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -180,6 +181,12 @@ func kindOf(obj runtime.Object) string {
 		return "CronJob"
 	case *networkingv1.Ingress:
 		return "Ingress"
+	case *corev1.ServiceAccount:
+		return "ServiceAccount"
+	case *corev1.Service:
+		return "Service"
+	case *discoveryv1.EndpointSlice:
+		return "EndpointSlice"
 	}
 	return ""
 }
@@ -194,6 +201,8 @@ func groupOf(obj runtime.Object) string {
 		return "batch"
 	case *networkingv1.Ingress:
 		return "networking.k8s.io"
+	case *discoveryv1.EndpointSlice:
+		return "discovery.k8s.io"
 	}
 	return ""
 }
@@ -284,6 +293,19 @@ func TestDetailLinksMatchV14(t *testing.T) {
 		l.Tables = append(l.Tables, t)
 		want[page] = l
 	}
+	// v1.6: ReplicaSets have a page, so a pod's owner links to it, and a
+	// Deployment lists its ReplicaSets as revisions.
+	pod := want["pods/shop/web-abc-1"]
+	pod.Owners[0].Resource = "replicasets"
+	want["pods/shop/web-abc-1"] = pod
+	web := want["deployments/shop/web"]
+	web.Tables = append(web.Tables, resources.Table{
+		Title: "Revisions", Columns: []string{"Revision", "ReplicaSet", "Pods", "State", "Age"},
+		Rows:  [][]string{{"", "web-abc", "0/1", "old", ""}},
+		Links: [][]*resources.Link{{nil, {Resource: "replicasets", Namespace: "shop", Name: "web-abc"}, nil, nil, nil}},
+	})
+	want["deployments/shop/web"] = web
+
 	usedBy("configmaps/shop/app-config", []string{"Deployment", "web", "volume config", "1"}, []string{"Pod", "debug", "envFrom", ""})
 	usedBy("secrets/shop/db-creds", []string{"Deployment", "web", "env PASSWORD, volume creds", "1"})
 

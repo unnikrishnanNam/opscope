@@ -52,7 +52,7 @@ or "turned off" from an error:
 ### `GET /api/health`
 
 ```json
-{ "status": "ok", "version": "v1.5.0" }
+{ "status": "ok", "version": "v1.6.0" }
 ```
 
 Used by the Kubernetes liveness and readiness probes. It doesn't contact any cluster.
@@ -132,19 +132,130 @@ Counts for the overview page. `namespace` limits the namespaced counts.
 {
   "namespaces": 12,
   "nodes": { "total": 3, "ready": 3 },
-  "pods": { "total": 54, "byStatus": { "Running": 52, "CrashLoopBackOff": 2 } },
-  "workloads": [{ "resource": "deployments", "total": 20, "unhealthy": 1 }],
+  "pods": { "total": 54, "byStatus": { "Running": 52, "CrashLoopBackOff": 2 }, "unhealthy": 2 },
+  "workloads": [{ "resource": "deployments", "total": 20, "unhealthy": 1, "types": ["replicas_unavailable", "rollout_stuck"] }],
   "storage": [{ "resource": "persistentvolumeclaims", "total": 8, "unhealthy": 1 }],
-  "gatewayAPI": [{ "resource": "gateways", "total": 2, "unhealthy": 0 }]
+  "gatewayAPI": [{ "resource": "gateways", "total": 2, "unhealthy": 0 }],
+  "signals": { "crash_loop": 2, "replicas_unavailable": 1, "pvc_unbound": 1 }
 }
 ```
 
-`unhealthy` counts what needs a look: workloads with fewer replicas ready than wanted, failed Jobs,
-claims that are `Pending` or `Lost`, volumes that are `Released` or `Failed`, Gateways that aren't
-`Programmed` and HTTPRoutes that aren't `Accepted`. CronJobs are never counted as unhealthy.
+What needs a look comes from the Signal engine, so it's what the Issues feed lists. `signals` counts
+the objects with an open signal of each type. `unhealthy` counts the objects of a kind with an open
+signal of the types its row names: Deployments `replicas_unavailable` or `rollout_stuck`;
+StatefulSets and DaemonSets `replicas_unavailable`; Jobs `job_failed`; claims `pvc_unbound`;
+volumes `volume_released`; Gateways `gateway_not_programmed`; HTTPRoutes `route_not_accepted`.
+`pods.unhealthy` counts pods with any open signal. CronJobs are never counted as unhealthy. `types`
+lists those types, for a link to `/issues` filtered the same way.
 PersistentVolumes, like nodes, are counted across the whole cluster whatever the `namespace`.
 `storage` is `null` when the cluster has no claims and no volumes, or Opscope isn't allowed to list
 them. `gatewayAPI` is `null` when the cluster has no Gateway API.
+
+### `GET /api/clusters/{id}/health/counts`
+
+How many objects have an open signal, by kind and by signal type, in `namespace` or the whole
+cluster: what the overview's counts are made of.
+
+```json
+{
+  "built": "live",
+  "partial": [{ "resource": "gateways", "code": "not_installed", "reason": "not installed" }],
+  "historySince": "2026-11-16T14:53:38Z",
+  "kinds": { "pods": 11, "deployments": 3, "services": 2 },
+  "types": { "crash_loop": 2, "replicas_unavailable": 3, "selector_matches_nothing": 1 }
+}
+```
+
+`built` is `live` when the Signal engine keeps the cluster up to date from its watch cache, and
+`on_request` when the answer was worked out for this request (live data off, or the cache still on
+its first list): then there's no history, so `historySince` and signals' `firstSeen` are left out,
+and containers' logs aren't read. `partial` lists the kinds
+the detectors couldn't read, as the graph's answers do. Without the Secret role there are no
+certificate checks; without Gateway API, no route or Gateway signals.
+
+### `GET /api/clusters/{id}/issues`
+
+The Issues feed: the Signal engine's signals, a workload's pods grouped. Query parameters, all
+optional: `namespace`; `state` (`open`, the default, with open and going-away signals, or
+`resolved`, those resolved in the last hour); `severity` (`critical`, `warning` or `info`); `type`,
+one or more signal types, comma-separated; `kind`, the objects' kind by URL name
+(`deployments`).
+
+```json
+{
+  "built": "live",
+  "partial": [],
+  "historySince": "2026-11-17T14:54:10Z",
+  "open": 27,
+  "resolved": 1,
+  "groups": [
+    {
+      "id": "group:5d2f7079-…:crash_loop",
+      "type": "crash_loop",
+      "title": "Crash loop",
+      "severity": "critical",
+      "state": "open",
+      "owner": { "uid": "5d2f7079-…", "resource": "deployments", "kind": "Deployment", "namespace": "shop", "name": "order-service" },
+      "firstSeen": "2026-11-17T09:10:00Z",
+      "lastSeen": "2026-11-17T15:00:12Z",
+      "signals": [
+        {
+          "id": "9d1719b5c0ca552a651d9de2470d50a9",
+          "type": "crash_loop",
+          "title": "Crash loop",
+          "severity": "critical",
+          "cluster": "lab",
+          "resource": { "uid": "…", "resource": "pods", "kind": "Pod", "namespace": "shop", "name": "order-service-fb47c5848-9hpsf" },
+          "owner": { "uid": "5d2f7079-…", "resource": "deployments", "kind": "Deployment", "namespace": "shop", "name": "order-service" },
+          "message": "Container order-service restarted 656 times; last exit Error (exit 1); its log shows refused credentials",
+          "firstSeen": "2026-11-17T09:10:00Z",
+          "lastSeen": "2026-11-17T15:00:12Z",
+          "count": 656,
+          "state": "open",
+          "evidence": [
+            { "source": "field", "detector": "pods.containers", "field": "status.containerStatuses[0].state.waiting.reason", "value": "CrashLoopBackOff", "resourceVersion": "48211", "seen": "…" },
+            { "source": "log", "detector": "pods.containers", "field": "log of container order-service, last run", "pattern": "auth_failed", "matches": 1, "seen": "…" }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+A group is one signal, or the signals of one type on several pods of one workload (`owner`, and an
+`id` starting `group:`); grouping is for display, and every signal keeps its own `id`. Groups come
+worst first, then newest. `open` and `resolved` count the groups in `namespace` on either tab,
+whatever the other filters. A signal's `id` is derived from its cluster, object UID and type, so it
+stays the same across restarts. `state` is `open`, `resolving` (its condition went away less than a
+minute ago) or `resolved` (with `resolved`, when); `stale` is set while Opscope has missed changes
+to the object's kind and hasn't read it again. `evidence` says what the signal was read from:
+`source` is `field` (`field`, `value`), `event` (`event`: `uid`, `reason`, `count`, `lastSeen`),
+`log` (`pattern` and `matches`, or `value`; never a log line) or `metric` (`field`, `value`).
+`built`, `partial` and `historySince` are as for `/health/counts`. The signal types are listed in
+`docs/design/issues.md` ("Vocabulary").
+
+### `GET /api/clusters/{id}/issues/{signal}`
+
+One signal by its `id`, open or resolved in the last hour, with all its evidence; `404` otherwise.
+
+### `GET /api/clusters/{id}/health?resource=&namespace=&name=`
+
+One object's health, its signals (open, going away, and resolved in the last hour) and how its
+health changed since Opscope started:
+
+```json
+{
+  "built": "live",
+  "partial": [],
+  "health": { "state": "failing", "since": "2026-11-17T09:10:00Z", "signals": ["9d1719b5…"] },
+  "signals": [],
+  "transitions": [{ "uid": "…", "from": "healthy", "to": "failing", "at": "2026-11-17T09:10:00Z", "signals": ["9d1719b5…"] }]
+}
+```
+
+`health` is `null` for a kind no detector reads, and for an object Opscope doesn't hold.
+`resource` must be a kind Opscope knows (`400` otherwise).
 
 ### `GET /api/clusters/{id}/names`
 
@@ -283,7 +394,7 @@ data: {}
 | Event       | When                                                                                       |
 | ----------- | ------------------------------------------------------------------------------------------ |
 | `status`    | First, and whenever `state` or a kind's mode changes; `/live` without counts or errors      |
-| `changed`   | Objects of `resource` were added, changed or deleted, in `namespaces` (left out for cluster-wide kinds); at most once a second per resource |
+| `changed`   | Objects of `resource` were added, changed or deleted, in `namespaces` (left out for cluster-wide kinds); at most once a second per resource. `"resource":"issues"` means a signal opened or resolved, or an object's health changed, in those namespaces |
 | `resync`    | Changes may have been missed (the stream fell behind): fetch everything again              |
 | `heartbeat` | Every 15 seconds, so proxies keep the connection and a client can tell it's alive          |
 
@@ -316,7 +427,7 @@ Every answer has the same shape:
       "name": "web-7d9f-x1",
       "presence": "present",
       "status": "Running",
-      "health": null,
+      "health": { "state": "healthy" },
       "resourceVersion": "48211"
     },
     {
@@ -360,7 +471,11 @@ Every answer has the same shape:
   `missing` node, `missing:<resource>/<namespace>/<name>`; one whose kind can't be read is
   `unknown`. A Service whose selector matches nothing has a `dangling` entry
   (`{"kind":"selects","field":"spec.selector","reason":"matches no pods"}`).
-- `status` is what the node's list page shows, for display. `health` is always `null` for now.
+- `status` is what the node's list page shows, for display. `health` is the object's health from
+  its open signals: `{"state": "healthy" | "degraded" | "failing", "since": …, "signals": [IDs]}`.
+  `since` is left out when the health hasn't changed since Opscope started. `health` is `null` for
+  kinds no detector reads (ConfigMaps, Services, … until v1.6's later phases), for missing and
+  unknown nodes, and while the cluster isn't read live.
 - An edge points from the object that needs to the one it needs: Pod → Secret, Service → Pod,
   HTTPRoute → Service. Its `id` is derived from its two ends and kind, so it's the same in every
   answer. Each piece of `evidence` is one field that makes it; `optional` is set when every
@@ -494,10 +609,15 @@ The values of `{resource}`:
 | `persistentvolumeclaims` | PersistentVolumeClaim | namespace | core                        | yes         |
 | `persistentvolumes`      | PersistentVolume      | cluster   | core                        | yes         |
 | `storageclasses`         | StorageClass          | cluster   | `storage.k8s.io`            | yes         |
+| `serviceaccounts`        | ServiceAccount        | namespace | core                        | yes         |
+| `replicasets`            | ReplicaSet            | namespace | `apps`                      | yes         |
+| `endpointslices`         | EndpointSlice         | namespace | `discovery.k8s.io`          | detail only |
 
 The list is defined in `backend/internal/resources/resources.go` (`Listers`) and, for detail
-pages, `detail.go`. The graph also reads ReplicaSets (`apps`), EndpointSlices (`discovery.k8s.io`)
-and ServiceAccounts (core), which have no endpoints of their own (`graphOnly`).
+pages, `detail.go`. EndpointSlices have a detail view and no list: a Service's detail lists the
+endpoints of all its slices, in an `Endpoints` table. A Deployment's detail lists the ReplicaSets
+it owns, newest revision first, in a `Revisions` table; there's no ReplicaSet page in the
+sidebar, but the list exists, and ReplicaSets are in `/names`. EndpointSlices aren't.
 
 ## Examples
 

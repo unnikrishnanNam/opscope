@@ -54,7 +54,7 @@ The manifests in each release tag use that release's published image, so you can
 straight from GitHub:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.5.0/deploy/kubernetes/opscope.yaml
+kubectl apply -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.6.0/deploy/kubernetes/opscope.yaml
 ```
 
 From a clone of the repository, apply `deploy/kubernetes/opscope.yaml` the same way. Apply the file,
@@ -114,9 +114,12 @@ in memory:
 | ServiceAccounts                       | about 1.5 MiB                            |
 | Events, Namespaces                    | about 1.3 MiB                            |
 
-ReplicaSets, EndpointSlices and ServiceAccounts are kept for the topology: they have no pages of
-their own. The topology's graph of how objects connect adds about 2.7 MiB per 1,000 objects of
-every kind but Events and Namespaces; it shares the objects with the copy above.
+ReplicaSets, EndpointSlices and ServiceAccounts were added for the topology, and have pages since
+v1.6. The topology's graph of how objects connect adds about 2.7 MiB per 1,000 objects of
+every kind but Events and Namespaces; it shares the objects with the copy above. The signals
+behind the health of each object add under 1 MiB per 1,000 pods (measured with a tenth of them
+crash-looping), also sharing the objects; they're kept in memory, so they start again when
+Opscope restarts.
 
 On top of that copy and the graph, the process needs about 25 MiB. Go's garbage collector also lets memory grow
 to about twice what Opscope holds before it cleans up, unless `GOMEMLIMIT` tells it to work harder
@@ -158,16 +161,16 @@ cluster each time you open them.
 | API group                   | Resources                                             | Used for               |
 | --------------------------- | ----------------------------------------------------- | ---------------------- |
 | core (`""`)                 | namespaces, nodes, pods, services, configmaps, events | Lists and detail pages |
-| core (`""`)                 | pods/log (`get`)                                      | The Logs tab           |
+| core (`""`)                 | pods/log (`get`)                                      | The Logs tab, log signals |
 | `apps`                      | deployments, statefulsets, daemonsets                 | Workloads              |
 | `batch`                     | jobs, cronjobs                                        | Workloads              |
 | `networking.k8s.io`         | ingresses                                             | Networking             |
 | core (`""`)                 | persistentvolumeclaims, persistentvolumes             | Storage                |
 | `storage.k8s.io`            | storageclasses                                        | Storage                |
 | `gateway.networking.k8s.io` | gateways, httproutes, gatewayclasses                  | Gateway API (optional) |
-| `apps`                      | replicasets                                           | Topology               |
-| `discovery.k8s.io`          | endpointslices                                        | Topology               |
-| core (`""`)                 | serviceaccounts                                       | Topology               |
+| `apps`                      | replicasets                                           | Topology, revisions    |
+| `discovery.k8s.io`          | endpointslices                                        | Topology, endpoints    |
+| core (`""`)                 | serviceaccounts                                       | Topology, Config       |
 | `metrics.k8s.io`            | nodes, pods                                           | CPU and memory usage   |
 | core (`""`)                 | secrets (`secrets-access.yaml` only)                  | Secrets pages, Reveal  |
 | core (`""`)                 | nodes/proxy (`get`, `volume-usage.yaml` only)         | Volume usage (opt-in)  |
@@ -212,22 +215,43 @@ key, is sent with `Cache-Control: no-store`, and never appears in the YAML view.
 
 With `watch`, the API server sends Opscope each Secret that changes, values included, just as it
 does when the Secrets list is loaded. Opscope drops the values as each Secret arrives and keeps
-only its type and key names, so values are never stored, cached or logged.
+only its type and key names, so values are never stored, cached or logged. For a TLS Secret it also
+keeps when the certificate in `tls.crt` expires, read before the values go, so the Issues feed can
+warn about certificates expiring within 30 days.
 
 **Granting Secret access is a deliberate choice.** With `secrets-access.yaml` applied, the Opscope
 pod can read every Secret in the cluster, and so can anyone who can reach Opscope. To grant it:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.5.0/deploy/kubernetes/secrets-access.yaml
+kubectl apply -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.6.0/deploy/kubernetes/secrets-access.yaml
 ```
 
 To remove it again:
 
 ```bash
-kubectl delete -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.5.0/deploy/kubernetes/secrets-access.yaml
+kubectl delete -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.6.0/deploy/kubernetes/secrets-access.yaml
 ```
 
 The Secrets pages then say that this user isn't allowed to read them.
+
+### Log signals
+
+The Issues feed reads a little of the logs of containers that are already failing, so a crash loop
+can say what the container said before it exited ("its log shows connection refused"). Only these
+are read:
+
+- for a crash-looping container, the log of the run that just ended (never one still running),
+  and the current log of a running container whose readiness or liveness probe fails;
+- the last 200 lines or 64 KiB, whichever is less;
+- the same container at most once every 5 minutes, and at most 5 at once per cluster.
+
+Each line (its first 16 KiB) is matched in memory against a short list of known patterns
+(connection refused, refused credentials, a missing file, permission denied, out of memory, an
+address in use, TLS and DNS failures, timeouts, panics and uncaught exceptions) and dropped. What's kept is the pattern's name and how many lines
+matched, and how many other kinds of line there were: never a line, nor anything made from one, in
+memory, in the answers or in Opscope's own log. It uses `get` on `pods/log`, which the role already
+has for the Logs tab; without it, the signals stay and say their logs couldn't be read.
+`OPSCOPE_LOG_SIGNALS=false` turns it off, and no log is read except when you open the Logs tab.
 
 ### Volume usage
 
@@ -326,8 +350,8 @@ Each release is published to the GitHub Container Registry for `linux/amd64` and
 
 | Tag       | Points to                                         |
 | --------- | ------------------------------------------------- |
-| `v1.5.0`  | That release, never moved                         |
-| `1.5`     | The latest release of that minor version          |
+| `v1.6.0`  | That release, never moved                         |
+| `1.6`     | The latest release of that minor version          |
 | `latest`  | The latest release (pre-releases are never tagged `latest`) |
 
 On a server, pin a version tag, so that a restart never upgrades Opscope by surprise. The commands
@@ -353,6 +377,7 @@ Opscope is configured with environment variables:
 | `OPSCOPE_CLUSTER_NAME` | context name       | Display name for the environment or in-cluster cluster            |
 | `OPSCOPE_VOLUME_USAGE` | (off)              | `true`: show how full volumes are (see [Volume usage](#volume-usage)) |
 | `OPSCOPE_LIVE`         | (on)               | `false`: keep no live copy; pages ask the cluster each time (see [Turning live data off](#turning-live-data-off)) |
+| `OPSCOPE_LOG_SIGNALS`  | (on)               | `false`: never read failing containers' logs for the Issues feed (see [Log signals](#log-signals)) |
 | `DATA_DIR`             | `../data`          | Where clusters added in the UI are saved (`/data` in the image)   |
 | `STATIC_DIR`           | `../frontend/dist` | Folder with the built web UI (`/app/web` in the image)            |
 
@@ -377,11 +402,11 @@ Usage history is kept in memory and starts empty after a restart. Each release's
 **In a cluster,** delete the optional roles you applied, then `opscope.yaml`:
 
 ```bash
-kubectl delete -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.5.0/deploy/kubernetes/secrets-access.yaml --ignore-not-found
+kubectl delete -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.6.0/deploy/kubernetes/secrets-access.yaml --ignore-not-found
 ```
 
 ```bash
-kubectl delete -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.5.0/deploy/kubernetes/opscope.yaml
+kubectl delete -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.6.0/deploy/kubernetes/opscope.yaml
 ```
 
 Do the same for `volume-usage.yaml` if you applied it. Deleting `opscope.yaml` deletes the

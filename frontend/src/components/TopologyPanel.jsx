@@ -1,10 +1,14 @@
 import { useEffect, useId, useRef } from "react";
 import { Link, useLocation } from "react-router";
+import { useApi } from "../api.js";
+import { issuesLink } from "../pages/issuesRequest.js";
 import { countOf, kindIcon, pluralKind, relation } from "../graph/kinds.js";
 import { cardKind } from "../graph/view.js";
 import { detailPath, nsQuery } from "../sections.js";
 import Button from "./Button.jsx";
-import { gapTag, statusText } from "./TopologyGraph.jsx";
+import HealthBadge from "./HealthBadge.jsx";
+import { SEVERITY } from "./IssueList.jsx";
+import { gapTag, statusText, troubleOf } from "./TopologyGraph.jsx";
 import { ArrowLeftIcon, ArrowRightIcon, CloseIcon, EndpointSlicesIcon, NamespaceIcon } from "./icons.jsx";
 import "./TopologyPanel.css";
 
@@ -75,8 +79,17 @@ export default function TopologyPanel({ view, id, focus, clusterId, level = 3, o
 
       <Notes n={n} view={view} />
 
-      {n.presence === "present" && (n.status || n.endpoints) && (
+      {n.presence === "present" && (n.status || n.endpoints || n.health) && (
         <dl className="topo-panel-facts">
+          {n.health && (
+            <div>
+              <dt>Health</dt>
+              <dd>
+                <HealthBadge health={n.health} />
+                {n.pods && n.health.state !== "healthy" && " (the worst of its pods)"}
+              </dd>
+            </div>
+          )}
           {n.status && (
             <div>
               <dt>Status</dt>
@@ -110,6 +123,10 @@ export default function TopologyPanel({ view, id, focus, clusterId, level = 3, o
             </Button>
           )}
         </div>
+      )}
+
+      {n.health && !n.pods && clusterId && n.health.state !== "healthy" && (
+        <PanelIssues clusterId={clusterId} n={n} search={search} level={level + 1} />
       )}
 
       {n.pods && <Members clusterId={clusterId} n={n} search={search} level={level + 1} />}
@@ -176,6 +193,43 @@ function Notes({ n, view }) {
 }
 
 // Members lists the pods a group card stands for, with their status.
+// PanelIssues lists a card's open issues, each linking to its row on the
+// Issues page. Read live, as the Issues page is.
+function PanelIssues({ clusterId, n, search, level }) {
+  const Heading = `h${level}`;
+  const q = new URLSearchParams({ resource: n.resource, name: n.name });
+  if (n.namespace) q.set("namespace", n.namespace);
+  const { data } = useApi(`/clusters/${encodeURIComponent(clusterId)}/health?${q}`, { refreshMs: 10_000, live: "issues" });
+  const open = (data?.signals ?? []).filter((s) => s.state !== "resolved");
+  if (!open.length) return null;
+  return (
+    <section className="topo-panel-section">
+      <Heading className="topo-panel-heading">
+        Issues <span className="topo-panel-count">{open.length}</span>
+      </Heading>
+      <ul className="topo-panel-issues">
+        {open.map((s) => {
+          const sev = SEVERITY[s.severity] ?? SEVERITY.info;
+          return (
+            <li key={s.id}>
+              <span className={`topo-panel-issue-mark issue-mark-${sev.tone}`}>
+                <sev.icon size={14} />
+                <span className="visually-hidden">{sev.label}:</span>
+              </span>
+              <span>
+                <Link to={issuesLink(clusterId, { signal: s.id }, search)} className="topo-panel-link">
+                  {s.title}
+                </Link>
+                <span className="topo-panel-issue-message">{s.message}</span>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 function Members({ clusterId, n, search, level }) {
   const Heading = `h${level}`;
   return (
@@ -196,6 +250,7 @@ function Members({ clusterId, n, search, level }) {
                 <span>{pod.name}</span>
               )}
               <span className="topo-panel-quiet">{pod.status}</span>
+              {troubleOf(pod) && <HealthBadge health={pod.health} />}
             </li>
           );
         })}

@@ -2,10 +2,13 @@ package collector
 
 import (
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/hex"
+	"encoding/pem"
 	"maps"
 	"slices"
 	"strconv"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -36,6 +39,7 @@ func trim(obj any) (any, error) {
 	trimMeta(obj)
 	switch o := obj.(type) {
 	case *corev1.Secret:
+		noteCertExpiry(o)
 		dropSecretValues(o)
 	case *corev1.ConfigMap:
 		hashConfigMap(o)
@@ -78,6 +82,48 @@ func trimMeta(obj any) {
 
 // dropSecretValues keeps a Secret's key names and nothing they hold.
 // kubectl apply's annotation, which holds them too, went in trimMeta.
+// CertNotAfterAnnotation holds when a TLS Secret's certificate expires, on
+// the cached copy, whose values are dropped: the one thing about a
+// certificate the Issues feed needs (cert_expiring), read before the values
+// go. Like the ConfigMap hash, it's Opscope's and never on the cluster.
+const CertNotAfterAnnotation = "opscope/cert-not-after"
+
+// noteCertExpiry keeps when a TLS Secret's certificate expires. Nothing
+// else of the Secret's data is kept (contract 11). A Secret already trimmed
+// has no data left and keeps the time it has.
+func noteCertExpiry(s *corev1.Secret) {
+	notAfter, ok := CertNotAfter(s)
+	if !ok {
+		return
+	}
+	if s.Annotations == nil {
+		s.Annotations = map[string]string{}
+	}
+	s.Annotations[CertNotAfterAnnotation] = notAfter.UTC().Format(time.RFC3339)
+}
+
+// CertNotAfter reads when the first certificate in a kubernetes.io/tls
+// Secret's tls.crt expires: from the annotation on a cached copy, or from
+// the data of one read from the cluster.
+func CertNotAfter(s *corev1.Secret) (time.Time, bool) {
+	if s.Type != corev1.SecretTypeTLS {
+		return time.Time{}, false
+	}
+	if v := s.Annotations[CertNotAfterAnnotation]; v != "" {
+		t, err := time.Parse(time.RFC3339, v)
+		return t, err == nil
+	}
+	block, _ := pem.Decode(s.Data[corev1.TLSCertKey])
+	if block == nil || block.Type != "CERTIFICATE" {
+		return time.Time{}, false
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return cert.NotAfter, true
+}
+
 func dropSecretValues(s *corev1.Secret) {
 	for key := range s.Data {
 		s.Data[key] = nil

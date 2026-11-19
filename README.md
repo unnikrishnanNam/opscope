@@ -42,16 +42,28 @@ machine or inside the cluster it shows.
   which Services select which pods, what each pod uses (ConfigMaps, Secrets, claims, its
   ServiceAccount), where traffic goes from Ingresses and routes, and which node each pod runs on.
   Every connection says which field it was read from, and something referred to that doesn't
-  exist (a missing Secret, a Service with no pods) is shown as missing. The map updates live and
-  also comes as a list, for the keyboard and screen readers.
-- **Detail pages:** a summary, containers, conditions, events and YAML for every object, links to
-  owners and nodes, what uses a ConfigMap or Secret, and pod logs with the previous run and live
+  exist (a missing Secret, a Service with no pods) is shown as missing. Cards that are failing or
+  degraded say so. The map updates live and also comes as a list, for the keyboard and screen
+  readers.
+- **Issues:** what's wrong right now, worst first, in plain words: crash loops, images that can't
+  be pulled, pods that can't be scheduled, rollouts that stopped, Services with no ready
+  endpoints, routes to Services that don't exist, claims that won't bind, nodes that aren't
+  ready, certificates about to expire, and more. Each issue says what it was read from: the fields,
+  the events, and for a crashing container, what its log showed (a few lines read and matched,
+  never kept). A workload's pods with the same problem are one row; the overview's counts link
+  here, filtered; issues that clear stay listed for an hour. Each object's health shows on its
+  page and on the map. Issues are kept in memory, so they start again when Opscope restarts.
+- **Detail pages:** an object's health and its issues first, then a summary, containers,
+  conditions, events and YAML for every object, links to
+  owners and nodes, what uses a ConfigMap, Secret or ServiceAccount, a Deployment's revisions, the
+  endpoints behind a Service and whether each is ready, and pod logs with the previous run and live
   follow. Links to objects that don't exist say so.
 - **Live usage:** CPU and memory per node and pod from metrics-server, with the last 15 minutes as
   a trend.
 - **Command palette:** press ⌘K (Ctrl+K) to jump to any page, object, namespace or cluster, to ask
-  what uses an object ("pods using db-creds") or what runs on a node, and to run what the current
-  page offers, such as copying a read-only kubectl command.
+  what uses an object ("pods using db-creds") or what runs on a node, to open the issues of a
+  namespace or the critical ones, and to run what the current page offers, such as copying a
+  read-only kubectl command.
 - **Keyboard shortcuts** for pages and tabs, listed in the app with `?`.
 - **Multiple clusters:** connect clusters from kubeconfig files, the pod's service account, or the
   UI, and switch between them.
@@ -84,7 +96,7 @@ clusters, and cleaning up.
 In the cluster Opscope should show:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.5.0/deploy/kubernetes/opscope.yaml
+kubectl apply -f https://raw.githubusercontent.com/unnikrishnanNam/opscope/v1.6.0/deploy/kubernetes/opscope.yaml
 ```
 
 ```bash
@@ -160,7 +172,10 @@ Shortcuts are ignored while you type in a field.
 - **Volume usage** is off by default. It needs `get` on `nodes/proxy`, which reaches the kubelet's
   whole API, so it's turned on deliberately, with a setting and a separate, optional role. See
   [Volume usage](docs/deployment.md#volume-usage).
-- **Logs** are never cached, since they can contain sensitive data.
+- **Logs** are never cached, since they can contain sensitive data. For the Issues feed, Opscope
+  reads a few lines of a failing container's log, matches them against known patterns in memory,
+  and keeps only the pattern names and counts. See [Log signals](docs/deployment.md#log-signals)
+  (`OPSCOPE_LOG_SIGNALS=false` turns it off).
 - **Kubeconfigs added in the UI** are checked before they're accepted (no login commands or file
   paths, which could run programs or read files on the server), and saved with only the chosen
   context, readable only by Opscope.
@@ -177,6 +192,8 @@ Shortcuts are ignored while you type in a field.
 | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pods-dark.png"><img src="docs/screenshots/pods-light.png" alt="The pods list, with status, readiness, restarts and live usage"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pod-dark.png"><img src="docs/screenshots/pod-light.png" alt="A crash-looping pod's detail page: facts, containers and conditions"></picture> |
 | **Topology of a namespace** | **Around one object** |
 | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/topology-dark.png"><img src="docs/screenshots/topology-light.png" alt="The Topology map of a namespace: a GatewayClass, Gateway and HTTPRoutes sending traffic to Services, which select the pods of their Deployments"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/topology-object-dark.png"><img src="docs/screenshots/topology-object-light.png" alt="The map around a crash-looping Deployment, two steps away: its ReplicaSets and pods, the ConfigMap and Secrets they use, and the panel listing what it needs and the field each connection was read from"></picture> |
+| **Issues** | **A failing Deployment's page** |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/issues-dark.png"><img src="docs/screenshots/issues-light.png" alt="The Issues page of a namespace, worst first: a crash loop open to show what it was read from, with its log showing connection refused, then a route to a missing Service, a Service with no ready endpoints, an image that can't be pulled and more"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/issue-detail-dark.png"><img src="docs/screenshots/issue-detail-light.png" alt="A Deployment's detail page marked Failing, with its two issues first: its rollout stopped, and no replica is ready"></picture> |
 | **PersistentVolumeClaims** | **A claim's detail page** |
 | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/claims-dark.png"><img src="docs/screenshots/claims-light.png" alt="The PersistentVolumeClaims list, with status, volume, capacity, how full each volume is, and claims that are pending"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/claim-dark.png"><img src="docs/screenshots/claim-light.png" alt="A nearly full claim's detail page: its volume and StorageClass, used and free space, and the pod that uses it"></picture> |
 

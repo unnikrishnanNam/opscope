@@ -17,7 +17,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// Event is anything the bus carries: ObjectChanged or CollectorGap.
+// Event is anything the bus carries: ObjectChanged and CollectorGap from
+// the collectors; SignalRaised, SignalResolved and HealthChanged from the
+// Signal engine.
 type Event interface {
 	isEvent()
 }
@@ -69,8 +71,45 @@ type CollectorGap struct {
 	Reason   string
 }
 
-func (ObjectChanged) isEvent() {}
-func (CollectorGap) isEvent()  {}
+// SignalRaised says the Signal engine opened a signal: a problem with one
+// object (see internal/signals). It names the signal; read the engine for
+// the rest.
+type SignalRaised struct {
+	Cluster   string
+	ID        string
+	UID       string // the object's
+	Namespace string // the object's; "" for cluster-wide kinds
+	Type      string // from the vocabulary, e.g. "crash_loop"
+	Severity  string
+	At        time.Time
+}
+
+// SignalResolved says a signal's condition stayed away long enough for it
+// to close, or its object was deleted.
+type SignalResolved struct {
+	Cluster   string
+	ID        string
+	UID       string
+	Namespace string
+	Type      string
+	At        time.Time
+}
+
+// HealthChanged says an object's health changed: healthy, degraded or
+// failing.
+type HealthChanged struct {
+	Cluster   string
+	UID       string
+	Namespace string
+	From, To  string
+	At        time.Time
+}
+
+func (ObjectChanged) isEvent()  {}
+func (CollectorGap) isEvent()   {}
+func (SignalRaised) isEvent()   {}
+func (SignalResolved) isEvent() {}
+func (HealthChanged) isEvent()  {}
 
 // Bus fans events out to subscribers. The zero value isn't usable; use New.
 type Bus struct {

@@ -14,16 +14,23 @@ type LogOptions struct {
 	Tail      int64  // how many of the latest lines to start with
 	Previous  bool   // logs of the container's previous run (useful after a crash)
 	Follow    bool   // keep the stream open and send new lines as they're written
+	// LimitBytes stops the stream after this many bytes (0 for no limit):
+	// the Signal engine reads only a little of a failing container's log.
+	LimitBytes int64
 }
 
 // PodLogs opens a pod's logs as a stream. The caller must Close it. With
 // Follow, the stream stays open until ctx is cancelled.
 func PodLogs(ctx context.Context, client kubernetes.Interface, namespace, name string, opts LogOptions) (io.ReadCloser, error) {
 	tail := opts.Tail
-	return client.CoreV1().Pods(namespace).GetLogs(name, &corev1.PodLogOptions{
+	o := &corev1.PodLogOptions{
 		Container: opts.Container,
 		TailLines: &tail,
 		Previous:  opts.Previous,
 		Follow:    opts.Follow,
-	}).Stream(ctx)
+	}
+	if opts.LimitBytes > 0 {
+		o.LimitBytes = &opts.LimitBytes
+	}
+	return client.CoreV1().Pods(namespace).GetLogs(name, o).Stream(ctx)
 }

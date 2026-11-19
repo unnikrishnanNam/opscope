@@ -356,3 +356,42 @@
   color: var(--text-muted);
   overflow-wrap: anywhere;
 }
+
+/* A card's open issues: a severity mark, the type linking to its row on
+   the Issues page, and what it says. */
+.topo-panel-issues {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.topo-panel-issues li {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.topo-panel-issue-mark {
+  padding-top: 2px;
+}
+
+.topo-panel-issue-mark.issue-mark-bad {
+  color: var(--bad-mark);
+}
+
+.topo-panel-issue-mark.issue-mark-warn {
+  color: var(--warn-mark);
+}
+
+.topo-panel-issue-mark.issue-mark-info {
+  color: var(--neutral-mark);
+}
+
+.topo-panel-issue-message {
+  display: block;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}

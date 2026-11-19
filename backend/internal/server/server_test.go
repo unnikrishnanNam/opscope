@@ -20,6 +20,7 @@ import (
 	"opscope/internal/collector"
 	"opscope/internal/graph"
 	"opscope/internal/metrics"
+	"opscope/internal/signals"
 )
 
 // newTestServer builds the server with a temporary static folder that
@@ -30,7 +31,7 @@ func newTestServer(t *testing.T) http.Handler {
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	live := collector.NewSet(t.Context(), false, bus.New(), logger)
-	return New(Config{Version: "test", StaticDir: dir}, clusters.NewManager(t.TempDir()), live, graph.NewEngine(live, logger), metrics.NewHistory(), logger)
+	return New(Config{Version: "test", StaticDir: dir}, clusters.NewManager(t.TempDir()), live, graph.NewEngine(live, logger), signals.NewEngine(live, signals.Default, logger), metrics.NewHistory(), logger)
 }
 
 // get sends a GET request to the handler and returns the recorded response.

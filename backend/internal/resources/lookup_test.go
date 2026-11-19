@@ -33,7 +33,7 @@ func TestLookup(t *testing.T) {
 	if _, ok := Lookup("rollouts"); ok {
 		t.Error("found a kind Opscope doesn't know")
 	}
-	// The graph's own kinds are collected, with a way to list them directly.
+	// Every kind is collected, with a way to list it directly.
 	got := map[string]bool{}
 	for _, k := range Kinds() {
 		got[k.Resource] = true
@@ -44,12 +44,14 @@ func TestLookup(t *testing.T) {
 			t.Errorf("%s has no typed list for the Direct source", k.Resource)
 		}
 	}
-	for resource := range graphOnly {
+	// Every kind with a detail view is collected, listed or not
+	// (EndpointSlices have a detail view and no list).
+	for resource := range kinds {
 		if !got[resource] {
 			t.Errorf("%s isn't collected", resource)
 		}
-		if _, ok := Listers[resource]; ok {
-			t.Errorf("%s has a lister; graphOnly is for kinds without pages", resource)
-		}
+	}
+	if _, ok := Listers["endpointslices"]; ok {
+		t.Error("EndpointSlices have no list: a Service shows its endpoints")
 	}
 }

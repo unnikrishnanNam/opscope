@@ -7,8 +7,8 @@
 // Following edges forward gives what an object depends on (upstream);
 // following them backward gives what depends on it (downstream).
 //
-// The graph holds no health. Every node has a Health slot that stays nil
-// until the Signal engine (v1.6) fills it.
+// The graph holds no health of its own. Every node has a Health slot that
+// the Signal engine fills (v1.6) when nodes are read.
 package graph
 
 import (
@@ -47,16 +47,23 @@ type Node struct {
 	Name            string     `json:"name"`
 	Presence        string     `json:"presence"`
 	Status          string     `json:"status,omitempty"` // what its list page shows; display only (filled from T3)
-	Health          *Health    `json:"health"`           // nil until the Signal engine (v1.6)
+	Health          *Health    `json:"health"`           // from the Signal engine; nil when it has no word on the object
 	Dangling        []Dangling `json:"dangling,omitempty"`
 	ResourceVersion string     `json:"resourceVersion,omitempty"`
 }
 
-// Health is filled in by the Signal engine in v1.6. Until then every
-// node's Health is nil.
+// Health is a node's health from the Signal engine (internal/signals):
+// healthy, degraded or failing, since when, and the open signals behind it.
 type Health struct {
-	State string `json:"state"`
+	State   string    `json:"state"`
+	Since   time.Time `json:"since,omitzero"` // left out when it hasn't changed since Opscope started
+	Signals []string  `json:"signals,omitempty"`
 }
+
+// HealthFunc looks up an object's health by cluster, kind and UID; nil
+// when there's none. It's called while the graph is read, so it mustn't
+// wait on anything that waits on the graph.
+type HealthFunc func(cluster, resource, uid string) *Health
 
 // Edge is one typed connection between two nodes. There is one edge per
 // source, target and kind; every field that makes it is a piece of evidence.

@@ -24,7 +24,7 @@ type Config struct {
 }
 
 // New returns an http.Handler with every route registered.
-func New(cfg Config, manager *clusters.Manager, live *collector.Set, graphs graphReader, history *metrics.History, logger *slog.Logger) http.Handler {
+func New(cfg Config, manager *clusters.Manager, live *collector.Set, graphs graphReader, issues signalReader, history *metrics.History, logger *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
 
 	// API routes. Go 1.22+ lets us put the HTTP method and {placeholders}
@@ -43,7 +43,14 @@ func New(cfg Config, manager *clusters.Manager, live *collector.Set, graphs grap
 
 	// A fixed path segment beats a {placeholder}, so this route wins over
 	// the one above for /api/clusters/{id}/overview.
-	mux.HandleFunc("GET /api/clusters/{id}/overview", getOverview(manager, live))
+	mux.HandleFunc("GET /api/clusters/{id}/overview", getOverview(manager, live, issues))
+	// How many objects need a look, by kind and signal type (beats {resource}/{name}).
+	mux.HandleFunc("GET /api/clusters/{id}/health/counts", getHealthCounts(manager, issues, live.Source))
+	// The Issues feed, one signal, and one object's health (fixed segments
+	// beat {resource}, {resource}/{name}).
+	mux.HandleFunc("GET /api/clusters/{id}/issues", getIssues(manager, issues, live.Source))
+	mux.HandleFunc("GET /api/clusters/{id}/issues/{signal}", getIssue(manager, issues, live.Source))
+	mux.HandleFunc("GET /api/clusters/{id}/health", getHealth(manager, issues, live.Source))
 
 	// Every object's name, for the command palette (also beats {resource}).
 	mux.HandleFunc("GET /api/clusters/{id}/names", listNames(manager, live))

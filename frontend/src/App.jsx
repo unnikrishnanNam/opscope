@@ -7,6 +7,7 @@ import AddCluster from "./pages/AddCluster.jsx";
 import ResourceList from "./pages/ResourceList.jsx";
 import Overview from "./pages/Overview.jsx";
 import Topology from "./pages/Topology.jsx";
+import Issues from "./pages/Issues.jsx";
 import ResourceDetail from "./pages/ResourceDetail.jsx";
 import NotFound from "./pages/NotFound.jsx";
 import { allPages } from "./sections.js";
@@ -45,9 +46,11 @@ export default function App() {
         <Route path="clusters/add" element={<AddCluster />} />
         <Route path="c/:clusterId">
           <Route index element={<Navigate to="overview" replace />} />
-          {allPages.map((page) => (
-            <Route key={page.path} path={page.path} element={pageElement(page)} />
-          ))}
+          {allPages
+            .filter((page) => !page.noList)
+            .map((page) => (
+              <Route key={page.path} path={page.path} element={pageElement(page)} />
+            ))}
           {allPages
             .filter((page) => page.resource)
             .map((page) => (
@@ -64,10 +67,11 @@ export default function App() {
   );
 }
 
-// The overview and the topology have their own pages; every other page is a
-// table of one resource type.
+// The overview, the topology and the issues have their own pages; every
+// other page is a table of one resource type.
 function pageElement(page) {
   if (page.path === "overview") return <Overview page={page} />;
   if (page.path === "topology") return <Topology page={page} />;
+  if (page.path === "issues") return <Issues page={page} />;
   return <ResourceList page={page} />;
 }

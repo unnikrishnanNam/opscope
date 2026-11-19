@@ -103,3 +103,14 @@
   font-size: var(--text-sm);
   color: var(--text-subtle);
 }
+
+/* An event that raised an issue links to it. */
+.event-issue {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-strong);
+  color: var(--text-subtle);
+}
+
+.event-issue:hover {
+  color: var(--text);
+}

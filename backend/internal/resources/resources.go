@@ -54,6 +54,9 @@ var Listers = map[string]Lister{
 	"services":     asLister(listServices),
 	"ingresses":    asLister(listIngresses),
 
+	"serviceaccounts": asLister(listServiceAccounts),
+	"replicasets":     asLister(listReplicaSets), // no sidebar page; searchable, and a Deployment's revisions
+
 	"persistentvolumeclaims": asLister(listPersistentVolumeClaims),
 	"persistentvolumes":      asLister(listPersistentVolumes),
 	"storageclasses":         asLister(listStorageClasses),
@@ -78,14 +81,6 @@ var listOnly = map[string]kindInfo{
 	"events": {core("events"), "Event", true},
 }
 
-// graphOnly are kinds the graph reads that have no list or detail page
-// (docs/design/topology.md). They're collected like every other kind.
-var graphOnly = map[string]kindInfo{
-	"replicasets":     {group("apps", "v1", "replicasets"), "ReplicaSet", true},
-	"endpointslices":  {group("discovery.k8s.io", "v1", "endpointslices"), "EndpointSlice", true},
-	"serviceaccounts": {core("serviceaccounts"), "ServiceAccount", true},
-}
-
 func kindOf(resource string, info kindInfo) Kind {
 	return Kind{
 		Resource:   resource,
@@ -97,9 +92,9 @@ func kindOf(resource string, info kindInfo) Kind {
 }
 
 // Lookup finds a kind by its URL name ("pods") among every kind Opscope
-// knows: listed, with a detail page, or read only by the graph.
+// knows: listed, with a detail page, or both.
 func Lookup(resource string) (Kind, bool) {
-	for _, table := range []map[string]kindInfo{kinds, listOnly, graphOnly} {
+	for _, table := range []map[string]kindInfo{kinds, listOnly} {
 		if info, ok := table[resource]; ok {
 			return kindOf(resource, info), true
 		}
@@ -111,7 +106,7 @@ func Lookup(resource string) (Kind, bool) {
 // "Deployment"), as owner references and Gateway API references name them.
 // The core group is "".
 func LookupKind(group, kind string) (Kind, bool) {
-	for _, table := range []map[string]kindInfo{kinds, listOnly, graphOnly} {
+	for _, table := range []map[string]kindInfo{kinds, listOnly} {
 		for resource, info := range table {
 			if info.Kind == kind && info.GVR.Group == group {
 				return kindOf(resource, info), true
@@ -122,12 +117,14 @@ func LookupKind(group, kind string) (Kind, bool) {
 }
 
 // Kinds returns every resource type a collector keeps: those in Listers and
-// those only the graph reads (graphOnly), sorted by name. A lister without
-// an entry in kinds or listOnly is a mistake caught by the tests.
+// those with a detail view (EndpointSlices have a detail view and no list),
+// sorted by name. A lister without an entry in kinds or listOnly is a
+// mistake caught by the tests.
 func Kinds() []Kind {
 	var out []Kind
-	names := append(slices.Collect(maps.Keys(Listers)), slices.Collect(maps.Keys(graphOnly))...)
+	names := append(slices.Collect(maps.Keys(Listers)), slices.Collect(maps.Keys(kinds))...)
 	slices.Sort(names)
+	names = slices.Compact(names)
 	for _, resource := range names {
 		if k, ok := Lookup(resource); ok {
 			out = append(out, k)

@@ -41,7 +41,8 @@ export default function TopBar({ cluster, status, pagePath, onMenu, onSearch }) 
     if (objectName && cluster) {
       crumbs = [
         { label: page.group },
-        { label: page.label, to: `/c/${cluster.id}/${page.path}${search}` },
+        // EndpointSlices have no list to go back to.
+        { label: page.label, to: page.noList ? undefined : `/c/${cluster.id}/${page.path}${search}` },
         { label: objectName },
       ];
     }

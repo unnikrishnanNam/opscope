@@ -80,3 +80,11 @@
   flex-direction: column;
   gap: var(--space-4);
 }
+
+/* The status and the health, side by side after the title. */
+.detail-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}

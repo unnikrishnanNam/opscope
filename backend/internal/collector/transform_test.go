@@ -1,7 +1,14 @@
 package collector
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"maps"
+	"math/big"
 	"testing"
 	"time"
 
@@ -160,5 +167,45 @@ func TestTrimDropsReplicaSetTemplates(t *testing.T) {
 	if *rs.Spec.Replicas != 3 || rs.Spec.Selector.MatchLabels["app"] != "web" || rs.Status.ReadyReplicas != 2 ||
 		rs.Annotations["deployment.kubernetes.io/revision"] != "7" || len(rs.OwnerReferences) != 1 {
 		t.Errorf("trimmed too much: %+v", rs)
+	}
+}
+
+// A TLS Secret keeps when its certificate expires, and nothing else of its
+// data; trimming it again keeps the date.
+func TestTrimKeepsACertificatesExpiry(t *testing.T) {
+	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	notAfter := time.Date(2027, 1, 2, 3, 4, 5, 0, time.UTC)
+	tmpl := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "shop"}, NotBefore: notAfter.AddDate(-1, 0, 0), NotAfter: notAfter}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	crt := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+	s := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "tls"}, Type: corev1.SecretTypeTLS,
+		Data: map[string][]byte{corev1.TLSCertKey: crt, corev1.TLSPrivateKeyKey: []byte("private")}}
+
+	trim(s)
+	trim(s)
+	if got := s.Annotations[CertNotAfterAnnotation]; got != "2027-01-02T03:04:05Z" {
+		t.Errorf("expiry = %q", got)
+	}
+	for k, v := range s.Data {
+		if v != nil {
+			t.Errorf("%s kept its value", k)
+		}
+	}
+	if got, ok := CertNotAfter(s); !ok || !got.Equal(notAfter) {
+		t.Errorf("CertNotAfter = %v, %v", got, ok)
+	}
+
+	// Other Secrets, and a TLS Secret whose certificate can't be read, get nothing.
+	for _, other := range []*corev1.Secret{
+		{Type: corev1.SecretTypeOpaque, Data: map[string][]byte{corev1.TLSCertKey: crt}},
+		{Type: corev1.SecretTypeTLS, Data: map[string][]byte{corev1.TLSCertKey: []byte("not a certificate")}},
+	} {
+		trim(other)
+		if _, ok := other.Annotations[CertNotAfterAnnotation]; ok {
+			t.Errorf("%s Secret got an expiry", other.Type)
+		}
 	}
 }

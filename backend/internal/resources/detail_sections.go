@@ -78,6 +78,12 @@ func addSections(d *Detail, resource string, obj *unstructured.Unstructured) err
 		return volumeSections(d, obj)
 	case "storageclasses":
 		return storageClassSections(d, obj)
+	case "serviceaccounts":
+		return serviceAccountSections(d, obj)
+	case "replicasets":
+		return replicaSetSections(d, obj)
+	case "endpointslices":
+		return endpointSliceSections(d, obj)
 	}
 	return nil
 }

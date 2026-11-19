@@ -50,6 +50,10 @@ type Graph struct {
 
 	wanting  map[string]map[string]bool // target key → readers that name it
 	watching map[string]map[string]bool // "resource/namespace" → readers whose matches look there
+
+	// healthOf fills a present node's Health as it's read; nil leaves it
+	// empty. The engine sets it (SetHealth).
+	healthOf func(resource, uid string) *Health
 }
 
 // entry is a present object and what it contributes to the graph.
@@ -257,6 +261,13 @@ func (g *Graph) Readable(resource string) bool {
 // ---- Resolving references ----
 
 // refsOf runs every builder for a kind over one object.
+// RefsOf returns the references an object makes, as the graph's builders
+// read them: for engines that check them against what exists (the Signal
+// engine's missing references), so they and the graph agree.
+func RefsOf(resource string, obj runtime.Object) []Ref {
+	return refsOf(resource, obj)
+}
+
 func refsOf(resource string, obj runtime.Object) []Ref {
 	var out []Ref
 	for _, b := range buildersFor(resource) {
@@ -503,6 +514,9 @@ func (g *Graph) Snapshot() Snapshot {
 func (g *Graph) node(id string) Node {
 	n := *g.nodes[id]
 	n.Dangling = slices.Clone(n.Dangling)
+	if g.healthOf != nil && n.Presence == Present {
+		n.Health = g.healthOf(n.Resource, id)
+	}
 	return n
 }
 

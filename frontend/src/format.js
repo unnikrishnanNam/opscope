@@ -71,3 +71,9 @@ export function cpu(millicores) {
 export function percent(part, whole) {
   return whole > 0 ? Math.round((part / whole) * 100) : 0;
 }
+
+// singular("Ingresses") -> "Ingress", singular("pods") -> "pod": a kind's
+// plural label, for a count of one.
+export function singular(plural) {
+  return /sses$/i.test(plural) ? plural.slice(0, -2) : plural.replace(/s$/i, "");
+}

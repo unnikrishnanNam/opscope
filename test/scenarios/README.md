@@ -234,3 +234,95 @@ since it can't list across namespaces.
 ```bash
 kind delete cluster --name opscope-graph
 ```
+
+## Revisions, endpoints and ServiceAccounts
+
+`rollouts.yaml` is for the pages v1.6 added: a Deployment's revisions, the endpoints behind a
+Service, and a ServiceAccount's page. The second step sets an image that can't be pulled, so the
+rollout stops halfway with two ReplicaSets running:
+
+```bash
+kind create cluster --name opscope-rollouts --kubeconfig /tmp/opscope-rollouts.kubeconfig
+export KUBECONFIG=/tmp/opscope-rollouts.kubeconfig
+until kubectl apply -f test/scenarios/rollouts.yaml; do sleep 2; done
+kubectl -n rollouts-test rollout status deploy/shop
+kubectl -n rollouts-test set image deploy/shop app=registry.invalid/shop:2
+```
+
+Run Opscope with `OPSCOPE_KUBECONFIG=/tmp/opscope-rollouts.kubeconfig` and look at
+`rollouts-test`:
+
+| Page                     | What it should show                                                                                     |
+| ------------------------ | ------------------------------------------------------------------------------------------------------- |
+| Deployment `shop`        | Revisions: 2 current, 0/1; 1 "old, still running", 2/2. Each links to its ReplicaSet                    |
+| ReplicaSet of revision 2 | Revision 2, the `registry.invalid/shop:2` container, its one pod in ErrImagePull or ImagePullBackOff, owned by `shop` |
+| Service `split`          | Endpoints: `split-0` Ready, `split-1` Not ready, both on port `http 8080/TCP`                           |
+| Its EndpointSlice        | The same two endpoints, Service `split`, address type IPv4; no list to go back to in the breadcrumb    |
+| ServiceAccount `shop`    | Token mounted in pods: no, unless a pod asks; Secrets: `regcred` for pulling images; Used by: Deployment `shop`, 3 pods |
+| ServiceAccount `default` | "Used by: every pod in rollouts-test that names no other account", and no table                         |
+
+### Clean up
+
+```bash
+kind delete cluster --name opscope-rollouts
+```
+
+## Issues
+
+`issues.yaml` has a case for every signal type a plain kind cluster can show, in the namespace
+`issues-test`, for the Issues feed. The types it can't show (`evicted`, the `node_*` types, Gateway
+API status, `volume_nearly_full`, `volume_released`) are tested with fakes in
+`backend/internal/signals`. The certificate is made fresh, so it always expires in 20 days:
+
+```bash
+kind create cluster --name opscope-issues --kubeconfig /tmp/opscope-issues.kubeconfig
+export KUBECONFIG=/tmp/opscope-issues.kubeconfig
+until kubectl apply -f test/scenarios/issues.yaml; do sleep 2; done
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 20 \
+  -subj /CN=shop.example -keyout /tmp/issues.key -out /tmp/issues.crt
+kubectl -n issues-test create secret tls expiring-cert --cert=/tmp/issues.crt --key=/tmp/issues.key
+```
+
+Give it two minutes: `replicas_unavailable`, `pvc_unbound`, `mount_failed` and the two Service
+types wait that long from when the object started failing (or, when it doesn't say, from when
+Opscope first saw it). Then run Opscope with `OPSCOPE_KUBECONFIG=/tmp/opscope-issues.kubeconfig`,
+or check the engine without the UI:
+
+```bash
+cd backend
+OPSCOPE_TEST_KUBECONFIG=/tmp/opscope-issues.kubeconfig OPSCOPE_TEST_EXPECT=issues \
+  go test ./internal/signals -run TestLiveCluster -v
+```
+
+It starts a collector and the Signal engine as Opscope does, waits up to 3 minutes for every signal
+below (`typo`'s comes 2 minutes after the engine starts), and fails on any it didn't expect:
+
+| Object                         | Signals                                                              |
+| ------------------------------ | -------------------------------------------------------------------- |
+| Pod `crash`                    | `crash_loop`, whose log shows connection refused (log signals)        |
+| Pod `oom`                      | `oom_killed`; `crash_loop` too, between kills                        |
+| Pod `once`                     | `container_error`                                                    |
+| Pod `bad-image`                | `image_pull_failed`                                                  |
+| Pod `no-secret`                | `config_missing`, `reference_missing`                                |
+| Pod `bad-init`                 | `init_failing`                                                       |
+| Pod `nowhere`                  | `unschedulable`                                                      |
+| Pod `no-volume`                | `mount_failed`, `reference_missing`                                  |
+| Pod and Service `unready`      | `probe_failing` on the pod, `no_ready_endpoints` on the Service      |
+| Service `typo`                 | `selector_matches_nothing`                                           |
+| Deployment `stuck`             | `replicas_unavailable`, `rollout_stuck`; its pod `image_pull_failed` |
+| Deployment `no-account`        | `replicas_unavailable`; its ReplicaSet `create_failed`; after 10 minutes, `rollout_stuck` |
+| Deployment `no-config`         | `reference_missing` and `replicas_unavailable` (once, on the Deployment); its pod `config_missing`; after 10 minutes, `rollout_stuck` |
+| Job `report`                   | `job_failed` (its failed pod is the Job's to judge: no signal)       |
+| Ingress `old`                  | `backend_missing`                                                    |
+| PersistentVolumeClaim `orphan` | `pvc_unbound`                                                        |
+| Secret `expiring-cert`         | `cert_expiring` (info: 20 days left)                                 |
+| Pod `fine`                     | nothing                                                              |
+
+The overview of `issues-test` then says 11 pods unhealthy, 3 Deployments not ready, 1 Job failed
+and 1 claim not bound.
+
+### Clean up
+
+```bash
+kind delete cluster --name opscope-issues
+```
