@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useCommands } from "../commands/registry.jsx";
+import { singular } from "../format.js";
 import { sortRows } from "../sort.js";
 import Button from "./Button.jsx";
 import { EmptyState } from "./Callout.jsx";
@@ -254,7 +255,8 @@ function filterRows(rows, columns, filter) {
 }
 
 function countLabel(shown, total, noun) {
-  return shown === total ? `${total} ${noun}` : `${shown} of ${total} ${noun}`;
+  const n = total === 1 ? singular(noun) : noun;
+  return shown === total ? `${total} ${n}` : `${shown} of ${total} ${n}`;
 }
 
 function ariaSort(sort, key) {

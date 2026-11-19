@@ -59,12 +59,12 @@ type Signal struct {
 	Severity  string     `json:"severity"` // critical, warning, info
 	Cluster   string     `json:"cluster"`
 	Resource  Ref        `json:"resource"`
-	Owner     *Ref       `json:"owner,omitempty"` // the workload that controls it, for grouping only
-	Message   string     `json:"message"`         // plain words: "Restarted 14 times; last exit Error (exit 1)"
-	FirstSeen time.Time  `json:"firstSeen"`       // when this occurrence started
-	LastSeen  time.Time  `json:"lastSeen"`        // when a detector last found it
-	Count     int64      `json:"count"`           // what the type counts: restarts, events; at least 1
-	State     string     `json:"state"`           // open, resolving, resolved
+	Owner     *Ref       `json:"owner,omitempty"`    // the workload that controls it, for grouping only
+	Message   string     `json:"message"`            // plain words: "Restarted 14 times; last exit Error (exit 1)"
+	FirstSeen time.Time  `json:"firstSeen,omitzero"` // when this occurrence started; left out when unknown (an answer on request)
+	LastSeen  time.Time  `json:"lastSeen"`           // when a detector last found it
+	Count     int64      `json:"count"`              // what the type counts: restarts, events; at least 1
+	State     string     `json:"state"`              // open, resolving, resolved
 	Resolved  *time.Time `json:"resolved,omitempty"`
 	// Stale is set while the object's kind is behind a collector gap: the
 	// signal stays open, but hasn't been checked again since.

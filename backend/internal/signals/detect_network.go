@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
@@ -81,10 +82,10 @@ func serviceEndpoints(obj runtime.Object, c Context) []Found {
 		return nil
 	}
 	selector := labels.SelectorFromSet(svc.Spec.Selector)
-	var selected []string
+	var selected []*corev1.Pod
 	for _, p := range c.List("pods", svc.Namespace) {
 		if pod := p.(*corev1.Pod); pod.DeletionTimestamp == nil && selector.Matches(labels.Set(pod.Labels)) {
-			selected = append(selected, pod.Name)
+			selected = append(selected, pod)
 		}
 	}
 	selectorEvidence := Evidence{Source: FromField, Field: "spec.selector", Value: labels.Set(svc.Spec.Selector).String(), ResourceVersion: svc.ResourceVersion}
@@ -124,8 +125,32 @@ func serviceEndpoints(obj runtime.Object, c Context) []Found {
 	return []Found{{
 		Type:     "no_ready_endpoints",
 		Message:  fmt.Sprintf("It selects %d %s, and none is ready", len(selected), plural(int64(len(selected)), "pod", "pods")),
+		Since:    lastUnready(selected),
 		Evidence: append([]Evidence{selectorEvidence}, evidence...),
 	}}
+}
+
+// lastUnready is when the last of these pods stopped being ready, from
+// their Ready conditions: when the Service lost its last ready endpoint.
+// It's zero when a pod doesn't say, and the type's wait then counts from
+// when Opscope saw it.
+func lastUnready(pods []*corev1.Pod) time.Time {
+	var last time.Time
+	for _, pod := range pods {
+		var since time.Time
+		for _, cond := range pod.Status.Conditions {
+			if cond.Type == corev1.PodReady && cond.Status != corev1.ConditionTrue {
+				since = cond.LastTransitionTime.Time
+			}
+		}
+		if since.IsZero() {
+			return time.Time{}
+		}
+		if since.After(last) {
+			last = since
+		}
+	}
+	return last
 }
 
 // routeBackends: an Ingress or HTTPRoute that sends traffic to a Service

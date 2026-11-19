@@ -300,9 +300,9 @@ func TestDetailLinksMatchV14(t *testing.T) {
 	want["pods/shop/web-abc-1"] = pod
 	web := want["deployments/shop/web"]
 	web.Tables = append(web.Tables, resources.Table{
-		Title: "Revisions", Columns: []string{"Revision", "ReplicaSet", "Pods", "State"},
-		Rows:  [][]string{{"", "web-abc", "0/1", "old"}},
-		Links: [][]*resources.Link{{nil, {Resource: "replicasets", Namespace: "shop", Name: "web-abc"}, nil, nil}},
+		Title: "Revisions", Columns: []string{"Revision", "ReplicaSet", "Pods", "State", "Age"},
+		Rows:  [][]string{{"", "web-abc", "0/1", "old", ""}},
+		Links: [][]*resources.Link{{nil, {Resource: "replicasets", Namespace: "shop", Name: "web-abc"}, nil, nil, nil}},
 	})
 	want["deployments/shop/web"] = web
 

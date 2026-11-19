@@ -2,6 +2,7 @@ package signals
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"slices"
@@ -131,7 +132,7 @@ func readSignals(t *testing.T, e *Engine, cluster string, src resources.Source) 
 	t.Helper()
 	var out []Signal
 	var info Info
-	if err := e.Read(context.Background(), cluster, src, "", func(v View, i Info) error {
+	if err := e.Read(context.Background(), cluster, src, resources.Query{}, func(v View, i Info) error {
 		out, info = v.Signals(Filter{State: Open}), i
 		return nil
 	}); err != nil {
@@ -310,5 +311,20 @@ func TestVocabulary(t *testing.T) {
 				t.Errorf("%s reads %s", d.Name, k)
 			}
 		}
+	}
+}
+
+// Every read takes a moment (contract 2): now, or an error until there's
+// history to read.
+func TestReadTakesAMoment(t *testing.T) {
+	f := newFakeFeed()
+	f.cluster("lab", map[string][]runtime.Object{}, nil)
+	e := startEngine(t, f)
+	err := e.Read(context.Background(), "lab", nil, resources.Query{At: time.Now().Add(-time.Hour)}, func(View, Info) error {
+		t.Error("read a past moment")
+		return nil
+	})
+	if !errors.Is(err, resources.ErrNoHistory) {
+		t.Errorf("err = %v", err)
 	}
 }

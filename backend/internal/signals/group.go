@@ -14,9 +14,9 @@ type Group struct {
 	Type      string    `json:"type"`  // from the vocabulary
 	Title     string    `json:"title"` // the type in a few words: "Crash loop"
 	Severity  string    `json:"severity"`
-	State     string    `json:"state"`           // open if any of its signals is open or resolving
-	Owner     *Ref      `json:"owner,omitempty"` // the workload, for a group of its pods
-	FirstSeen time.Time `json:"firstSeen"`       // the earliest of its signals
+	State     string    `json:"state"`              // open if any of its signals is open or resolving
+	Owner     *Ref      `json:"owner,omitempty"`    // the workload, for a group of its pods
+	FirstSeen time.Time `json:"firstSeen,omitzero"` // the earliest of its signals; left out when none says
 	LastSeen  time.Time `json:"lastSeen"`
 	Signals   []Signal  `json:"signals"`
 }
@@ -54,7 +54,7 @@ func GroupSignals(signals []Signal) []Group {
 			if severityRank(s.Severity) > severityRank(g.Severity) {
 				g.Severity = s.Severity
 			}
-			if g.FirstSeen.IsZero() || s.FirstSeen.Before(g.FirstSeen) {
+			if !s.FirstSeen.IsZero() && (g.FirstSeen.IsZero() || s.FirstSeen.Before(g.FirstSeen)) {
 				g.FirstSeen = s.FirstSeen
 			}
 			if s.LastSeen.After(g.LastSeen) {

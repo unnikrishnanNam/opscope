@@ -491,9 +491,17 @@ func (e *Engine) HealthOf(cluster, resource, uid string) *Health {
 }
 
 // Read runs fn on a cluster's signals: the live world when it's complete,
-// otherwise one worked out from src for namespace ("" for all) and reused
-// for a few seconds. fn mustn't keep the View.
-func (e *Engine) Read(ctx context.Context, cluster string, src resources.Source, namespace string, fn func(View, Info) error) error {
+// otherwise one worked out from src for q.Namespace ("" for all) and
+// reused for a few seconds. fn mustn't keep the View.
+//
+// q.At is the moment to read (contract 2): zero means now, the only one
+// there is until the Time machine (v1.8); any other is
+// resources.ErrNoHistory.
+func (e *Engine) Read(ctx context.Context, cluster string, src resources.Source, q resources.Query, fn func(View, Info) error) error {
+	if !q.At.IsZero() {
+		return resources.ErrNoHistory
+	}
+	namespace := q.Namespace
 	if l := e.live(cluster); l != nil {
 		l.mu.Lock()
 		if l.complete {

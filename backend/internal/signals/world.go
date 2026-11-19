@@ -381,9 +381,8 @@ func (w *world) apply(uid, resource string, obj runtime.Object, f Found, now tim
 		return
 	}
 	delete(w.pending, id)
-	if since.IsZero() {
-		since = now
-	}
+	// Without history, an answer on request can't say when a condition the
+	// object doesn't date started: it's left unknown, not "now".
 
 	s := &Signal{
 		ID: id, Type: f.Type, Title: t.Title, Severity: severity, Cluster: w.cluster,

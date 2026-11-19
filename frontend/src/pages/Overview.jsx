@@ -1,7 +1,7 @@
 import { Link, useLocation, useOutletContext, useSearchParams } from "react-router";
 import { useApi } from "../api.js";
 import { useCommands } from "../commands/registry.jsx";
-import { bytes, clock, cpu, percent } from "../format.js";
+import { bytes, clock, cpu, percent, singular } from "../format.js";
 import Button from "../components/Button.jsx";
 import { Callout } from "../components/Callout.jsx";
 import { Card } from "../components/Card.jsx";
@@ -41,8 +41,6 @@ const KINDS = {
 };
 
 const pageFor = (resource) => allPages.find((p) => p.resource === resource);
-// "Deployments" -> "Deployment", for "1 Deployment not ready".
-const singular = (label) => label.replace(/s$/, "");
 
 // The cluster's front page: a health summary and the four key numbers, then
 // every resource kind with how many need attention, pod health, nodes and

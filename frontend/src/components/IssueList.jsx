@@ -122,7 +122,7 @@ function IssueRow({ group: g, clusterId, search, showNamespace, isOpen, onToggle
         {isOpen && (
           <div id={panelId} className="issue-panel">
             {one ? (
-              <Evidence evidence={one.evidence} />
+              <Evidence evidence={one.evidence} object={one.resource} clusterId={clusterId} search={search} />
             ) : (
               <ul className="issue-pods">
                 {g.signals.map((s) => (
@@ -131,7 +131,7 @@ function IssueRow({ group: g, clusterId, search, showNamespace, isOpen, onToggle
                       <ObjectLink r={s.resource} clusterId={clusterId} search={search} />
                       <span className="issue-pod-message">{s.message}</span>
                     </div>
-                    <Evidence evidence={s.evidence} />
+                    <Evidence evidence={s.evidence} object={s.resource} clusterId={clusterId} search={search} />
                   </li>
                 ))}
               </ul>
@@ -143,7 +143,8 @@ function IssueRow({ group: g, clusterId, search, showNamespace, isOpen, onToggle
         {resolved ? (
           <span title={new Date(latest(g.signals)).toLocaleString()}>resolved {age(latest(g.signals))} ago</span>
         ) : (
-          <span title={`Since ${new Date(g.firstSeen).toLocaleString()}`}>for {age(g.firstSeen)}</span>
+          // Unknown when it was worked out on request, with no history.
+          g.firstSeen && <span title={`Since ${new Date(g.firstSeen).toLocaleString()}`}>for {age(g.firstSeen)}</span>
         )}
         {one && one.count > 1 && <span className="issue-count">{one.count.toLocaleString()}×</span>}
       </div>

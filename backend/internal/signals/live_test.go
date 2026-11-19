@@ -49,7 +49,8 @@ var issuesScenario = []string{
 // one namespace. It logs every open signal, with what logs said. With
 // OPSCOPE_TEST_EXPECT=issues it checks issues.yaml's namespace: every signal
 // the README promises, and crash's log finding, within OPSCOPE_TEST_WAIT
-// (30s by default) of the engine starting, and no others. OPSCOPE_TEST_MIN
+// (3 minutes by default: some types wait 2 minutes from when the engine
+// first sees the object) of the engine starting, and no others. OPSCOPE_TEST_MIN
 // keeps it reading for at least that long, for logs to be read.
 func TestLiveCluster(t *testing.T) {
 	path := os.Getenv("OPSCOPE_TEST_KUBECONFIG")
@@ -78,7 +79,7 @@ func TestLiveCluster(t *testing.T) {
 	if os.Getenv("OPSCOPE_TEST_EXPECT") == "issues" {
 		namespace, want = "issues-test", issuesScenario
 	}
-	wait := 30 * time.Second
+	wait := 3 * time.Minute
 	if d, err := time.ParseDuration(os.Getenv("OPSCOPE_TEST_WAIT")); err == nil {
 		wait = d
 	}
@@ -90,7 +91,7 @@ func TestLiveCluster(t *testing.T) {
 	var got []Signal
 	var info Info
 	for {
-		err := engine.Read(ctx, cluster.ID, src, namespace, func(v View, i Info) error {
+		err := engine.Read(ctx, cluster.ID, src, resources.Query{Namespace: namespace}, func(v View, i Info) error {
 			got, info = v.Signals(Filter{Namespace: namespace, State: Open}), i
 			return nil
 		})

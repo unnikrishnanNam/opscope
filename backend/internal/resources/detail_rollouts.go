@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -53,7 +54,8 @@ func deploymentRevisions(ctx context.Context, src Source, d *Detail) {
 		return cmp.Or(cmp.Compare(revisionOf(b.ObjectMeta), revisionOf(a.ObjectMeta)), cmp.Compare(a.Name, b.Name))
 	})
 
-	t := Table{Title: "Revisions", Columns: []string{"Revision", "ReplicaSet", "Pods", "State"}}
+	t := Table{Title: "Revisions", Columns: []string{"Revision", "ReplicaSet", "Pods", "State", "Age"}}
+	now := time.Now()
 	for _, rs := range owned {
 		revision, state := "", "old"
 		if n := revisionOf(rs.ObjectMeta); n > 0 {
@@ -68,9 +70,28 @@ func deploymentRevisions(ctx context.Context, src Source, d *Detail) {
 		t.addRow(text(revision),
 			Cell{Text: rs.Name, Link: &Link{Resource: "replicasets", Namespace: rs.Namespace, Name: rs.Name}},
 			text(fmt.Sprintf("%d/%d", rs.Status.ReadyReplicas, replicas(rs.Spec.Replicas))),
-			text(state))
+			text(state),
+			text(ageText(rs.CreationTimestamp.Time, now)))
 	}
 	d.addTable(t)
+}
+
+// ageText is how long ago t was, in one unit as kubectl says it: "45s",
+// "12m", "5h", "3d". "" when t is unset.
+func ageText(t, now time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	d := max(now.Sub(t), 0)
+	switch {
+	case d < time.Minute:
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	case d < time.Hour:
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh", int(d.Hours()))
+	}
+	return fmt.Sprintf("%dd", int(d.Hours()/24))
 }
 
 // ownedPods lists the pods an owner (a ReplicaSet) has, from the graph,

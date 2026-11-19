@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"opscope/internal/graph"
+	"opscope/internal/resources"
 )
 
 // Every place Opscope shows health says the same of the same object: the
@@ -49,7 +50,7 @@ func TestEveryViewAgreesOnHealth(t *testing.T) {
 
 	eventually(t, "the signals", func() bool {
 		var groups []Group
-		_ = signals.Read(ctx, "lab", nil, "", func(v View, _ Info) error {
+		_ = signals.Read(ctx, "lab", nil, resources.Query{}, func(v View, _ Info) error {
 			groups = GroupSignals(v.Signals(Filter{State: Open}))
 			return nil
 		})
@@ -63,7 +64,7 @@ func TestEveryViewAgreesOnHealth(t *testing.T) {
 		// The object's own health (GET /health).
 		var own string
 		var listed bool
-		_ = signals.Read(ctx, "lab", nil, "", func(v View, _ Info) error {
+		_ = signals.Read(ctx, "lab", nil, resources.Query{}, func(v View, _ Info) error {
 			if h, ok := v.Health(uid); ok {
 				own = h.State
 			}
@@ -100,7 +101,7 @@ func TestEveryViewAgreesOnHealth(t *testing.T) {
 	}
 
 	// The overview's counts: objects of a kind with an open signal.
-	_ = signals.Read(ctx, "lab", nil, "", func(v View, _ Info) error {
+	_ = signals.Read(ctx, "lab", nil, resources.Query{}, func(v View, _ Info) error {
 		if p, d := v.Objects("shop", "pods"), v.Objects("shop", "deployments"); p != 1 || d != 2 {
 			t.Errorf("overview counts: %d pods, %d deployments; want 1 and 2", p, d)
 		}

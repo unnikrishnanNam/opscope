@@ -18,6 +18,14 @@
   font-weight: var(--weight-strong);
 }
 
+.evidence-source a {
+  color: inherit;
+}
+
+.evidence-source a:hover {
+  color: var(--text);
+}
+
 .evidence-what {
   min-width: 0;
   color: var(--text-muted);
@@ -30,7 +38,6 @@
 }
 
 .evidence-value {
-  margin-left: var(--space-2);
   font-family: var(--font-mono);
 }
 

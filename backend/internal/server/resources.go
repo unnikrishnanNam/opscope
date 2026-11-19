@@ -60,7 +60,7 @@ func getOverview(manager *clusters.Manager, live *collector.Set, issues signalRe
 		q := queryFrom(r)
 		src := live.Source(cluster)
 		var overview *resources.Overview
-		err := issues.Read(r.Context(), cluster.ID, src, q.Namespace, func(v signals.View, _ signals.Info) error {
+		err := issues.Read(r.Context(), cluster.ID, src, q, func(v signals.View, _ signals.Info) error {
 			var err error
 			overview, err = resources.GetOverview(r.Context(), src, q, attention{v, q.Namespace})
 			return err

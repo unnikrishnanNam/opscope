@@ -250,6 +250,12 @@ func TestWorkloadDetectors(t *testing.T) {
 		Reason: "ProgressDeadlineExceeded", Message: `ReplicaSet "stuck-2" has timed out progressing.`, LastTransitionTime: ago(time.Minute)})
 	rs := &appsv1.ReplicaSet{ObjectMeta: controlled(objMeta("shop", "web-2"), "apps/v1", "Deployment", "web"), Spec: appsv1.ReplicaSetSpec{Replicas: &two}}
 	quiet := &appsv1.ReplicaSet{ObjectMeta: controlled(objMeta("shop", "api-1"), "apps/v1", "Deployment", "api")}
+	sts := &appsv1.StatefulSet{ObjectMeta: objMeta("shop", "db"), Spec: appsv1.StatefulSetSpec{Replicas: &two},
+		Status: appsv1.StatefulSetStatus{ReadyReplicas: 2}}
+	failing := &appsv1.ReplicaSet{ObjectMeta: controlled(objMeta("shop", "failing"), "apps/v1", "Deployment", "broke"),
+		Spec: appsv1.ReplicaSetSpec{Replicas: &two}, Status: appsv1.ReplicaSetStatus{Conditions: []appsv1.ReplicaSetCondition{{
+			Type: appsv1.ReplicaSetReplicaFailure, Status: corev1.ConditionTrue, Reason: "FailedCreate",
+			Message: `pods "failing-" is forbidden: exceeded quota`, LastTransitionTime: ago(3 * 24 * time.Hour)}}}}
 	failedCreate := func(about metav1.Object, name string, last time.Duration) obj {
 		return obj{"events", &corev1.Event{ObjectMeta: objMeta("shop", name), Type: corev1.EventTypeWarning, Reason: "FailedCreate",
 			Message:        `pods "web-2-" is forbidden: exceeded quota`,
@@ -276,9 +282,13 @@ func TestWorkloadDetectors(t *testing.T) {
 			{"jobs", &batchv1.Job{ObjectMeta: objMeta("shop", "backup"), Status: batchv1.JobStatus{Conditions: []batchv1.JobCondition{{
 				Type: batchv1.JobComplete, Status: corev1.ConditionTrue}}}}},
 		}},
-		{name: "create_failed", want: []string{"web-2:create_failed"}, objects: []obj{
+		{name: "create_failed", want: []string{"web-2:create_failed", "db:create_failed", "failing:create_failed"}, objects: []obj{
 			{"replicasets", rs}, failedCreate(rs, "web-2.1", time.Minute),
 			{"replicasets", quiet}, failedCreate(quiet, "api-1.1", time.Hour), // an hour old: over
+			// The controller retries every 16 minutes or so: an event 15 minutes old still counts.
+			{"statefulsets", sts}, failedCreate(sts, "db.1", 15*time.Minute),
+			// A ReplicaSet says so in its condition, however old its events.
+			{"replicasets", failing},
 		}},
 	}
 	for _, c := range cases {
@@ -386,20 +396,45 @@ func TestNetworkDetectors(t *testing.T) {
 }
 
 // A pod's labels change which Services select it, and the Services are
-// checked again: the trigger.
+// checked again: the trigger. Both types wait 2 minutes, so a Service
+// applied just before its pods, or pods still starting, raise nothing.
 func TestServicesFollowTheirPods(t *testing.T) {
 	w := testWorld()
 	w.upsert("services", service("web", map[string]string{"app": "web"}), t0)
+	if got := types_(open(w)); len(got) != 0 {
+		t.Fatalf("before its pods came: %v", got)
+	}
+	at := t0.Add(3 * time.Minute)
+	w.tick(at)
 	if got := types_(open(w)); !slices.Equal(got, []string{"web:selector_matches_nothing:open"}) {
 		t.Fatalf("signals = %v", got)
 	}
-	w.upsert("pods", labelled("web-1", map[string]string{"app": "web"}, true), t0.Add(time.Second))
+	w.upsert("pods", labelled("web-1", map[string]string{"app": "web"}, true), at.Add(time.Second))
 	if got := open(w); len(got) != 1 || got[0].State != Resolving {
 		t.Fatalf("after the pod came: %v", types_(got))
 	}
-	w.upsert("endpointslices", slice("web-x", "web", false), t0.Add(2*time.Second))
+	w.upsert("endpointslices", slice("web-x", "web", false), at.Add(2*time.Second))
+	if got := types_(open(w)); slices.Contains(got, "web:no_ready_endpoints:open") {
+		t.Errorf("a pod not ready yet: %v", got)
+	}
+	w.tick(at.Add(3 * time.Minute))
 	if got := types_(open(w)); !slices.Contains(got, "web:no_ready_endpoints:open") {
-		t.Errorf("after the slice came: %v", got)
+		t.Errorf("a pod still not ready after the wait: %v", got)
+	}
+}
+
+// The endpoints wait counts from the pods' Ready conditions, so a Service
+// whose pods stopped being ready an hour ago opens at once.
+func TestNoReadyEndpointsSince(t *testing.T) {
+	w := testWorld()
+	pod := labelled("db-1", map[string]string{"app": "db"}, false)
+	pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionFalse, LastTransitionTime: ago(time.Hour)}}
+	w.upsert("pods", pod, t0)
+	w.upsert("endpointslices", slice("db-x", "db", false), t0)
+	w.upsert("services", service("db", map[string]string{"app": "db"}), t0)
+	got := open(w)
+	if len(got) != 1 || got[0].Type != "no_ready_endpoints" || !got[0].FirstSeen.Equal(ago(time.Hour).Time) {
+		t.Fatalf("signals = %v", got)
 	}
 }
 

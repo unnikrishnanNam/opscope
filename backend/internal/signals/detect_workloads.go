@@ -72,16 +72,33 @@ func workloadConditions(obj runtime.Object, c Context) []Found {
 	return nil
 }
 
+// createWindow is how recent a FailedCreate event must be. Controllers
+// retry a failing create with a back-off that reaches about 16 minutes
+// (the work queue's 1000-second cap), so their events are that far apart.
+const createWindow = 20 * time.Minute
+
 // workloadEvents finds controllers that can't create their pods: a
-// quota, an admission webhook, a ServiceAccount that doesn't exist.
+// quota, an admission webhook, a ServiceAccount that doesn't exist. A
+// ReplicaSet says so in its ReplicaFailure condition, for as long as it
+// lasts; the others only in events, which count while they're recent.
 func workloadEvents(obj runtime.Object, c Context) []Found {
 	m, ok := obj.(metav1.Object)
 	if !ok || m.GetDeletionTimestamp() != nil {
 		return nil
 	}
 	var f Found
+	if rs, isRS := obj.(*appsv1.ReplicaSet); isRS {
+		for i, cond := range rs.Status.Conditions {
+			if cond.Type == appsv1.ReplicaSetReplicaFailure && cond.Status == corev1.ConditionTrue {
+				f.Since = cond.LastTransitionTime.Time
+				f.Message = "Can't create its pods: " + firstLine(orElse(cond.Message, cond.Reason))
+				f.Evidence = append(f.Evidence, Evidence{Source: FromField, Field: fmt.Sprintf("status.conditions[%d]", i),
+					Value: "ReplicaFailure=True (" + cond.Reason + ")", ResourceVersion: rs.ResourceVersion})
+			}
+		}
+	}
 	for _, e := range c.Events(string(m.GetUID())) {
-		if e.Type == corev1.EventTypeWarning && e.Reason == "FailedCreate" && c.Now().Sub(eventTime(e)) <= eventWindow {
+		if e.Type == corev1.EventTypeWarning && e.Reason == "FailedCreate" && c.Now().Sub(eventTime(e)) <= createWindow {
 			addEvent(&f, e)
 			if f.Message == "" {
 				f.Message = "Can't create its pods: " + firstLine(e.Message)

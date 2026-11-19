@@ -8,8 +8,8 @@ import { Skeleton } from "../components/Loading.jsx";
 import { PageHeader } from "../components/PageHeader.jsx";
 import Tabs from "../components/Tabs.jsx";
 import { SegmentedControl } from "../components/Toggle.jsx";
-import { SuccessIcon } from "../components/icons.jsx";
-import { clock } from "../format.js";
+import { IssuesIcon, SuccessIcon } from "../components/icons.jsx";
+import { clock, singular } from "../format.js";
 import { allPages, nsQuery } from "../sections.js";
 import { choices, filtered, issuesPath, issuesRequest, withFilter } from "./issuesRequest.js";
 import "./Issues.css";
@@ -109,7 +109,7 @@ export default function Issues({ page }) {
         ) : !data ? (
           <Skeleton height={240} />
         ) : shown.length === 0 ? (
-          <Nothing tab={r.tab} namespace={r.namespace} filtering={filtering} />
+          <Nothing tab={r.tab} namespace={r.namespace} filtering={filtering} partial={data.partial ?? []} />
         ) : (
           <IssueList
             groups={shown}
@@ -144,9 +144,9 @@ function About({ data }) {
           </p>
         )
       )}
-      {forbidden.length > 0 && (
+      {forbidden.length > 0 && !cantReadPods(partial) && (
         <Callout compact tone="warning">
-          Opscope can't read {forbidden.map((p) => kindLabel(p.resource, true)).join(", ")}, so it can't check them:{" "}
+          Opscope can't read {someKinds(forbidden)}, so it can't check them:{" "}
           {forbidden.length === 1 && forbidden[0].resource === "secrets"
             ? "certificates nearing expiry, and Secrets that pods name, aren't checked."
             : "problems with them won't show here."}
@@ -156,8 +156,21 @@ function About({ data }) {
   );
 }
 
-function Nothing({ tab, namespace, filtering }) {
+function Nothing({ tab, namespace, filtering, partial }) {
   const where = namespace ? ` in ${namespace}` : "";
+  // Without pods there's nothing to say "healthy" about: most problems show
+  // on pods. A user allowed into only some namespaces is here when looking
+  // across all of them.
+  if (cantReadPods(partial)) {
+    return (
+      <EmptyState icon={IssuesIcon} title={`Opscope isn't allowed to read pods${where}`}>
+        So it can't tell what's wrong {namespace ? "here" : "across the cluster"}.{" "}
+        {namespace
+          ? "Ask for read access to this namespace, or pick another in the namespace picker."
+          : "It may only be allowed into some namespaces: pick one in the namespace picker, or type its name there."}
+      </EmptyState>
+    );
+  }
   if (filtering) {
     return (
       <EmptyState title={`No ${tab} issues match these filters${where}`}>
@@ -173,6 +186,18 @@ function Nothing({ tab, namespace, filtering }) {
       Every object Opscope checks looks healthy.
     </EmptyState>
   );
+}
+
+function cantReadPods(partial) {
+  return partial.some((p) => p.resource === "pods" && p.code === "forbidden");
+}
+
+// someKinds names up to four kinds and counts the rest: "Pods, Services,
+// Jobs, Nodes and 12 more".
+function someKinds(kinds) {
+  const names = kinds.map((p) => kindLabel(p.resource, true));
+  if (names.length <= 4) return names.join(", ");
+  return `${names.slice(0, 4).join(", ")} and ${names.length - 4} more`;
 }
 
 // FilterSelect: a labelled native select with an "All" choice.
@@ -209,5 +234,5 @@ function kindLabel(resource, plural = false) {
   if (!resource) return "";
   const page = allPages.find((p) => p.resource === resource);
   const label = page?.label ?? resource;
-  return plural ? label : label.replace(/s$/, "");
+  return plural ? label : singular(label);
 }

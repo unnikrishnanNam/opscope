@@ -283,8 +283,9 @@ openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 
 kubectl -n issues-test create secret tls expiring-cert --cert=/tmp/issues.crt --key=/tmp/issues.key
 ```
 
-Give it two minutes: `replicas_unavailable`, `pvc_unbound` and `mount_failed` wait that long from
-when the object started failing. Then run Opscope with `OPSCOPE_KUBECONFIG=/tmp/opscope-issues.kubeconfig`,
+Give it two minutes: `replicas_unavailable`, `pvc_unbound`, `mount_failed` and the two Service
+types wait that long from when the object started failing (or, when it doesn't say, from when
+Opscope first saw it). Then run Opscope with `OPSCOPE_KUBECONFIG=/tmp/opscope-issues.kubeconfig`,
 or check the engine without the UI:
 
 ```bash
@@ -293,8 +294,8 @@ OPSCOPE_TEST_KUBECONFIG=/tmp/opscope-issues.kubeconfig OPSCOPE_TEST_EXPECT=issue
   go test ./internal/signals -run TestLiveCluster -v
 ```
 
-It starts a collector and the Signal engine as Opscope does, waits up to 30 seconds for every signal
-below, and fails on any it didn't expect:
+It starts a collector and the Signal engine as Opscope does, waits up to 3 minutes for every signal
+below (`typo`'s comes 2 minutes after the engine starts), and fails on any it didn't expect:
 
 | Object                         | Signals                                                              |
 | ------------------------------ | -------------------------------------------------------------------- |

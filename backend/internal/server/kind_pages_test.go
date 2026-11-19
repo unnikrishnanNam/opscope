@@ -3,6 +3,7 @@ package server
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -79,6 +80,12 @@ func TestServiceAccountDetail(t *testing.T) {
 	}
 }
 
+// made sets when a ReplicaSet was created, that long ago.
+func made(rs *appsv1.ReplicaSet, ago time.Duration) *appsv1.ReplicaSet {
+	rs.CreationTimestamp = metav1.NewTime(time.Now().Add(-ago))
+	return rs
+}
+
 func TestDeploymentRevisions(t *testing.T) {
 	two, zero := int32(2), int32(0)
 	revision := func(m metav1.ObjectMeta, n string) metav1.ObjectMeta {
@@ -94,9 +101,9 @@ func TestDeploymentRevisions(t *testing.T) {
 	}
 	objects := []runtime.Object{
 		&appsv1.Deployment{ObjectMeta: revision(smeta("shop", "web"), "10"), Spec: appsv1.DeploymentSpec{Replicas: &two}},
-		rs("web-9", "9", 1, 1, 1),   // the rollout to 10 is under way
-		rs("web-10", "10", 2, 1, 0), // the current one
-		rs("web-2", "2", 0, 0, 0),
+		made(rs("web-9", "9", 1, 1, 1), 2*time.Hour+time.Minute),       // the rollout to 10 is under way
+		made(rs("web-10", "10", 2, 1, 0), 3*time.Minute+5*time.Second), // the current one
+		made(rs("web-2", "2", 0, 0, 0), 40*24*time.Hour),
 		// Another Deployment's, and one nothing owns: not this one's revisions.
 		rs("api-1", "1", 1, 1, 1),
 		&appsv1.ReplicaSet{ObjectMeta: smeta("shop", "loose"), Spec: appsv1.ReplicaSetSpec{Replicas: &zero}},
@@ -105,9 +112,9 @@ func TestDeploymentRevisions(t *testing.T) {
 
 	d := detailFromGraph(t, objects, "deployments", "shop", "web")
 	want := [][]string{
-		{"10", "web-10", "0/2", "current"},
-		{"9", "web-9", "1/1", "old, still running"},
-		{"2", "web-2", "0/0", "old"},
+		{"10", "web-10", "0/2", "current", "3m"},
+		{"9", "web-9", "1/1", "old, still running", "2h"},
+		{"2", "web-2", "0/0", "old", "40d"},
 	}
 	if got := rows(t, d, "Revisions"); !reflect.DeepEqual(got, want) {
 		t.Errorf("revisions = %v, want %v", got, want)

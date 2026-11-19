@@ -14,7 +14,7 @@ import (
 // signalReader reads a cluster's signals: *signals.Engine, or a fake in
 // tests.
 type signalReader interface {
-	Read(ctx context.Context, cluster string, src resources.Source, namespace string, fn func(signals.View, signals.Info) error) error
+	Read(ctx context.Context, cluster string, src resources.Source, q resources.Query, fn func(signals.View, signals.Info) error) error
 }
 
 // attention is a View as the overview counts it (resources.Attention).
@@ -51,7 +51,7 @@ func getHealthCounts(manager *clusters.Manager, issues signalReader, sources fun
 		}
 		namespace := r.URL.Query().Get("namespace")
 		var out healthCounts
-		err := issues.Read(r.Context(), cluster.ID, sources(cluster), namespace, func(v signals.View, info signals.Info) error {
+		err := issues.Read(r.Context(), cluster.ID, sources(cluster), resources.Query{Namespace: namespace}, func(v signals.View, info signals.Info) error {
 			out = healthCounts{Info: info, Kinds: v.Counts(namespace), Types: v.TypeCounts(namespace)}
 			return nil
 		})
@@ -101,7 +101,7 @@ func getIssues(manager *clusters.Manager, issues signalReader, sources func(*clu
 			types = strings.Split(t, ",")
 		}
 		var out issuesAnswer
-		err := issues.Read(r.Context(), cluster.ID, sources(cluster), namespace, func(v signals.View, info signals.Info) error {
+		err := issues.Read(r.Context(), cluster.ID, sources(cluster), resources.Query{Namespace: namespace}, func(v signals.View, info signals.Info) error {
 			out.Info = info
 			out.Open = len(signals.GroupSignals(v.Signals(signals.Filter{Namespace: namespace, State: signals.Open})))
 			out.Resolved = len(signals.GroupSignals(v.Signals(signals.Filter{Namespace: namespace, State: signals.Resolved})))
@@ -139,7 +139,7 @@ func getIssue(manager *clusters.Manager, issues signalReader, sources func(*clus
 		}
 		var s signals.Signal
 		found := false
-		err := issues.Read(r.Context(), cluster.ID, sources(cluster), "", func(v signals.View, _ signals.Info) error {
+		err := issues.Read(r.Context(), cluster.ID, sources(cluster), resources.Query{}, func(v signals.View, _ signals.Info) error {
 			s, found = v.Signal(r.PathValue("signal"))
 			return nil
 		})
@@ -184,7 +184,7 @@ func getHealth(manager *clusters.Manager, issues signalReader, sources func(*clu
 		}
 		var out healthAnswer
 		found := false
-		err := issues.Read(r.Context(), cluster.ID, sources(cluster), namespace, func(v signals.View, info signals.Info) error {
+		err := issues.Read(r.Context(), cluster.ID, sources(cluster), resources.Query{Namespace: namespace}, func(v signals.View, info signals.Info) error {
 			out.Info = info
 			uid, ok := v.Find(resource, namespace, name)
 			if !ok {
