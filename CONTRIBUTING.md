@@ -131,6 +131,10 @@ backend/                  Go server
   internal/graph/         the topology: how objects connect, built from the live copy; edge builders
                           by area (build_workloads.go, build_network.go, build_storage.go), the
                           engine that keeps a graph per cluster, and the queries behind /graph
+  internal/signals/       the Issues feed: detectors by area (detect_pods.go, detect_workloads.go,
+                          detect_network.go, detect_infra.go, detect_config.go), the vocabulary of
+                          signal types, the engine that keeps each cluster's signals and health,
+                          and logs/, which matches a few lines of failing containers' logs
   internal/metrics/       live usage from metrics-server and the in-memory history; volumes.go reads
                           volume usage from the kubelets
   internal/server/        HTTP routes, middleware, static file serving
@@ -229,10 +233,11 @@ runs the Go tests and the frontend tests. Before opening a pull request, also ch
 6. **Docs:** the resource list in the README, the permissions table in
    [`docs/deployment.md`](docs/deployment.md) and the resource table in [`docs/api.md`](docs/api.md).
 
-A kind that only the topology needs, with no page of its own (ReplicaSets, EndpointSlices and
-ServiceAccounts), goes in `graphOnly` in `resources.go` instead of `Listers`. It's collected and
-watched like every other kind, but has no list, detail page or search entry. It still needs its
-permissions (step 3), its line in the permissions table, and step 5.
+A kind can have a detail page and no list (EndpointSlices: a Service shows its endpoints), or a
+list and no sidebar entry (ReplicaSets: a Deployment shows them as revisions). Every kind in
+`Listers` or `kinds` is collected and watched. In `src/sections.js`, such a page goes in
+`hiddenPages` (with `noList` when it has no list), so routes, links and object search find it while
+the sidebar and the palette's "Go to" leave it out.
 
 ### Adding a connection to the topology
 
@@ -258,6 +263,42 @@ each one carries that field as evidence.
 A new edge shows on the Topology page, in the panel of both ends, without more work. Detail pages
 ask the graph only for what `resources.AddRelations` asks (links to missing objects, a claim's pods,
 "Used by" and the like); add to it there if a detail page should show the new connection.
+
+### Adding a detector
+
+The Issues feed's signals come from detectors: pure functions that read one object, and what its
+`Context` gives (its events, other objects, volume usage, log findings), and say which problems it
+has. A signal is raised on the object that shows the symptom; working out that one problem causes
+another is left to diagnosis.
+
+1. **The detector:** a function in the `detect_*.go` file for its area, registered in that file's
+   `init` with `Default.Register(Detector{Name: "pods.containers", Kinds: []string{"pods"}, Types:
+   []string{"crash_loop"}, Detect: ...})`. It returns a `Found` per type: a message in plain words,
+   `Since` when the object says when it started, and `Evidence` for every field, event or count it
+   read (never a Secret's value or a log line). Use `Timed` when the answer changes with time alone
+   (an event growing old, a certificate nearing expiry), `Reads` for kinds it only looks up, and
+   `Triggers` when another kind's change bears on it (a pod's labels on the Services that select
+   it).
+2. **Missing references** are read with `graph.RefsOf`, the topology's own builders, so the Issues
+   feed and the map agree on what's missing. A kind the world can't read (`c.Readable`) is never
+   reported missing.
+3. **Tests:** cases in `detectors_test.go` that raise each type and look-alikes that don't.
+   `TestEveryTypeIsDetected` fails if a type in the vocabulary has no detector, and `Register`
+   panics on a type that isn't in it. If a kind cluster can show the problem, add it to
+   `test/scenarios/issues.yaml`, its row to the README there, and its line to `issuesScenario` in
+   `live_test.go`.
+
+### Adding a signal type
+
+Signal types are an API: rules match on them, so a type is added, never renamed, and one that's no
+longer raised stays in the vocabulary, `Reserved`.
+
+1. A line in `Vocabulary` in `internal/signals/vocabulary.go`: its name, a title of a few words
+   ("Crash loop"), its default severity (a detector may raise it, never lower it), a `Wait` when a
+   normal change would raise it briefly (a rollout, a provisioner), and what it means.
+2. A detector that raises it (see above), and its row in the vocabulary table in
+   [`docs/design/issues.md`](docs/design/issues.md).
+3. If the overview counts it, its type in `attentionTypes` in `internal/resources/overview.go`.
 
 ### Adding commands
 

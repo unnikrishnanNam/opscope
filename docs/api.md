@@ -52,7 +52,7 @@ or "turned off" from an error:
 ### `GET /api/health`
 
 ```json
-{ "status": "ok", "version": "v1.5.0" }
+{ "status": "ok", "version": "v1.6.0" }
 ```
 
 Used by the Kubernetes liveness and readiness probes. It doesn't contact any cluster.
@@ -168,7 +168,8 @@ cluster: what the overview's counts are made of.
 
 `built` is `live` when the Signal engine keeps the cluster up to date from its watch cache, and
 `on_request` when the answer was worked out for this request (live data off, or the cache still on
-its first list): then there's no history, and `historySince` is left out. `partial` lists the kinds
+its first list): then there's no history, so `historySince` and signals' `firstSeen` are left out,
+and containers' logs aren't read. `partial` lists the kinds
 the detectors couldn't read, as the graph's answers do. Without the Secret role there are no
 certificate checks; without Gateway API, no route or Gateway signals.
 
@@ -213,7 +214,7 @@ one or more signal types, comma-separated; `kind`, the objects' kind by URL name
           "state": "open",
           "evidence": [
             { "source": "field", "detector": "pods.containers", "field": "status.containerStatuses[0].state.waiting.reason", "value": "CrashLoopBackOff", "resourceVersion": "48211", "seen": "…" },
-            { "source": "log", "detector": "pods.containers", "field": "log of container order-service, previous run", "pattern": "auth_failed", "matches": 1, "seen": "…" }
+            { "source": "log", "detector": "pods.containers", "field": "log of container order-service, last run", "pattern": "auth_failed", "matches": 1, "seen": "…" }
           ]
         }
       ]

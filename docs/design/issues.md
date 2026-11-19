@@ -25,7 +25,7 @@ build phases 0–8 or the D, G, L, P, R, S and T phases. All work happens on the
 one commit per phase, as in v1.4 and v1.5. Each phase is reviewed before it is committed, and the
 next phase starts only after that.
 
-**Status (2026-11-18):** in progress: I0–I6 done, I7 next.
+**Status (2026-11-18):** done, released in v1.6.0.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -237,7 +237,7 @@ backend/internal/signals/detect_*.go  detectors, one file per area (pods, worklo
 backend/internal/signals/logs/  reading, pattern matching and template counting; nothing kept
 backend/internal/server/        issues.go: the /issues endpoints
 frontend/src/pages/             Issues.jsx
-frontend/src/components/        HealthBadge, SignalList, Evidence
+frontend/src/components/        HealthBadge, IssueList, Evidence
 ```
 
 `signals` imports `resources` (for `Source`, `Kinds()` and the status helpers), `bus` and `graph`
@@ -318,8 +318,8 @@ detector that raises it and where it is read from.
 | `rollout_stuck`           | critical | Deployment      | condition `Progressing=False`, reason `ProgressDeadlineExceeded`             |
 | `job_failed`              | warning  | Job             | condition `Failed=True`                                                      |
 | `create_failed`           | critical | ReplicaSet, StatefulSet, DaemonSet, Job | `FailedCreate` events (quota, admission, a missing ServiceAccount) |
-| `selector_matches_nothing` | warning | Service         | the graph's dangling `selects`                                               |
-| `no_ready_endpoints`      | critical | Service         | it selects pods, and none of its endpoints is ready                          |
+| `selector_matches_nothing` | warning | Service         | its selector against its namespace's pods, as the graph's dangling `selects`, for 2 minutes |
+| `no_ready_endpoints`      | critical | Service         | it selects pods, and none of its endpoints is ready, for 2 minutes since the last one's `Ready` went false |
 | `backend_missing`         | critical | Ingress, HTTPRoute | a `routes` edge to a missing Service                                      |
 | `route_not_accepted`      | critical | HTTPRoute       | a parent's `Accepted=False`, or `ResolvedRefs=False`                         |
 | `gateway_not_programmed`  | critical | Gateway         | `Programmed=False`                                                           |
@@ -347,8 +347,9 @@ Issues page says so.
 
 ### Durations
 
-Several types wait before they open (`replicas_unavailable`, `pvc_unbound`, `mount_failed`: 2
-minutes), so a normal rollout or a slow provisioner doesn't raise a signal. The wait starts from the
+Several types wait before they open (`replicas_unavailable`, `pvc_unbound`, `mount_failed`,
+`selector_matches_nothing`, `no_ready_endpoints`: 2 minutes), so a normal rollout, a Service applied
+just before its pods, or a slow provisioner doesn't raise a signal. The wait starts from the
 earliest timestamp the object itself gives (a condition's `lastTransitionTime`, an event's
 `firstTimestamp`), not from when Opscope saw it. A pod that has been Pending for an hour when
 Opscope starts is a signal at once.
@@ -467,12 +468,12 @@ Goal: detail pages and Topology show health from the same engine.
 
 Goal: v1.6.0 is ready to tag.
 
-- [ ] Bugs found on the way fixed, one commit each
-- [ ] README features and screenshots; `CONTRIBUTING.md` (adding a detector, adding a signal type)
-- [ ] `docs/deployment.md`: what's read from logs and why, memory, the in-memory history
-- [ ] Every check CI runs: `make test`, `go vet`, `gofmt`, the frontend build, `make docker-build`
-- [ ] Image tag in `deploy/kubernetes/opscope.yaml` and the manifest URLs set to v1.6.0
-- [ ] Status line, design record table, release notes drafted (the tag is pushed by the maintainer)
+- [x] Bugs found on the way fixed, one commit each (two, both from the screenshots: see notes)
+- [x] README features and screenshots; `CONTRIBUTING.md` (adding a detector, adding a signal type)
+- [x] `docs/deployment.md`: what's read from logs and why, memory, the in-memory history
+- [x] Every check CI runs: `make test`, `go vet`, `gofmt`, the frontend build, `make docker-build`
+- [x] Image tag in `deploy/kubernetes/opscope.yaml` and the manifest URLs set to v1.6.0
+- [x] Status line, design record table, release notes drafted (the tag is pushed by the maintainer)
 
 ## Not in this release
 
@@ -803,3 +804,81 @@ Goal: v1.6.0 is ready to tag.
 - **Not checked with Gateway API or metrics-server in the browser:** multipass, which has both,
   wasn't reachable (its VMs were stopped), and neither kind cluster has them. The Gateway API
   detectors are tested on fakes (I3), and nothing in this phase depends on either.
+
+### I7: Release (2026-11-18)
+
+- On `docs/issues`, as one more commit after I6, rather than on a release branch after merging as
+  v1.5 did (decided with the maintainer, 2026-11-18): one pull request for all of v1.6.0.
+- **Two bugs found while taking the screenshots on kind, each fixed in its own commit:**
+  - **A crash loop resolved and opened again with every restart** (`5a9c658`). Once a crash
+    loop's back-off grows, the kubelet shows the container as terminated for more than a minute
+    after each crash (about 75–90 seconds at a 2m40s back-off) before it waits in
+    CrashLoopBackOff again: longer than the 60-second resolve delay. The first-seen time reset and
+    the Resolved tab filled with crash loops that never stopped. A container that has restarted,
+    has just exited after a run shorter than the kubelet's 10-minute back-off reset, and will run
+    again is now still crash-looping; one that ran for hours and exited once isn't. Watched on the
+    `crash` pod through a full cycle: the signal stayed open and kept its first-seen time.
+  - **A crash loop's log could be read mid-run** (`a09c269`). The "previous run" was read whenever
+    the container had crash-looped, even while it ran again, and between runs that isn't always the
+    run that ended: a read found only the first line a run writes ("starting"), missed the
+    "connection refused" after it, and kept that for five minutes. Now the run that just ended is
+    read: the previous one while the container waits out its back-off, the current one while it
+    shows terminated, and nothing while it runs. Either counts against the same five-minute limit;
+    the evidence says "last run".
+- **Screenshots:** the Issues page of `issues-test` with the crash loop open to its evidence, and
+  the failing Deployment `stuck`'s page, light and dark, taken as before (1440 × 900 at 2×, scaled
+  to 1600 × 1000) from a build stamped v1.6.0, on the `opscope-rollouts` kind cluster with
+  `issues.yaml`: multipass, used for earlier releases' screenshots, wasn't reachable. Taken with a
+  small script driving headless Chrome over its DevTools protocol, as in v1.4; Chrome's own
+  `--screenshot` with a virtual-time budget never settles, since the live stream keeps the page
+  busy. The crash pod was recreated so its issue was the newest, at the top of the list.
+- **README:** the Issues feature, health on the map and on detail pages, the palette's issue
+  commands, a log-signals line in the Security section, and the two screenshots in the gallery.
+  **CONTRIBUTING:** `internal/signals/` in the layout, pages without a sidebar entry (`hiddenPages`)
+  in place of `graphOnly`, and new sections on adding a detector and adding a signal type.
+- **Version:** the manifest's image, the manifest URLs in the README and `docs/deployment.md`, the
+  image tag table, the health example in `docs/api.md` and the bug report placeholder say v1.6.0;
+  `check-manifest-tag.sh v1.6.0` passes. The record is in the design records table, and I in the
+  list of phase letters taken.
+- **Checks:** `make test` (Go and 156 frontend tests), `go vet`, `gofmt`, `go test -race ./...`,
+  `npm ci` and the frontend build, `make docker-build` (whose image answers `/api/health` with
+  v1.6.0), and the image for `linux/amd64` as CI builds it.
+- **Release notes** drafted for the maintainer, in the v1.5 notes' shape: what's new, upgrading
+  (no new permissions; log signals on by default and how to turn them off; the TLS expiry date
+  kept with the Secret role; volume usage read in the background when on; memory; live data off;
+  the overview's counts now from issues), and notes.
+- **Pre-release check (2026-11-19).** The record read again against the code, phase by phase, then
+  every feature tried on kind: `issues.yaml` live and with `OPSCOPE_LIVE=false`, and the
+  permissions scenario's users (`team-a`, allowed into one namespace; `no-watch`, which can't
+  watch; and `shipped`, the manifest's ClusterRole without the Secret role) on `opscope-graph`.
+  What it found, all fixed:
+  - **Under-done against the record:** the Revisions table had no age column; the issues and
+    health endpoints ignored `at` instead of answering 400 for history (contract 2); evidence
+    didn't link to where it can be seen (a field to the YAML tab, an event to Events, a log to
+    Logs); two lines of the record described an earlier design.
+  - **`create_failed` went away while the problem stayed.** A controller retries a failing create
+    with a back-off that reaches about 16 minutes, longer than the 10-minute event window. A
+    ReplicaSet's `ReplicaFailure` condition now counts for as long as it lasts, and the others'
+    `FailedCreate` events for 20 minutes.
+  - **A Service in front of a fresh Deployment raised a critical issue.** `no_ready_endpoints`
+    and `selector_matches_nothing` opened at once, so pods still starting, or a Service applied a
+    moment before its pods, opened issues that then sat under Resolved for an hour. Both now wait
+    2 minutes, as `replicas_unavailable` does; the endpoints wait counts from when the last
+    selected pod's `Ready` went false, so a Service down for an hour when Opscope starts opens at
+    once. A fresh Deployment and Service with a 25-second readiness delay now raise nothing.
+  - **`team-a` across all namespaces said every object looked healthy.** It can't list pods
+    cluster-wide, so the engine saw none. The page now says Opscope isn't allowed to read pods and
+    points to the namespace picker, and leaves out the "can't read" list, which said the same.
+  - **Answers worked out on request said "for 4s".** With no history, an issue's start is unknown
+    unless the object gives it: `firstSeen` is now left out, and the row says nothing.
+  - **Glitches:** a list of one said "1 serviceaccounts" (every list page did, since v1.0); the
+    lists, the overview and the Issues page's kind filter now share one `singular`, which also
+    keeps "Ingress" whole. At 375 px an evidence row broke inside a word ("C / rashLoopBackOff"):
+    a field and its value were set apart by a margin, not a space.
+  - Checked and left as they are: the overview's "16 need attention" counts the objects in its
+    rows (pods, workloads, claims), where Issues lists 28, Services and Ingresses among them;
+    answers worked out on request don't read logs (`docs/api.md` now says so); and every detail
+    page polls every 10 seconds, as since v1.4.
+  - **Checks:** `go test -race ./...`, `go vet`, 159 frontend tests and the build; the live test
+    on `issues.yaml` (every promised signal, within 2 minutes now that the Service types wait);
+    and each page in the browser in both themes and at 375 px, with no console errors.
