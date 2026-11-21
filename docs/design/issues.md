@@ -882,3 +882,13 @@ Goal: v1.6.0 is ready to tag.
   - **Checks:** `go test -race ./...`, `go vet`, 159 frontend tests and the build; the live test
     on `issues.yaml` (every promised signal, within 2 minutes now that the Service types wait);
     and each page in the browser in both themes and at 375 px, with no console errors.
+- **Asked for before the release (2026-11-21):**
+  - **The Topology panel links to pages.** Its "Open Deployment" button, which v1.5's record
+    promised, showed only on the map around one object, and there not for that object itself:
+    on a namespace map there is no focus, and `n.pods?.owner !== focus` compared `undefined`
+    with `undefined`. It now shows for any card with a page. Each connection under "Needs" and
+    "Needed by" also gets a link to its object's page (a chevron beside the button that picks
+    the card on the map); missing and unreadable objects, and kinds without a page, get none. The
+    panel and the list share one `pageOf` (`graph/view.js`), so the list now also links a
+    ReplicaSet's own pods to the ReplicaSet. Checked on kind: a namespace map, a group of pods
+    (to its Deployment), the map around one object, light and dark, and 375 px.

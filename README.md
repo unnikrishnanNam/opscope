@@ -43,7 +43,8 @@ machine or inside the cluster it shows.
   ServiceAccount), where traffic goes from Ingresses and routes, and which node each pod runs on.
   Every connection says which field it was read from, and something referred to that doesn't
   exist (a missing Secret, a Service with no pods) is shown as missing. Cards that are failing or
-  degraded say so. The map updates live and also comes as a list, for the keyboard and screen
+  degraded say so. Selecting a card lists what it needs and what needs it, each a link to that
+  object's page. The map updates live and also comes as a list, for the keyboard and screen
   readers.
 - **Issues:** what's wrong right now, worst first, in plain words: crash loops, images that can't
   be pulled, pods that can't be scheduled, rollouts that stopped, Services with no ready

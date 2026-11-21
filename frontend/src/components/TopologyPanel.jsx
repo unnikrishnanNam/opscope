@@ -3,13 +3,13 @@ import { Link, useLocation } from "react-router";
 import { useApi } from "../api.js";
 import { issuesLink } from "../pages/issuesRequest.js";
 import { countOf, kindIcon, pluralKind, relation } from "../graph/kinds.js";
-import { cardKind } from "../graph/view.js";
+import { cardKind, pageOf } from "../graph/view.js";
 import { detailPath, nsQuery } from "../sections.js";
 import Button from "./Button.jsx";
 import HealthBadge from "./HealthBadge.jsx";
 import { SEVERITY } from "./IssueList.jsx";
 import { gapTag, statusText, troubleOf } from "./TopologyGraph.jsx";
-import { ArrowLeftIcon, ArrowRightIcon, CloseIcon, EndpointSlicesIcon, NamespaceIcon } from "./icons.jsx";
+import { ArrowLeftIcon, ArrowRightIcon, ChevronRightIcon, CloseIcon, EndpointSlicesIcon, NamespaceIcon } from "./icons.jsx";
 import "./TopologyPanel.css";
 
 // TopologyPanel shows the card selected on a map: what it is, any gap it
@@ -17,8 +17,8 @@ import "./TopologyPanel.css";
 // side and leaves the map usable, so picking another card shows that one.
 //
 //   view         the shaped view (graph/view.js); id, the selected card
-//   focus        the map's own object, whose page is the one open
-//   clusterId    for links to objects' pages
+//   clusterId    for links to objects' pages: the selected one's, and each
+//                connection's beside it
 //   onSelect(id) picks another card; onClose() closes the panel
 //   expanded, onExpand(owner, on)  workloads whose pods are shown one by one
 // Name keeps an object's name in one piece in a sentence: "team-a" never
@@ -27,7 +27,7 @@ function Name({ children }) {
   return <span className="topo-note-name">{children}</span>;
 }
 
-export default function TopologyPanel({ view, id, focus, clusterId, level = 3, onSelect, onClose, expanded, onExpand }) {
+export default function TopologyPanel({ view, id, clusterId, level = 3, onSelect, onClose, expanded, onExpand }) {
   const Title = `h${level}`;
   const titleId = useId();
   const titleRef = useRef(null);
@@ -43,7 +43,7 @@ export default function TopologyPanel({ view, id, focus, clusterId, level = 3, o
 
   if (!n) return null;
   const Icon = kindIcon(n.resource);
-  const page = n.id !== focus && n.pods?.owner !== focus ? pageOf(clusterId, n) : null;
+  const page = pageOf(clusterId, n);
   const canExpand = onExpand && n.pods;
   const canGroup = onExpand && expanded?.has(n.id);
 
@@ -109,7 +109,7 @@ export default function TopologyPanel({ view, id, focus, clusterId, level = 3, o
         <div className="topo-panel-actions">
           {page && (
             <Button size="sm" to={page.path + search}>
-              Open {page.label}
+              Open {page.kind}
             </Button>
           )}
           {canExpand && (
@@ -131,7 +131,7 @@ export default function TopologyPanel({ view, id, focus, clusterId, level = 3, o
 
       {n.pods && <Members clusterId={clusterId} n={n} search={search} level={level + 1} />}
 
-      <Connections id={id} view={view} nodes={nodes} onSelect={onSelect} level={level + 1} />
+      <Connections id={id} view={view} nodes={nodes} clusterId={clusterId} search={search} onSelect={onSelect} level={level + 1} />
     </aside>
   );
 }
@@ -262,8 +262,8 @@ function Members({ clusterId, n, search, level }) {
 // Connections lists the card's edges in two parts: what it needs (edges
 // from it) and what needs it (edges to it), each by how it reads ("Uses",
 // "Selected by"). Each is a button that picks the card at the other end,
-// with what the edge was read from.
-function Connections({ id, view, nodes, onSelect, level }) {
+// with what the edge was read from, and a link to that object's page.
+function Connections({ id, view, nodes, clusterId, search, onSelect, level }) {
   const Heading = `h${level}`;
   const sides = [
     { out: true, title: "Needs", Icon: ArrowRightIcon, about: "What this object depends on." },
@@ -295,7 +295,15 @@ function Connections({ id, view, nodes, onSelect, level }) {
             <p className="topo-rel-words">{words}</p>
             <ul className="topo-rel-list">
               {list.map(({ e, other }) => (
-                <Connection key={e.id} e={e} other={other} here={nodes.get(id)} onSelect={onSelect} />
+                <Connection
+                  key={e.id}
+                  e={e}
+                  other={other}
+                  here={nodes.get(id)}
+                  page={pageOf(clusterId, other)}
+                  search={search}
+                  onSelect={onSelect}
+                />
               ))}
             </ul>
           </div>
@@ -304,7 +312,7 @@ function Connections({ id, view, nodes, onSelect, level }) {
     ));
 }
 
-function Connection({ e, other, here, onSelect }) {
+function Connection({ e, other, here, page, search, onSelect }) {
   const OtherIcon = kindIcon(other.resource);
   const tag = gapTag(other);
   const notes = unique((e.evidence ?? []).map((ev) => ev.note).filter(Boolean));
@@ -315,17 +323,22 @@ function Connection({ e, other, here, onSelect }) {
   const inPods = total && e.count ? (e.count === total ? `in all ${total} pods` : `in ${e.count} of ${total} pods`) : null;
   return (
     <li className="topo-rel-item">
-      <button type="button" className={`topo-pick topo-pick-${other.presence}`} onClick={() => onSelect(other.id)}>
-        <OtherIcon size={14} className="topo-pick-icon" />
-        <span className="topo-pick-kind">{cardKind(other)}</span>
-        <span className="topo-pick-name">{other.name}</span>
-        {tag && (
-          <span className="topo-pick-tag">
-            <tag.Icon size={12} />
-            <span>{tag.label}</span>
-          </span>
+      <div className="topo-rel-row">
+        <button type="button" className={`topo-pick topo-pick-${other.presence}`} onClick={() => onSelect(other.id)}>
+          <OtherIcon size={14} className="topo-pick-icon" />
+          <span className="topo-pick-kind">{cardKind(other)}</span>
+          <span className="topo-pick-name">{other.name}</span>
+          {tag && (
+            <span className="topo-pick-tag">
+              <tag.Icon size={12} />
+              <span>{tag.label}</span>
+            </span>
+          )}
+        </button>
+        {page && (
+          <Button size="sm" variant="quiet" icon={ChevronRightIcon} label={`Open ${page.kind} ${other.name}`} to={page.path + search} />
         )}
-      </button>
+      </div>
       {(notes.length > 0 || inPods || e.optional) && (
         <p className="topo-rel-notes">
           {[notes.slice(0, 3).join(", ") + (notes.length > 3 ? `, +${notes.length - 3} more` : ""), inPods, e.optional && "optional"]
@@ -347,28 +360,6 @@ function Connection({ e, other, here, onSelect }) {
       )}
     </li>
   );
-}
-
-// pageOf is the page to open for a card: the object's own, or for a group
-// of pods, their workload's. Missing and unknown objects have none.
-function pageOf(clusterId, n) {
-  if (!clusterId || n.presence !== "present") return null;
-  if (n.pods) {
-    const [resource, namespace, name] = splitId(n.pods.owner, n);
-    const path = resource && detailPath(clusterId, resource, namespace, name);
-    return path && { path, label: n.pods.ownerKind };
-  }
-  const path = detailPath(clusterId, n.resource, n.namespace, n.name);
-  return path && { path, label: n.kind };
-}
-
-// splitId reads a group's owner back from its node: the owner's own fields,
-// since IDs are UIDs.
-function splitId(owner, group) {
-  const resource = { Deployment: "deployments", StatefulSet: "statefulsets", DaemonSet: "daemonsets", Job: "jobs", ReplicaSet: "replicasets", CronJob: "cronjobs" }[
-    group.pods.ownerKind
-  ];
-  return [resource, group.namespace, group.name];
 }
 
 function unique(list) {

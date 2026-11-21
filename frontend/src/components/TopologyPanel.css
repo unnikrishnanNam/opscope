@@ -249,11 +249,19 @@
   min-width: 0;
 }
 
-.topo-pick {
+/* The card's button, and the link to its page beside it. */
+.topo-rel-row {
   display: flex;
   align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.topo-pick {
+  display: flex;
+  flex: 1;
+  align-items: center;
   gap: 6px;
-  width: 100%;
   min-width: 0;
   min-height: 30px;
   padding: 4px 8px;

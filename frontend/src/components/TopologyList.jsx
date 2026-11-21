@@ -2,8 +2,8 @@ import { useMemo } from "react";
 import { Link, useLocation } from "react-router";
 import { kindIcon, relation } from "../graph/kinds.js";
 import { layout } from "../graph/layout.js";
-import { cardKind } from "../graph/view.js";
-import { detailPath, nsQuery } from "../sections.js";
+import { cardKind, pageOf } from "../graph/view.js";
+import { nsQuery } from "../sections.js";
 import HealthBadge from "./HealthBadge.jsx";
 import { gapTag, statusText, troubleOf } from "./TopologyGraph.jsx";
 import "./TopologyList.css";
@@ -106,16 +106,6 @@ function Item({ n, view, nodes, focus, clusterId, search }) {
 // Name links to the object's page, or for a group of pods to their
 // workload's, when there is one.
 function Name({ n, clusterId, search }) {
-  let path = null;
-  if (clusterId && n.presence === "present") {
-    if (n.pods) {
-      const resource = { Deployment: "deployments", StatefulSet: "statefulsets", DaemonSet: "daemonsets", Job: "jobs", CronJob: "cronjobs" }[
-        n.pods.ownerKind
-      ];
-      path = resource && detailPath(clusterId, resource, n.namespace, n.name);
-    } else {
-      path = detailPath(clusterId, n.resource, n.namespace, n.name);
-    }
-  }
-  return path ? <Link to={path + search}>{n.name}</Link> : n.name;
+  const page = pageOf(clusterId, n);
+  return page ? <Link to={page.path + search}>{n.name}</Link> : n.name;
 }

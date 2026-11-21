@@ -102,7 +102,6 @@ export default function TopologyView({ answer, clusterId, label, height, fitKey,
               <TopologyPanel
                 view={view}
                 id={shown}
-                focus={view.focus}
                 clusterId={clusterId}
                 level={level}
                 onSelect={(id) => {
