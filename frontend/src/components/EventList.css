@@ -114,3 +114,21 @@
 .event-issue:hover {
   color: var(--text);
 }
+
+/* A warning whose issue has resolved: still listed (Kubernetes keeps the
+   event), but quieter, and marked so. */
+.event-done .event-warning,
+.event-done .event-reason-warning {
+  color: var(--text-subtle);
+}
+
+.event-issue-resolved {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--ok);
+}
+
+.event-issue-resolved svg {
+  align-self: center;
+}

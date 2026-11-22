@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardKind, shape, statusSummary, unreadable, worstHealth } from "./view.js";
+import { cardKind, pageOf, shape, statusSummary, unreadable, worstHealth } from "./view.js";
 
 // Answers shaped like GET /graph/…: node(id) for "resource/namespace/name".
 const KINDS = {
@@ -167,5 +167,22 @@ describe("worstHealth", () => {
     expect(worstHealth([h("healthy"), h("degraded")])).toEqual({ state: "degraded" });
     expect(worstHealth([h("healthy"), h(null)])).toEqual({ state: "healthy" });
     expect(worstHealth([h(null), h(null)])).toBe(null);
+  });
+});
+
+describe("pageOf", () => {
+  const present = { presence: "present", resource: "services", kind: "Service", namespace: "shop", name: "web" };
+  it("is the object's own page", () => {
+    expect(pageOf("lab", present)).toEqual({ path: "/c/lab/network/services/shop/web", kind: "Service" });
+  });
+  it("is a group's workload's page", () => {
+    const group = { ...present, resource: "pods", kind: "Pod", name: "api", pods: { owner: "uid-api", ownerKind: "ReplicaSet", members: [] } };
+    expect(pageOf("lab", group)).toEqual({ path: "/c/lab/workloads/replicasets/shop/api", kind: "ReplicaSet" });
+  });
+  it("is nothing for a missing or unreadable object, a kind without a page, or no cluster", () => {
+    expect(pageOf("lab", { ...present, presence: "missing" })).toBeNull();
+    expect(pageOf("lab", { ...present, presence: "unknown" })).toBeNull();
+    expect(pageOf("lab", { ...present, resource: undefined, kind: "Installation" })).toBeNull();
+    expect(pageOf(undefined, present)).toBeNull();
   });
 });

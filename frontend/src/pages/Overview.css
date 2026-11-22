@@ -206,6 +206,28 @@
 
 /* Resources: a row per kind */
 
+/* The card's rows share one grid, so the state column is as wide as its
+   widest text ("None released or failed", "12 not programmed") and the bars
+   line up across groups. Groups, lists and rows pass it down as subgrids. */
+.resource-groups {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  column-gap: var(--space-4);
+}
+
+.resource-group,
+.resource-rows,
+.resource-item {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+}
+
+.resource-group-title {
+  grid-column: 1 / -1;
+}
+
 .resource-group + .resource-group {
   margin-top: var(--space-4);
 }
@@ -218,19 +240,13 @@
 }
 
 .resource-rows {
-  margin: 0 calc(-1 * var(--space-2));
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
 /* A row: the kind's link to its list, then what needs attention, which
    links to the Issues page when there's something. */
-.resource-item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 128px;
-  align-items: center;
-  gap: var(--space-4);
-}
 
 .resource-row {
   display: grid;
@@ -238,6 +254,8 @@
   align-items: center;
   gap: var(--space-4);
   min-height: 38px;
+  /* Its hover background reaches into the card's padding; the text lines up with the titles. */
+  margin-left: calc(-1 * var(--space-2));
   padding: 0 var(--space-2);
   border-radius: var(--radius);
   color: inherit;
@@ -258,6 +276,10 @@
   gap: 10px;
   min-width: 0;
   font-weight: var(--weight-strong);
+}
+
+.resource-label {
+  min-width: 0;
 }
 
 .resource-name svg {
@@ -295,6 +317,8 @@
   align-self: stretch;
   display: flex;
   align-items: center;
+  /* As the row: the text starts where a plain state's does. */
+  margin: 0 calc(-1 * var(--space-2));
   padding: 0 var(--space-2);
   border-radius: var(--radius);
   text-decoration: none;
@@ -305,15 +329,24 @@
   text-decoration: underline;
 }
 
+/* On a phone there's no bar, and no room for both a long name and a long
+   state on one line: the names keep their width, and a state like "None
+   released or failed" wraps instead. */
 @media (max-width: 640px) {
-  .resource-item {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--space-3);
+  .resource-groups {
+    grid-template-columns: minmax(min-content, 1fr) minmax(0, max-content);
+    column-gap: var(--space-3);
   }
 
   .resource-row {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(min-content, 1fr) auto;
     gap: var(--space-3);
+    padding-block: var(--space-1);
+  }
+
+  .resource-state,
+  .resource-state .status {
+    white-space: normal;
   }
 
   .resource-bar {
@@ -388,4 +421,11 @@
 
 .node-row-usage .usage-track {
   flex: 1;
+}
+
+/* Under "Recent warnings": what the list is, and where to look instead. */
+.overview-warnings-about {
+  margin-bottom: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
 }

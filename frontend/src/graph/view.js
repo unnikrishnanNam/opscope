@@ -1,3 +1,4 @@
+import { detailPath } from "../sections.js";
 import { countOf } from "./kinds.js";
 
 // shape turns a graph answer (GET /api/clusters/{id}/graph/…) into what a
@@ -155,6 +156,25 @@ export function statusSummary(pods) {
 // have (Gateway API) has nothing to read, so it isn't a gap.
 export function unreadable(partial) {
   return (partial ?? []).filter((p) => p.code !== "not_installed");
+}
+
+// pageOf is where a card's object can be read in full: its own page, or for
+// a group of pods, their workload's. It's { path, kind }, or null for a
+// missing or unreadable object, or a kind without a page.
+const OWNER_RESOURCES = {
+  Deployment: "deployments",
+  StatefulSet: "statefulsets",
+  DaemonSet: "daemonsets",
+  ReplicaSet: "replicasets",
+  Job: "jobs",
+  CronJob: "cronjobs",
+};
+export function pageOf(clusterId, n) {
+  if (!clusterId || n.presence !== "present") return null;
+  // A group card has its workload's namespace and name.
+  const [resource, kind] = n.pods ? [OWNER_RESOURCES[n.pods.ownerKind], n.pods.ownerKind] : [n.resource, n.kind];
+  const path = resource && detailPath(clusterId, resource, n.namespace, n.name);
+  return path ? { path, kind } : null;
 }
 
 export function cardKind(n) {

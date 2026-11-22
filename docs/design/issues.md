@@ -25,7 +25,7 @@ build phases 0–8 or the D, G, L, P, R, S and T phases. All work happens on the
 one commit per phase, as in v1.4 and v1.5. Each phase is reviewed before it is committed, and the
 next phase starts only after that.
 
-**Status (2026-11-18):** done, released in v1.6.0.
+**Status (2026-11-22):** done, released in v1.6.0.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -882,3 +882,49 @@ Goal: v1.6.0 is ready to tag.
   - **Checks:** `go test -race ./...`, `go vet`, 159 frontend tests and the build; the live test
     on `issues.yaml` (every promised signal, within 2 minutes now that the Service types wait);
     and each page in the browser in both themes and at 375 px, with no console errors.
+- **Asked for before the release (2026-11-21):**
+  - **The Topology panel links to pages.** Its "Open Deployment" button, which v1.5's record
+    promised, showed only on the map around one object, and there not for that object itself:
+    on a namespace map there is no focus, and `n.pods?.owner !== focus` compared `undefined`
+    with `undefined`. It now shows for any card with a page. Each connection under "Needs" and
+    "Needed by" also gets a link to its object's page (a chevron beside the button that picks
+    the card on the map); missing and unreadable objects, and kinds without a page, get none. The
+    panel and the list share one `pageOf` (`graph/view.js`), so the list now also links a
+    ReplicaSet's own pods to the ReplicaSet. Checked on kind: a namespace map, a group of pods
+    (to its Deployment), the map around one object, light and dark, and 375 px.
+  - **Recent warnings say when their problem has gone.** A warning event stays in Kubernetes'
+    list for about an hour after its cause is fixed, and the overview's card showed it the same
+    either way; the "In Issues" tag just went away when its issue resolved. The overview now also
+    asks for the last hour's resolved issues (only when there are warnings): a warning whose issue
+    is open keeps "In Issues", one whose issue has resolved is marked "Resolved", linked to it on
+    the Resolved tab, and drawn in quieter colours. Warnings that raised no issue are left as they
+    are: Opscope hasn't judged them. A line under the card's title says what the list is, and
+    points to Issues for what's wrong now. No tabs for "active" warnings: an event has no state,
+    so the only way to know one still matters is to read the object, which is what Issues does.
+    Checked on kind: a pod with a missing ConfigMap volume went from "In Issues" to "Resolved" on
+    its own a minute after the ConfigMap was created, and the link opens the resolved issue;
+    light and dark, and 375 px.
+  - **The overview's states fit their column.** Each row of the Resources card was its own
+    grid, with a fixed 128 px column for what needs attention, and "None released or failed"
+    (139 px) ran past the card; so did a problem with a link's padding and dot, like "12 not
+    programmed" (about 150 px). The card is now one grid, passed down to groups and rows as
+    subgrids, with the state column as wide as its widest text, so the bars still line up across
+    groups. On a phone, where there's no bar, a long kind's name breaks between its words
+    (Persistent·Volume·Claims) rather than run into its count, and a state wraps only when it
+    still doesn't fit. Checked on multipass (read-only) and kind at 1024, 900, 768 and 375 px,
+    light and dark: no row past the card, names and states lined up with the group titles.
+  - These three went to `docs/issues` after pull request #24 had been merged at `79ae5bb`
+    (2026-11-19), so they reach `main` in a second pull request from the same branch, before
+    the tag.
+- **Release check (2026-11-22).** Every phase's list ticked, each `[~]` explained in its notes;
+  the version in the manifest, its URLs, the image tag table, the health example and the bug
+  report placeholder all v1.6.0, and `check-manifest-tag.sh v1.6.0` passes; `go vet`, `gofmt`,
+  `go test -race ./...`, `npm ci`, 162 frontend tests and the build; CI green on #24; no open
+  issues (one Dependabot pull request, #21, a `docker/login-action` bump, left to the
+  maintainer). **Screenshots retaken:** the overview's dated from v1.4 (stamped v1.4.0, before
+  the issue counts, and showing the overflow fixed above), taken again on multipass, which is
+  healthy now. The map around one object dated from v1.5, without health: it's now the
+  `issues-test` map on kind with the failing Deployment `no-config` selected, its panel showing
+  its health, its three issues and its links. Taken as before, stamped v1.6.0. The namespace
+  map, pods and storage screenshots show nothing v1.6 changed and are kept. The release notes
+  mention the panel's links and the warnings' state.
