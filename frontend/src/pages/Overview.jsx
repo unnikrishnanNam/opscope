@@ -169,11 +169,13 @@ export default function Overview({ page }) {
         <div className="overview-grid">
           <div className="overview-main">
             <Card title="Resources" aside={namespace ? `in ${namespace}` : "all namespaces"}>
-              <ResourceGroup title="Workloads" items={o.workloads} to={to} issuesTo={issuesTo} />
-              {/* gatewayAPI is null when the cluster doesn't have Gateway API. */}
-              {o.gatewayAPI && <ResourceGroup title="Gateway API" items={o.gatewayAPI} to={to} issuesTo={issuesTo} />}
-              {/* storage is null when there are no claims or volumes, or they can't be listed. */}
-              {o.storage && <ResourceGroup title="Storage" items={o.storage} to={to} issuesTo={issuesTo} />}
+              <div className="resource-groups">
+                <ResourceGroup title="Workloads" items={o.workloads} to={to} issuesTo={issuesTo} />
+                {/* gatewayAPI is null when the cluster doesn't have Gateway API. */}
+                {o.gatewayAPI && <ResourceGroup title="Gateway API" items={o.gatewayAPI} to={to} issuesTo={issuesTo} />}
+                {/* storage is null when there are no claims or volumes, or they can't be listed. */}
+                {o.storage && <ResourceGroup title="Storage" items={o.storage} to={to} issuesTo={issuesTo} />}
+              </div>
             </Card>
             <Card
               title="Pods by status"
@@ -415,6 +417,12 @@ function UsageCell({ usage, field, what, format }) {
   );
 }
 
+// breakable("PersistentVolumeClaims") lets a kind's name break between its
+// words (Persistent·Volume·Claims) when there's no room, as on a phone.
+function breakable(label) {
+  return label.split(/(?<=[a-z])(?=[A-Z])/).flatMap((part, i) => (i ? [<wbr key={i} />, part] : [part]));
+}
+
 // One group of resource kinds ("Workloads", "Gateway API", "Storage"), a row each:
 // name, count, a bar of healthy against not, and what needs attention.
 // A row's count of what needs attention links to the Issues page, filtered
@@ -434,7 +442,7 @@ function ResourceGroup({ title, items, to, issuesTo }) {
               <Link className="resource-row" to={to(p.path)}>
                 <span className="resource-name">
                   <p.icon size={16} />
-                  {w.label ?? p.label}
+                  <span className="resource-label">{breakable(w.label ?? p.label)}</span>
                 </span>
                 <span className="resource-count">{w.total}</span>
                 <span className="resource-bar" aria-hidden="true">

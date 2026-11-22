@@ -904,3 +904,12 @@ Goal: v1.6.0 is ready to tag.
     Checked on kind: a pod with a missing ConfigMap volume went from "In Issues" to "Resolved" on
     its own a minute after the ConfigMap was created, and the link opens the resolved issue;
     light and dark, and 375 px.
+  - **The overview's states fit their column.** Each row of the Resources card was its own
+    grid, with a fixed 128 px column for what needs attention, and "None released or failed"
+    (139 px) ran past the card; so did a problem with a link's padding and dot, like "12 not
+    programmed" (about 150 px). The card is now one grid, passed down to groups and rows as
+    subgrids, with the state column as wide as its widest text, so the bars still line up across
+    groups. On a phone, where there's no bar, a long kind's name breaks between its words
+    (Persistent·Volume·Claims) rather than run into its count, and a state wraps only when it
+    still doesn't fit. Checked on multipass (read-only) and kind at 1024, 900, 768 and 375 px,
+    light and dark: no row past the card, names and states lined up with the group titles.
