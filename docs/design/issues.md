@@ -25,7 +25,7 @@ build phases 0–8 or the D, G, L, P, R, S and T phases. All work happens on the
 one commit per phase, as in v1.4 and v1.5. Each phase is reviewed before it is committed, and the
 next phase starts only after that.
 
-**Status (2026-11-18):** done, released in v1.6.0.
+**Status (2026-11-22):** done, released in v1.6.0.
 
 **Legend:** `[x]` done · `[ ]` not done yet · `[~]` partly done or changed (see notes)
 
@@ -913,3 +913,18 @@ Goal: v1.6.0 is ready to tag.
     (Persistent·Volume·Claims) rather than run into its count, and a state wraps only when it
     still doesn't fit. Checked on multipass (read-only) and kind at 1024, 900, 768 and 375 px,
     light and dark: no row past the card, names and states lined up with the group titles.
+  - These three went to `docs/issues` after pull request #24 had been merged at `79ae5bb`
+    (2026-11-19), so they reach `main` in a second pull request from the same branch, before
+    the tag.
+- **Release check (2026-11-22).** Every phase's list ticked, each `[~]` explained in its notes;
+  the version in the manifest, its URLs, the image tag table, the health example and the bug
+  report placeholder all v1.6.0, and `check-manifest-tag.sh v1.6.0` passes; `go vet`, `gofmt`,
+  `go test -race ./...`, `npm ci`, 162 frontend tests and the build; CI green on #24; no open
+  issues (one Dependabot pull request, #21, a `docker/login-action` bump, left to the
+  maintainer). **Screenshots retaken:** the overview's dated from v1.4 (stamped v1.4.0, before
+  the issue counts, and showing the overflow fixed above), taken again on multipass, which is
+  healthy now. The map around one object dated from v1.5, without health: it's now the
+  `issues-test` map on kind with the failing Deployment `no-config` selected, its panel showing
+  its health, its three issues and its links. Taken as before, stamped v1.6.0. The namespace
+  map, pods and storage screenshots show nothing v1.6 changed and are kept. The release notes
+  mention the panel's links and the warnings' state.
