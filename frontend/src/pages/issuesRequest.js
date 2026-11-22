@@ -70,8 +70,9 @@ export function withFilter(params, name, value) {
 
 // issuesLink is a link to the Issues page, e.g. from the overview's counts:
 // issuesLink("lab", { kind: "deployments", types: ["replicas_unavailable"] }, "?ns=shop").
-export function issuesLink(clusterId, { kind, types, severity, signal } = {}, search = "") {
+export function issuesLink(clusterId, { tab, kind, types, severity, signal } = {}, search = "") {
   const q = new URLSearchParams(search);
+  if (tab === "resolved") q.set("tab", "resolved");
   if (severity) q.set("severity", severity);
   if (kind) q.set("kind", kind);
   if (types?.length) q.set("type", types.join(","));

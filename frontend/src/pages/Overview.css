@@ -389,3 +389,10 @@
 .node-row-usage .usage-track {
   flex: 1;
 }
+
+/* Under "Recent warnings": what the list is, and where to look instead. */
+.overview-warnings-about {
+  margin-bottom: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+}

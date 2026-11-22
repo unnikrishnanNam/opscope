@@ -57,6 +57,9 @@ describe("issuesRequest", () => {
       "/c/lab/issues?ns=shop&kind=deployments&type=replicas_unavailable%2Crollout_stuck",
     );
     expect(issuesLink("lab", { signal: "abc" })).toBe("/c/lab/issues?signal=abc");
+    expect(issuesLink("lab", { tab: "resolved", signal: "abc" }, "?ns=shop")).toBe(
+      "/c/lab/issues?ns=shop&tab=resolved&signal=abc",
+    );
     expect(issuesLink("lab")).toBe("/c/lab/issues");
   });
 });

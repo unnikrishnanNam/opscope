@@ -24,7 +24,8 @@ machine or inside the cluster it shows.
 ## Features
 
 - **Cluster overview:** a health summary, nodes and pods by status, CPU and memory usage, every
-  resource kind with what needs attention, and recent warning events.
+  resource kind with what needs attention, and recent warning events, each marked when the issue
+  it raised is still open or has resolved.
 - **Resources:** Nodes; Pods, Deployments, StatefulSets, DaemonSets, Jobs and CronJobs;
   ConfigMaps and Secrets; Services, Ingresses, and Gateway API Gateways, HTTPRoutes and
   GatewayClasses; PersistentVolumeClaims, PersistentVolumes and StorageClasses. Tables filter and

@@ -1,7 +1,7 @@
 import { Link, useLocation } from "react-router";
 import { age } from "../format.js";
 import { detailPath, nsQuery } from "../sections.js";
-import { WarningIcon } from "./icons.jsx";
+import { SuccessIcon, WarningIcon } from "./icons.jsx";
 import "./EventList.css";
 
 // EventList: Kubernetes events, newest first (the backend sorts them).
@@ -9,7 +9,9 @@ import "./EventList.css";
 // when it was last seen and how many times.
 //   showObject     include the object (off on an object's own page)
 //   showNamespace  prefix objects with their namespace (across namespaces)
-//   issueOf        optional: the link to the issue an event is evidence for
+//   issueOf        optional: the issue an event is evidence for, { to, resolved }.
+//                  A warning whose issue has resolved is marked so, and quieter:
+//                  the event stays in Kubernetes' list after the problem's gone.
 export default function EventList({ clusterId, events, showObject = true, showNamespace = false, emptyText, issueOf }) {
   const search = nsQuery(useLocation().search);
   if (events.length === 0) return <p className="event-list-empty">{emptyText}</p>;
@@ -20,8 +22,9 @@ export default function EventList({ clusterId, events, showObject = true, showNa
         const warning = e.type === "Warning";
         const link = showObject && detailPath(clusterId, e.objectResource, e.namespace, e.objectName);
         const issue = issueOf?.(e);
+        const done = warning && issue?.resolved;
         return (
-          <li key={e.uid || `${e.namespace}/${e.name}`} className="event">
+          <li key={e.uid || `${e.namespace}/${e.name}`} className={`event ${done ? "event-done" : ""}`}>
             <span className="event-mark">
               {warning ? <WarningIcon size={14} className="event-warning" /> : <span className="event-dot" />}
               <span className="visually-hidden">{warning ? "Warning:" : "Normal:"}</span>
@@ -35,11 +38,17 @@ export default function EventList({ clusterId, events, showObject = true, showNa
                     {link ? <Link to={link + search}>{e.object}</Link> : e.object}
                   </span>
                 )}
-                {issue && (
-                  <Link className="event-issue" to={issue}>
-                    In Issues
-                  </Link>
-                )}
+                {issue &&
+                  (issue.resolved ? (
+                    <Link className="event-issue event-issue-resolved" to={issue.to} title="The issue this raised has resolved">
+                      <SuccessIcon size={12} />
+                      Resolved
+                    </Link>
+                  ) : (
+                    <Link className="event-issue" to={issue.to}>
+                      In Issues
+                    </Link>
+                  ))}
               </div>
               <p className="event-message">{e.message}</p>
             </div>

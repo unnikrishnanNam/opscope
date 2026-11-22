@@ -892,3 +892,15 @@ Goal: v1.6.0 is ready to tag.
     panel and the list share one `pageOf` (`graph/view.js`), so the list now also links a
     ReplicaSet's own pods to the ReplicaSet. Checked on kind: a namespace map, a group of pods
     (to its Deployment), the map around one object, light and dark, and 375 px.
+  - **Recent warnings say when their problem has gone.** A warning event stays in Kubernetes'
+    list for about an hour after its cause is fixed, and the overview's card showed it the same
+    either way; the "In Issues" tag just went away when its issue resolved. The overview now also
+    asks for the last hour's resolved issues (only when there are warnings): a warning whose issue
+    is open keeps "In Issues", one whose issue has resolved is marked "Resolved", linked to it on
+    the Resolved tab, and drawn in quieter colours. Warnings that raised no issue are left as they
+    are: Opscope hasn't judged them. A line under the card's title says what the list is, and
+    points to Issues for what's wrong now. No tabs for "active" warnings: an event has no state,
+    so the only way to know one still matters is to read the object, which is what Issues does.
+    Checked on kind: a pod with a missing ConfigMap volume went from "In Issues" to "Resolved" on
+    its own a minute after the ConfigMap was created, and the link opens the resolved issue;
+    light and dark, and 375 px.
