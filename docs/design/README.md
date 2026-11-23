@@ -65,8 +65,8 @@ Goal: <what works at the end of this phase>.
 
 Each phase ends with Opscope working, the tests passing and its notes written. Number phases with a
 letter not used before, so phase names never collide across records. Taken so far: the numbers
-0–8 (the first build) and the letters D, G (the first topology attempt, taken out of `main`), I, L,
-P, R, S and T.
+0–8 (the first build) and the letters C, D, G (the first topology attempt, taken out of `main`), I,
+L, P, R, S and T.
 
 Once the work is released, update the status line and add the record to the table above. Its content
 then stays as it was: later changes get their own record or are described in the current
